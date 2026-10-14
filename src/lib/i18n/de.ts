@@ -201,7 +201,6 @@ export const de = {
 	'error.model_overlap': 'Die neue Version überschneidet sich mit einer späteren Arbeitsmodell-Version.',
 	'error.opening_exists': 'Es gibt bereits einen Anfangsstand. Weitere Änderungen erfasst du als Korrektur.',
 	'error.suggestion_resolved': 'Dieser Vorschlag wurde bereits bearbeitet.',
-	'error.range_too_large': 'Der Zeitraum ist zu groß (höchstens 93 Tage).',
 
 	'common.yes': 'Ja',
 	'common.no': 'Nein',

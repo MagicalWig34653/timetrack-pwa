@@ -220,14 +220,17 @@ export interface DeviceTokenCreated extends DeviceToken {
 	token: string;
 }
 
-// --- Planning and vacation (contracts/openapi.yaml v0.3.0) ---
+// --- Planning and vacation (contracts/openapi.yaml v0.3.1) ---
 
 export interface VacationSettings {
+	/** Read-only: false while nothing is stored; GET then returns the defaults (200). */
+	configured?: boolean;
 	/** ISO 3166-2, e.g. DE-ST */
 	region: string;
 	/** half days: 30 days = 60 */
 	annualEntitlementHalfDays: number;
-	carryOverHalfDays?: number;
+	/** Carry-over per vacation year in half days, e.g. {"2026": 8}; missing = 0. */
+	carryOverByYear?: Record<string, number>;
 	/** MM-DD or null */
 	carryOverExpiry?: string | null;
 }
@@ -235,6 +238,8 @@ export interface VacationSettings {
 export interface VacationBalance {
 	year: number;
 	snapshotDate?: string | null;
+	/** Stored remaining days of the snapshot; entitlement and carry-over of the year are 0 then. */
+	snapshotRemainingHalfDays?: number | null;
 	entitlementHalfDays: number;
 	carryOverHalfDays: number;
 	adjustmentHalfDays: number;
@@ -242,6 +247,24 @@ export interface VacationBalance {
 	plannedHalfDays: number;
 	availableHalfDays: number;
 	availableAfterPlannedHalfDays: number;
+}
+
+export interface VacationSnapshotEntry {
+	id: string;
+	date: string;
+	remainingHalfDays: number;
+}
+
+export interface VacationAdjustmentEntry {
+	id: string;
+	date: string;
+	halfDays: number;
+	reason: string;
+}
+
+export interface VacationEntries {
+	snapshots: VacationSnapshotEntry[];
+	adjustments: VacationAdjustmentEntry[];
 }
 
 export type AbsenceKind = 'vacation' | 'sick' | 'other';

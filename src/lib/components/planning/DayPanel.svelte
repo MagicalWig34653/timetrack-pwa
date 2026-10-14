@@ -118,14 +118,15 @@
 				<Button variant="outline" onclick={() => (mode = { type: 'custom' })}>{t('calendar.add_custom')}</Button>
 			</div>
 		{:else if mode.type === 'absence'}
-			{#key mode.absence?.id ?? 'new'}
+			{#key `${mode.absence?.id ?? 'new'}:${mode.absence?.version ?? 0}`}
 				<AbsenceForm
 					absence={mode.absence}
 					date={info.date}
 					onsaved={() => done(t('absence.saved'))}
 					oncancel={() => (mode = { type: 'none' })}
-					onstale={() => {
-						mode = { type: 'none' };
+					onstale={(fresh) => {
+						// Reopen on the server's current version; the calendar data is refreshed in the background.
+						mode = fresh ? { type: 'absence', absence: fresh } : { type: 'none' };
 						onchanged();
 					}}
 				/>

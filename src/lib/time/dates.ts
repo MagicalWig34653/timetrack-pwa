@@ -99,6 +99,16 @@ export function addDays(date: string, days: number): string {
 	return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}`;
 }
 
+/** Splits [from, to] into consecutive ranges of at most `maxDays` days (inclusive), e.g. for range-limited endpoints. */
+export function splitRange(from: string, to: string, maxDays: number): { from: string; to: string }[] {
+	const chunks: { from: string; to: string }[] = [];
+	for (let start = from; start <= to; start = addDays(start, maxDays)) {
+		const end = addDays(start, maxDays - 1);
+		chunks.push({ from: start, to: end < to ? end : to });
+	}
+	return chunks;
+}
+
 /** ISO weekday of a local day: 1 = Monday .. 7 = Sunday. */
 export function isoWeekday(date: string): number {
 	const [y, m, d] = date.split('-').map(Number);

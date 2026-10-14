@@ -28,6 +28,36 @@ test('calendar: create an approved vacation from a day, see it in the grid and i
 	await context.close();
 });
 
+test('day view: an approved vacation sets the target to 0 with a neutral note (C9 behaviour)', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser);
+	await page.goto('/time/2031-03-12');
+	await expect(page.getByTestId('day-target')).toHaveText('0:00');
+	await expect(page.getByTestId('day-target-note')).toContainText('Soll 0: Der Tag ist als „Urlaub“ gewertet.');
+	await page.goto('/time/2031-03-17');
+	await expect(page.getByTestId('day-target')).not.toHaveText('0:00');
+	await expect(page.getByTestId('day-target-note')).toHaveCount(0);
+	await context.close();
+});
+
+test('vacation: list manual entries of the year and delete one after confirmation', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser);
+	await page.goto('/vacation');
+	for (let i = new Date().getFullYear(); i < 2031; i++) await page.getByRole('button', { name: 'Folgejahr' }).click();
+	await expect(page.getByTestId('entries-empty')).toBeVisible();
+	await page.getByLabel('Datum').last().fill('2031-04-01');
+	await page.getByLabel('Tage (+ oder −)').fill('1');
+	await page.getByLabel('Grund').fill('Gutschrift Test');
+	await page.getByRole('button', { name: 'Korrektur speichern' }).click();
+	const entry = page.getByTestId('vacation-entry');
+	await expect(entry).toContainText('Korrektur 01.04.2031: +1 Tag');
+	await expect(page.getByTestId('balance-available')).toHaveText('26 Tage');
+	await entry.getByRole('button', { name: 'Löschen' }).click();
+	await entry.getByRole('button', { name: 'Jetzt löschen' }).click();
+	await expect(page.getByTestId('entries-empty')).toBeVisible();
+	await expect(page.getByTestId('balance-available')).toHaveText('25 Tage');
+	await context.close();
+});
+
 test('absence overlap is explained in German and nothing is saved', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser);
 	await page.goto(`/calendar?date=${monday}`);

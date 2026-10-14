@@ -15,7 +15,7 @@ export const dePlanning = {
 	'vacation.year_nav': 'Urlaubsjahr wechseln',
 	'vacation.previous_year': 'Vorjahr',
 	'vacation.next_year': 'Folgejahr',
-	'vacation.not_configured': 'Dein Urlaubsanspruch ist noch nicht eingerichtet. Solange nichts gespeichert ist, rechnet der Server mit 0 Tagen. Trage unten deine Werte ein und speichere sie.',
+	'vacation.not_configured': 'Deine Urlaubseinstellungen sind noch nicht gespeichert. Angezeigt werden Standardwerte; sie gelten erst, wenn du sie unten speicherst.',
 	'vacation.balance_title': 'Urlaubskonto {year}',
 	'vacation.balance_formula': 'Verfügbar = Anspruch + Übertrag + Korrekturen − gebuchter Urlaub. Geplanter Urlaub wird erst abgezogen, wenn er genehmigt ist.',
 	'vacation.balance_with_snapshot': 'Für dieses Jahr gilt ein Stichtagsbestand: Er ersetzt Anspruch, Übertrag und alles davor. Gerechnet wird ab dem Stichtag.',
@@ -46,8 +46,8 @@ export const dePlanning = {
 	'vacation.region_hint': 'Bestimmt die gesetzlichen Feiertage, an denen kein Urlaub verbraucht wird.',
 	'vacation.entitlement': 'Jahresanspruch (Tage)',
 	'vacation.entitlement_hint': 'Zum Beispiel 30 oder 28,5.',
-	'vacation.carry': 'Übertrag (Tage)',
-	'vacation.carry_hint': 'Resturlaub aus dem Vorjahr, falls kein Stichtagsbestand gilt.',
+	'vacation.carry': 'Übertrag für {year} (Tage)',
+	'vacation.carry_hint': 'Resturlaub, der aus dem Vorjahr in {year} mitgenommen wird. Gilt nicht, wenn für {year} ein Stichtagsbestand eingetragen ist. Andere Jahre bleiben unverändert.',
 	'vacation.expiry': 'Verfall des Übertrags (optional)',
 	'vacation.expiry_hint': 'Tag und Monat, zum Beispiel 31.03. Leer lassen, wenn der Übertrag nicht verfällt.',
 	'vacation.error_days': 'Bitte gib Tage als ganze oder halbe Zahl an, zum Beispiel 12 oder 12,5.',
@@ -68,6 +68,15 @@ export const dePlanning = {
 	'vacation.adjustment_days_hint': 'Zum Beispiel 1 für eine Gutschrift oder -0,5 für einen Abzug.',
 	'vacation.adjustment_save': 'Korrektur speichern',
 	'vacation.adjustment_saved': 'Korrektur gespeichert.',
+	'vacation.entries_title': 'Eingetragene Stichtage und Korrekturen {year}',
+	'vacation.entries_text': 'Alles, was du für dieses Jahr von Hand eingetragen hast. Löschen ändert das Konto sofort.',
+	'vacation.entries_empty': 'Für dieses Jahr gibt es keine eingetragenen Stichtage oder Korrekturen.',
+	'vacation.entry_snapshot': 'Stichtag {date}: {days} Resturlaub',
+	'vacation.entry_adjustment': 'Korrektur {date}: {days}',
+	'vacation.entry_delete': 'Löschen',
+	'vacation.entry_delete_now': 'Jetzt löschen',
+	'vacation.entry_cancel': 'Abbrechen',
+	'vacation.entry_deleted': 'Eintrag gelöscht.',
 
 	// absences
 	'absence.kind.vacation': 'Urlaub',
@@ -111,7 +120,7 @@ export const dePlanning = {
 	'absence.stale_text': 'Deine Änderung wurde nicht gespeichert. Lade die aktuelle Fassung und versuche es dann noch einmal.',
 	'absence.stale_reload': 'Aktuelle Fassung laden',
 	'absence.counted': 'Zählt: {days}',
-	'absence.workdays': 'Betrifft {days} an Arbeitstagen',
+	'absence.no_vacation_use': 'Verbraucht keinen Urlaub',
 	'absence.counts_not': 'Zählt nicht',
 	'absence.document_line': 'Unterlagen: {status}',
 	'absence.document_submitted_line': 'eingereicht am {date}',
@@ -122,7 +131,7 @@ export const dePlanning = {
 	'absences.filter_kind': 'Art',
 	'absences.filter_all': 'Alle',
 	'absences.empty': 'Keine Abwesenheiten für diese Auswahl.',
-	'absences.footnote': 'Abwesenheiten dürfen sich nicht überschneiden. Abgelehnte und stornierte Einträge zählen nicht.',
+	'absences.footnote': 'Abwesenheiten dürfen sich nicht überschneiden. Abgelehnte und stornierte Einträge zählen nicht und blockieren keine anderen Abwesenheiten.',
 
 	// calendar and plan
 	'calendar.title': 'Kalender',
@@ -176,8 +185,8 @@ export const dePlanning = {
 	'share.scope.actual': 'Tatsächliche Zeiten',
 	'share.scope.vacation': 'Urlaub',
 	'share.scope_text.plan': 'Die geplante Arbeitsform je Tag (Büro, Homeoffice, Kunde, Schule, frei), ohne Notizen.',
-	'share.scope_text.actual': 'Nur bewerteten Beginn, bewertetes Ende und Dauer je Tag, keine Orte, Notizen oder Einzelabschnitte.',
-	'share.scope_text.vacation': 'Nur Zeiträume, die als Urlaub erkennbar sind.',
+	'share.scope_text.actual': 'Nur bewerteten Beginn, bewertetes Ende und Dauer an Tagen mit Arbeitszeit, keine Orte, Notizen oder Einzelabschnitte.',
+	'share.scope_text.vacation': 'Nur genehmigter oder genommener Urlaub als Zeiträume. Geplanter oder nur beantragter Urlaub wird nicht gezeigt.',
 	'share.never_title': 'Das wird nie geteilt',
 	'share.never_notes': 'Notizen',
 	'share.never_places': 'Orte',
@@ -225,8 +234,15 @@ export const dePlanning = {
 	'shared.col_time': 'Bewertet von–bis',
 	'shared.col_duration': 'Dauer',
 
+	// day view hints (absences and holidays feed into the evaluation)
+	'day.target_note_zero': 'Soll 0: Der Tag ist als „{mark}“ gewertet.',
+	'day.target_note_half': 'Soll halbiert: halber Urlaubstag.',
+
 	// errors
 	'error.absence_overlap': 'In diesem Zeitraum gibt es bereits eine andere Abwesenheit. Abwesenheiten dürfen sich nicht überschneiden.',
 	'error.recipient_not_found': 'Dieses Konto wurde nicht gefunden. Prüfe den Kontonamen.',
-	'error.share_exists': 'Für dieses Konto gibt es bereits eine Freigabe. Ändere die vorhandene Freigabe.'
+	'error.share_exists': 'Für dieses Konto gibt es bereits eine Freigabe. Ändere die vorhandene Freigabe.',
+	'error.share_self': 'Du kannst nichts an dein eigenes Konto freigeben.',
+	'error.share_invalid': 'Die Freigabe wurde abgelehnt. Prüfe den Kontonamen; an das eigene Konto kann nichts freigegeben werden.',
+	'error.range_too_large': 'Der gewählte Zeitraum ist zu groß. Wähle einen kürzeren Zeitraum.'
 } as const;

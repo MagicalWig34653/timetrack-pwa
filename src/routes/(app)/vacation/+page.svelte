@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { api, ApiError } from '#lib/api/client.js';
-	import type { VacationBalance, VacationSettings } from '#lib/api/types.js';
+	import { api } from '#lib/api/client.js';
+	import type { VacationBalance, VacationEntries, VacationSettings } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import Unavailable from '#lib/components/planning/Unavailable.svelte';
 	import VacationBalanceCard from '#lib/components/planning/VacationBalanceCard.svelte';
+	import VacationEntryList from '#lib/components/planning/VacationEntryList.svelte';
 	import VacationEntryForms from '#lib/components/planning/VacationEntryForms.svelte';
 	import VacationSettingsForm from '#lib/components/planning/VacationSettingsForm.svelte';
 	import { Alert } from '#lib/components/ui/alert/index.js';
@@ -19,9 +20,9 @@
 	let load = $state<LoadState>({ status: 'loading' });
 	let year = $state(Number(todayLocal(zoneStore.value).slice(0, 4)));
 	let balance = $state<VacationBalance | null>(null);
-	/** null = not configured on the server (404); the form then offers the ADR-0005 defaults as a suggestion. */
+	/** GET vacation/settings always answers 200; `configured: false` means the defaults are not saved yet (v0.3.1). */
 	let settings = $state<VacationSettings | null>(null);
-	let settingsLoaded = $state(false);
+	let entries = $state<VacationEntries>({ snapshots: [], adjustments: [] });
 	let today = $state(todayLocal(zoneStore.value));
 
 	async function refresh() {
@@ -29,14 +30,8 @@
 			const zone = await zoneStore.ensure();
 			today = todayLocal(zone);
 			balance = await api.getVacationBalance(year);
-			try {
-				settings = await api.getVacationSettings();
-			} catch (e) {
-				// The balance endpoint exists, so a 404 here means "not configured yet".
-				if (e instanceof ApiError && e.status === 404) settings = null;
-				else throw e;
-			}
-			settingsLoaded = true;
+			settings = await api.getVacationSettings();
+			entries = await api.listVacationEntries(year);
 			load = { status: 'ready' };
 		} catch (error) {
 			load = toLoadState(error);
@@ -75,11 +70,16 @@
 				<a class="underline underline-offset-4" href="/calendar">{t('nav.calendar')}</a>
 			</span>
 		</nav>
-		{#if settingsLoaded && settings === null}
+		{#if settings && settings.configured === false}
 			<Alert variant="warning" data-testid="settings-missing">{t('vacation.not_configured')}</Alert>
 		{/if}
 		<VacationBalanceCard {balance} {settings} />
 		<VacationEntryForms {today} onsaved={saved} />
-		<VacationSettingsForm {settings} onsaved={(next) => { settings = next; void refresh(); }} />
+		<VacationEntryList {year} {entries} ondeleted={refresh} />
+		{#if settings}
+			{#key year}
+				<VacationSettingsForm {settings} {year} onsaved={(next) => { settings = next; void refresh(); }} />
+			{/key}
+		{/if}
 	</div>
 {/if}
