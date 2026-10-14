@@ -8,12 +8,12 @@ export const deTransfer = {
 	'error.range_too_large': 'Der Zeitraum ist zu lang. Erlaubt sind höchstens 366 Tage.',
 	'error.file_too_large': 'Die Datei ist größer als erlaubt.',
 	'error.unsupported_type': 'Dieser Dateityp wird nicht angenommen.',
-	'error.import_unreadable': 'Die Datei konnte nicht gelesen werden. Prüfe, ob es eine gültige CSV-Datei ist.',
-	'error.import_already_committed': 'Dieser Import wurde schon übernommen.',
-	'error.import_not_mapped': 'Ordne zuerst die Spalten zu und prüfe die Vorschau.',
+	'error.import_not_ready': 'Dieser Import ist in seinem jetzigen Zustand nicht möglich: Er wurde schon übernommen oder zurückgenommen oder die Spalten sind noch nicht geprüft.',
 	'error.import_has_errors': 'Die Vorschau enthält Fehlerzeilen. Behebe sie oder überspringe sie ausdrücklich.',
-	'error.import_not_committed': 'Dieser Import wurde nicht übernommen und kann daher nicht zurückgenommen werden.',
-	'error.import_rollback_conflict': 'Der Import kann nicht zurückgenommen werden, weil einzelne Einträge seitdem geändert wurden.',
+	'error.rollback_conflict': 'Der Import kann nicht zurückgenommen werden, weil einzelne Einträge seitdem geändert wurden.',
+	'error.too_many_rows': 'Die Datei enthält zu viele Zeilen (höchstens 20 000).',
+	'error.storage_unavailable': 'Der Speicherort dieser Datei ist gerade nicht erreichbar oder nicht mehr eingerichtet. Bitte den Betreiber fragen.',
+	'error.storage_corrupt': 'Die gespeicherte Datei ist beschädigt und kann nicht geliefert werden.',
 
 	// export
 	'export.title': 'Export',
