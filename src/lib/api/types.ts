@@ -510,3 +510,61 @@ export interface ExternalIdentity {
 	linkedAt: string;
 	lastUsedAt?: string | null;
 }
+
+// Berichtsheft (contract v0.6.0, ADR-0008)
+export interface LearningFieldInput {
+	number?: number | null;
+	name: string;
+	sortOrder?: number;
+}
+
+export interface LearningField extends LearningFieldInput {
+	id: string;
+}
+
+export interface ReportEntryInput {
+	date: string;
+	learningFieldId?: string | null;
+	/** name snapshot; with learningFieldId the server takes over the current name */
+	learningField: string;
+	durationSeconds?: number;
+	notes?: string;
+}
+
+export interface ReportEntry extends ReportEntryInput {
+	id: string;
+	version: number;
+	createdAt: string;
+	/** true for later AI-created, not yet confirmed drafts */
+	draft?: boolean;
+}
+
+export type ReportStatus = 'draft' | 'done';
+
+export interface ReportWeek {
+	year: number;
+	week: number;
+	startDate: string;
+	endDate: string;
+	status: ReportStatus;
+	entries: ReportEntry[];
+	totalSeconds: number;
+	byLearningField: { learningField: string; seconds: number }[];
+	/** evaluated working time of the week from time tracking; a hint only */
+	trackedWorkSeconds?: number;
+	sourceCount: number;
+}
+
+export interface ReportSourceInput {
+	year: number;
+	week: number;
+	date?: string | null;
+	note?: string | null;
+	fileId?: string | null;
+}
+
+export interface ReportSource extends ReportSourceInput {
+	id: string;
+	createdAt: string;
+	file?: FileMeta | null;
+}

@@ -4,6 +4,7 @@
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import DaySummary from '#lib/components/time/DaySummary.svelte';
 	import DayTimeline from '#lib/components/time/DayTimeline.svelte';
+	import ReportsTeaser from '#lib/components/reports/ReportsTeaser.svelte';
 	import SegmentList from '#lib/components/time/SegmentList.svelte';
 	import TimerCard from '#lib/components/time/TimerCard.svelte';
 	import Unavailable from '#lib/components/time/Unavailable.svelte';
@@ -121,5 +122,7 @@
 				</CardContent>
 			</Card>
 		{/if}
+
+		<ReportsTeaser />
 	</div>
 {/if}
