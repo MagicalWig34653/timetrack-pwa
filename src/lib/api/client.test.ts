@@ -18,6 +18,11 @@ describe('api client', () => {
 		expect(mock.calls[0].csrf).toBeUndefined();
 	});
 
+	it('accepts a bodyless 202 response (PUT /me/recovery/email)', async () => {
+		vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 202 })));
+		await expect(api.enableEmailRecovery('user@example.org')).resolves.toBeUndefined();
+	});
+
 	it('adopts the CSRF token from a session response and sends it on mutating calls', async () => {
 		const options = await api.loginOptions();
 		const session = await api.loginVerify(options.challengeId, { id: 'mock-login' });
