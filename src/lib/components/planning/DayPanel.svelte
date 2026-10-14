@@ -11,6 +11,7 @@
 	import { formatDuration } from '#lib/time/format.js';
 	import { markLabel } from '#lib/time/labels.js';
 	import { formatHalfDays } from '#lib/vacation/halfdays.js';
+	import { untrack } from 'svelte';
 	import AbsenceForm from './AbsenceForm.svelte';
 	import CustomDayForm from './CustomDayForm.svelte';
 	import PlanDayForm from './PlanDayForm.svelte';
@@ -23,8 +24,11 @@
 	let error = $state('');
 
 	// A different day starts with a clean panel.
+	let shownDate = untrack(() => info.date);
 	$effect(() => {
-		void info.date;
+		// Reloaded data for the same day keeps notice and form state.
+		if (info.date === shownDate) return;
+		shownDate = info.date;
 		mode = { type: 'none' };
 		notice = '';
 		error = '';
