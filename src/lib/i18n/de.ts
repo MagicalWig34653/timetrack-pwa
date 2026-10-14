@@ -112,7 +112,7 @@ export const de = {
 	'recovery.codes.copy_all': 'Alle kopieren',
 	'recovery.codes.download': 'Als Datei speichern',
 	'recovery.codes.confirm_saved': 'Ich habe die Codes sicher gespeichert.',
-	'recovery.codes.remaining': 'Noch {count} Codes übrig.',
+	'recovery.codes.remaining': 'Übrige Codes: {count}',
 	'recovery.codes.generate': 'Codes erzeugen',
 	'recovery.codes.regenerate': 'Neue Codes erzeugen',
 	'recovery.codes.regenerate_warning': 'Die bisherigen Codes werden dadurch ungültig.',

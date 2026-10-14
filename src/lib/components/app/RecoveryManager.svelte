@@ -203,7 +203,6 @@
 						label={status.fallbackPassword.active ? t('recovery.password.new') : t('recovery.password.label')}
 						hint={t('recovery.password.hint')}
 						bind:value={password}
-						minlength={12}
 						maxlength={256}
 						required
 					/>

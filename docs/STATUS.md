@@ -11,3 +11,11 @@ Globale Aufgaben/Entscheidungen: ../../timetrack-backend/docs/STATUS.md und ARBE
 Nachtrag 14.10.2026: Sprachregel in AGENTS.md verbindlich ergänzt (Details im Backend).
 Nur Dokumentation geändert; Diff geprüft, keine Builds erneut ausgeführt.
 Lokalisierungsressourcen für die bisherigen direkt eingebetteten deutschen UI-Texte noch offen.
+
+## Stand 14.10.2026 – Paket L1 (Branch l1-auth-ui)
+
+Vorhanden: Kontenoberfläche (Einladung/Registrierung, Login mit Passkey, Wiederherstellung, Passkey-/Recovery-/Sitzungsverwaltung,
+Admin-Einladungen), SPA ohne SSR mit Routenwächter, getippter API-Client, WebAuthn-Helfer, deutsche Lokalisierung in `src/lib/i18n/de.ts`,
+Mock-API (`npm run dev:mock`), Dev-Proxy `/api` -> 127.0.0.1:18080. Geprüft: `npm run check` (0 Fehler), `npm test` (31 grün),
+`npm run build`, Mock-Durchlauf in Headless-Chromium. NICHT geprüft: echtes Backend, echter Authenticator, mobile Breite/Dunkelmodus per Screenshot.
+Details und offene Vertragsfragen: `docs/handoffs/L1.md`. Noch kein Manifest/Service Worker.
