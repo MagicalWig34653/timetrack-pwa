@@ -165,6 +165,11 @@ export interface DayEvaluation {
 	evaluatedEnd?: string | null;
 	provisional: boolean;
 	segmentIds: string[];
+	/** Contract v0.2.1: segments of this working day (without voided ones). */
+	segments?: Segment[];
+	/** Contract v0.2.1: credit set on the day mark and the day note, so the form can be pre-filled. */
+	markCreditSeconds?: number | null;
+	note?: string | null;
 	breakHints: { code: BreakHintCode }[];
 }
 

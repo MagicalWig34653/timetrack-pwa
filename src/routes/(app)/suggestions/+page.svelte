@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { api } from '#lib/api/client.js';
+	import { ApiError } from '#lib/api/errors.js';
 	import type { Place, Suggestion } from '#lib/api/types.js';
 	import Field from '#lib/components/app/Field.svelte';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
@@ -76,6 +77,11 @@
 			await refresh();
 		} catch (e) {
 			error = errorMessage(e);
+			if (e instanceof ApiError && e.code === 'suggestion_resolved') {
+				// Already decided elsewhere (second device): drop the form and show the current list.
+				acceptingId = null;
+				await refresh();
+			}
 		} finally {
 			pending = false;
 		}
@@ -91,6 +97,7 @@
 			await refresh();
 		} catch (e) {
 			error = errorMessage(e);
+			if (e instanceof ApiError && e.code === 'suggestion_resolved') await refresh();
 		} finally {
 			pending = false;
 		}

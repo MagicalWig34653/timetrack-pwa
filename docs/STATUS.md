@@ -34,3 +34,14 @@ Dashboard `/` (Timer, Tagesverlauf roh/bewertet, Soll/Differenz, Zeitkonto), `/t
 Geprüft: `npm run check` 0/0, `npm test` 101 grün, `npm run build`, `npm run test:e2e` (echtes Backend, unverändert) 15 grün,
 `npm run test:e2e:mock` 6 grün (startet `dev:mock`), Screenshots 390 px und Desktop, hell/dunkel (Chromium). Nicht geprüft: echtes Backend für die neuen Seiten,
 Firefox/WebKit, Pfeiltasten-/Screenreader-Durchlauf. Details und offene Vertragsfragen: `docs/handoffs/L4.md`.
+
+## Stand 14.10.2026 – Paket L5 (Branch l5-time-integration)
+
+Die Zeiterfassungs-Seiten laufen gegen das echte Swift-Backend (C1–C6, Vertrag v0.2.1): neue Spec `e2e/stage2-time.spec.ts`
+(14 Tests, eigene Backend-Instanz auf `E2E_PORT`+1, eigene SQLite-DB): Arbeitsmodell 38:30 h, Orte mit Automatikmodus,
+Timer mit Doppelklick, ADR-Beispiel (roh 6:55, bewertet 7:15, Lücke unverändert), Korrektur mit Grund und 412-Konflikt aus zweitem
+Browser-Kontext, Storno, Tagesmarkierung, Anfangsstand, Gerätetoken (nur einmal sichtbar), `automation/events` per Bearer
+(direct/suggest/off, Vorbeifahrt, Duplikat), Vorschlag annehmen/verwerfen, Kontentrennung (fremde IDs -> 404).
+Geprüft: `npm run check` 0/0, `npm test` 101 grün, `npm run build`, `npm run test:e2e` 29 grün (15 alt + 14 neu), `npm run test:e2e:mock` 6 grün.
+UI behoben: Tagesnotiz/Gutschrift werden aus v0.2.1 vorbelegt, Anfangsstand auch nach erstem Modell erfassbar, Meldung `suggestion_resolved`.
+Keine Backend-Fehler gefunden. Neue Anleitung `docs/SHORTCUTS.md` (nicht auf echtem Gerät geprüft). Details: `docs/handoffs/L5.md`.

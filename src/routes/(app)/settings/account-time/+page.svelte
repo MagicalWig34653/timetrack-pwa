@@ -118,7 +118,8 @@
 			</CardContent>
 		</Card>
 
-		{#if !account.accountStart}
+		{#if !account.accountStart || account.openingSeconds === 0}
+			<!-- accountStart may come from the first work model, so an explicit opening balance stays possible (server answers 409 opening_exists). -->
 			<Card>
 				<CardHeader>
 					<CardTitle>{t('account_time.opening_title')}</CardTitle>

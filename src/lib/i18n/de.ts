@@ -197,6 +197,7 @@ export const de = {
 	'error.no_running_timer': 'Es läuft kein Timer, der gestoppt werden könnte.',
 	'error.model_overlap': 'Die neue Version überschneidet sich mit einer späteren Arbeitsmodell-Version.',
 	'error.opening_exists': 'Es gibt bereits einen Anfangsstand. Weitere Änderungen erfasst du als Korrektur.',
+	'error.suggestion_resolved': 'Dieser Vorschlag wurde bereits bearbeitet.',
 	'error.range_too_large': 'Der Zeitraum ist zu groß (höchstens 93 Tage).',
 
 	'common.yes': 'Ja',
@@ -528,12 +529,12 @@ export const de = {
 	'devices.created_text': 'Das Token wird nur jetzt angezeigt. Kopiere es in deinen Kurzbefehl. Später ist es nicht mehr abrufbar.',
 	'devices.created_done': 'Ich habe es gespeichert',
 	'devices.help_title': 'Kurzbefehle und Automatik',
-	'devices.help_intro': 'Ein Kurzbefehl meldet Ereignisse an die Schnittstelle. Die ausführliche Anleitung folgt gesondert; hier die Eckdaten.',
+	'devices.help_intro': 'Ein Kurzbefehl meldet Ereignisse an die Schnittstelle. Die Schritt-für-Schritt-Anleitung steht in der Datei docs/SHORTCUTS.md im PWA-Repository (noch nicht auf einem echten Gerät geprüft); hier die Eckdaten.',
 	'devices.help_auth': 'Anmeldung nur über den Header „Authorization: Bearer <Token>“, ohne Cookie.',
 	'devices.help_types': 'Ereignisarten: arrival (Ankunft), presence_confirmed (Aufenthalt bestätigt), departure (Abfahrt), cancel (Abbruch, z. B. Vorbeifahrt).',
 	'devices.help_idempotent': 'Jedes Ereignis braucht eine eigene eventId (UUID). Wird dasselbe Ereignis erneut gesendet, bekommst du das erste Ergebnis zurück.',
 	'devices.help_modes': 'Was passiert, hängt vom Ort ab: „Direkt buchen“ bucht nach bestätigtem Aufenthalt, „Vorschlag“ legt einen Vorschlag an, „Aus“ hält das Ereignis nur fest.',
-	'devices.help_results': 'Mögliche Ergebnisse: booked, suggested, ignored, recorded, duplicate, needs_review.',
+	'devices.help_results': 'Mögliche Ergebnisse: booked (gebucht), suggested (Vorschlag angelegt), ignored (Vorbeifahrt, nichts gebucht), recorded (nur festgehalten), duplicate (bereits bekannt), needs_review (bitte in der App prüfen).',
 	'devices.help_no_departure': 'Eine fehlende Abfahrt beweist nichts: Ein offener Eintrag wird höchstens als Vorschlag zum Beenden markiert.',
 	'devices.help_recipe': 'Die Orts-ID findest du unter Einstellungen / Orte.'
 } as const;
