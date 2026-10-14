@@ -1,5 +1,6 @@
 import { createPlanningMock } from './planning.ts';
 import { createTimeMock } from './time.ts';
+import { createTransferMock, type UploadedFile } from './transfer.ts';
 
 // In-memory mock of the happy paths in contracts/openapi.yaml (backend repo), API v0.1.0.
 // Framework-free so it can back both the Vite dev middleware and vitest fetch stubs.
@@ -16,11 +17,15 @@ export interface MockRequest {
 	ifMatch?: string;
 	/** value of the Authorization header (device tokens for /automation/events) */
 	authorization?: string;
+	/** multipart upload (field `file`) */
+	file?: UploadedFile;
 }
 
 export interface MockResponse {
 	status: number;
 	body?: unknown;
+	/** file download; replaces the JSON body */
+	binary?: { bytes: Uint8Array; contentType: string; headers: Record<string, string> };
 	/** Value for the tt_session cookie; null clears it; undefined leaves it untouched. */
 	sessionCookie?: string | null;
 }
@@ -69,6 +74,8 @@ export interface MockOptions {
 	seedTime?: boolean;
 	/** false skips the demo vacation/plan data, the second demo account and the demo share */
 	seedPlanning?: boolean;
+	/** false mimics a server without STORAGE_SECRET_KEY: S3 storage settings are refused with 501 */
+	storageSecretKey?: boolean;
 }
 
 const uuid = () => crypto.randomUUID();
@@ -95,6 +102,13 @@ export function createMockApi(options: MockOptions = {}) {
 		displayNameOf: (id) => accounts.get(id)?.displayName ?? ''
 	});
 	time.setDayContext(planning.dayContext);
+	const transfer = createTransferMock({
+		clock: options.now ?? Date.now,
+		displayNameOf: (id) => accounts.get(id)?.displayName ?? '',
+		call: (accountId, method, path, body) => time.handle(accountId, { method, path, body }),
+		absenceExists: (accountId, absenceId) => !!planning.states.get(accountId)?.absences.some((a) => a.id === absenceId),
+		storageSecretKey: options.storageSecretKey ?? true
+	});
 	const passkeys: MockPasskey[] = [];
 	const sessions = new Map<string, MockSession>();
 	const invitations: MockInvitation[] = [];
@@ -405,6 +419,9 @@ export function createMockApi(options: MockOptions = {}) {
 			ifMatch: req.ifMatch
 		});
 		if (timeResponse) return timeResponse;
+
+		const transferResponse = transfer.handle(account.id, { method, path: req.path, body: req.body, file: req.file, role: account.role });
+		if (transferResponse) return transferResponse;
 
 		const planningResponse = planning.handle(account.id, {
 			method,
