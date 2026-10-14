@@ -208,10 +208,11 @@ export function createMockApi(options: MockOptions = {}) {
 		};
 	}
 
-	function openSession(accountId: string, recovery = false): { id: string; session: MockSession } {
+	function openSession(accountId: string, recovery = false, rememberAsLast = true): { id: string; session: MockSession } {
 		const id = randomToken();
 		const session = { accountId, csrfToken: randomToken(), recovery };
-		lastAccountId = accountId;
+		// passkey sign-in with an unknown credential falls back to this account; OIDC sessions must not hijack that
+		if (rememberAsLast) lastAccountId = accountId;
 		sessions.set(id, session);
 		return { id, session };
 	}
@@ -382,7 +383,7 @@ export function createMockApi(options: MockOptions = {}) {
 			if (flow.purpose === 'login') {
 				if (!known) return fail('oidc_not_linked');
 				known.lastUsedAt = new Date().toISOString();
-				const { id } = openSession(known.accountId);
+				const { id } = openSession(known.accountId, false, false);
 				return { status: 302, redirect: '/', sessionCookie: id };
 			}
 			if (flow.purpose === 'link') {
@@ -437,7 +438,7 @@ export function createMockApi(options: MockOptions = {}) {
 				linkedAt: new Date().toISOString(),
 				lastUsedAt: new Date().toISOString()
 			});
-			const { id, session: opened } = openSession(created.id);
+			const { id, session: opened } = openSession(created.id, false, false);
 			return { status: 201, body: sessionBody(opened), sessionCookie: id };
 		}
 
