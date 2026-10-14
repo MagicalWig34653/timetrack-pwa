@@ -54,4 +54,4 @@ Oberfläche für Urlaub, Abwesenheiten, Kalender/Planung und Freigaben gegen den
 `/absences` (Jahresliste, Filter, Bearbeiten mit If-Match), `/settings/sharing` (ausgehende Freigaben), `/shared` (eingehende Freigaben, nur Lesen).
 Urlaub wird aus ganzzahligen halben Tagen als „12,5 Tage“ gezeigt. Mock enthält TS-Port der ADR-0005-Regeln und einen Feiertagsrechner (DE-ST u. a.).
 Neue Seiten zeigen bei 404/501 „noch nicht verfügbar“. Details, Mock-Annahmen und offene Vertragsfragen: `docs/handoffs/L6.md`.
-Prüfstand: siehe Handoff (check, test, build, test:e2e, test:e2e:mock, Screenshots 390 px/Desktop hell/dunkel).
+Geprüft: `npm run check` 0/0, `npm test` 158 grün, `npm run build`, `npm run test:e2e` (echtes Backend) 29 grün, `npm run test:e2e:mock` 13 grün (+4 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR), Screenshots 390 px/Desktop hell/dunkel.
