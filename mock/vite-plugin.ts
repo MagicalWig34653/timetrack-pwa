@@ -23,7 +23,9 @@ export function mockApiPlugin(): Plugin {
 					path: '/api' + (req.url ?? ''),
 					body: raw ? JSON.parse(raw) : undefined,
 					cookies,
-					csrfToken: Array.isArray(csrf) ? csrf[0] : csrf
+					csrfToken: Array.isArray(csrf) ? csrf[0] : csrf,
+					ifMatch: req.headers['if-match'] as string | undefined,
+					authorization: req.headers.authorization
 				});
 				res.statusCode = result.status;
 				if (result.sessionCookie !== undefined) {

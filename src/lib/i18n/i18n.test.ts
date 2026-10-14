@@ -34,8 +34,8 @@ describe('localization resource', () => {
 	});
 
 	it('maps every error code emitted by the mock API to a German message', () => {
-		const mockSource = readFileSync('mock/api.ts', 'utf8');
-		const codes = [...mockSource.matchAll(/error\(\d+, '([a-z_]+)'/g)].map((m) => m[1]);
+		const mockSource = readFileSync('mock/api.ts', 'utf8') + readFileSync('mock/time.ts', 'utf8');
+		const codes = [...mockSource.matchAll(/(?:error|fail)\(\d+, '([a-z_]+)'/g)].map((m) => m[1]);
 		expect(codes.length).toBeGreaterThan(5);
 		for (const code of codes) expect(`error.${code}` in de, code).toBe(true);
 	});

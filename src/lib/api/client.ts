@@ -1,6 +1,21 @@
 import { ApiError } from './errors';
 import type {
+	AccountAdjustmentInput,
 	CreationOptions,
+	DayEvaluation,
+	DayPreferences,
+	DeviceToken,
+	DeviceTokenCreated,
+	Place,
+	PlaceInput,
+	Segment,
+	SegmentCorrection,
+	SegmentInput,
+	SegmentKind,
+	Suggestion,
+	TimeAccount,
+	WorkModel,
+	WorkModelInput,
 	Invitation,
 	InvitationCreated,
 	Passkey,
@@ -23,8 +38,13 @@ export function setCsrfToken(token: string | null): void {
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
-	const headers: Record<string, string> = { Accept: 'application/json' };
+async function request<T>(
+	method: Method,
+	path: string,
+	body?: unknown,
+	extraHeaders: Record<string, string> = {}
+): Promise<T> {
+	const headers: Record<string, string> = { Accept: 'application/json', ...extraHeaders };
 	if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
 	if (body !== undefined) headers['Content-Type'] = 'application/json';
 
@@ -118,5 +138,54 @@ export const api = {
 	listInvitations: () => request<Invitation[]>('GET', '/admin/invitations'),
 	createInvitation: (input: { expiresInHours?: number; note?: string }) =>
 		request<InvitationCreated>('POST', '/admin/invitations', input),
-	revokeInvitation: (id: string) => request<void>('DELETE', `/admin/invitations/${id}`)
+	revokeInvitation: (id: string) => request<void>('DELETE', `/admin/invitations/${id}`),
+
+	// work models
+	listWorkModels: () => request<WorkModel[]>('GET', '/work-models'),
+	createWorkModel: (input: WorkModelInput) => request<WorkModel>('POST', '/work-models', input),
+	endWorkModel: (id: string, validTo: string) => request<WorkModel>('PATCH', `/work-models/${id}`, { validTo }),
+
+	// places
+	listPlaces: () => request<Place[]>('GET', '/places'),
+	createPlace: (input: PlaceInput) => request<Place>('POST', '/places', input),
+	updatePlace: (id: string, input: PlaceInput) => request<Place>('PUT', `/places/${id}`, input),
+	archivePlace: (id: string) => request<void>('DELETE', `/places/${id}`),
+
+	// segments and timer; `ifMatchVersion` becomes the If-Match header
+	listSegments: (from: string, to: string, includeVoided = false) =>
+		request<Segment[]>(
+			'GET',
+			`/time/segments?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${includeVoided ? '&includeVoided=true' : ''}`
+		),
+	createSegment: (input: SegmentInput) => request<Segment>('POST', '/time/segments', input),
+	correctSegment: (id: string, input: SegmentCorrection, ifMatchVersion: number) =>
+		request<Segment>('PATCH', `/time/segments/${id}`, input, { 'If-Match': String(ifMatchVersion) }),
+	voidSegment: (id: string, reason: string) =>
+		request<void>('DELETE', `/time/segments/${id}?reason=${encodeURIComponent(reason)}`),
+	currentTimer: () => request<Segment | null>('GET', '/time/timer'),
+	startTimer: (input: { clientEventId: string; kind?: SegmentKind; placeId?: string | null }) =>
+		request<Segment>('POST', '/time/timer/start', input),
+	stopTimer: (input: { clientEventId: string }) => request<Segment>('POST', '/time/timer/stop', input),
+
+	// day evaluations and time account
+	listDays: (from: string, to: string) =>
+		request<DayEvaluation[]>('GET', `/time/days?from=${from}&to=${to}`),
+	getDay: (date: string) => request<DayEvaluation>('GET', `/time/days/${date}`),
+	setDayPreferences: (date: string, input: DayPreferences) =>
+		request<DayEvaluation>('PUT', `/time/days/${date}`, input),
+	getTimeAccount: (asOf?: string) => request<TimeAccount>('GET', `/time/account${asOf ? `?asOf=${asOf}` : ''}`),
+	createAccountAdjustment: (input: AccountAdjustmentInput) =>
+		request<TimeAccount>('POST', '/time/account/adjustments', input),
+
+	// suggestions
+	listSuggestions: () => request<Suggestion[]>('GET', '/time/suggestions'),
+	acceptSuggestion: (id: string, times: { startedAt?: string; endedAt?: string } = {}) =>
+		request<Segment>('POST', `/time/suggestions/${id}/accept`, times),
+	rejectSuggestion: (id: string) => request<void>('POST', `/time/suggestions/${id}/reject`),
+
+	// device tokens
+	listDeviceTokens: () => request<DeviceToken[]>('GET', '/me/device-tokens'),
+	createDeviceToken: (input: { name: string; expiresInDays?: number }) =>
+		request<DeviceTokenCreated>('POST', '/me/device-tokens', input),
+	revokeDeviceToken: (id: string) => request<void>('DELETE', `/me/device-tokens/${id}`)
 };

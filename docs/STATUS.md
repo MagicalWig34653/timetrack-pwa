@@ -25,3 +25,12 @@ Details und offene Vertragsfragen: `docs/handoffs/L1.md`. Noch kein Manifest/Ser
 Playwright-E2E gegen das echte Swift-Backend (`npm run test:e2e`, Port `E2E_PORT`, Standard 18090, SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator):
 15 Tests grün (Bootstrap, Registrierung, Login/Logout, Passkeys, Recovery-Codes/Passwort, Einladungen, Kontentrennung, Sitzungen, Vertrag).
 Keine Backend- oder UI-Fehler gefunden. Nicht geprüft: MariaDB-Modus, E-Mail-Wiederherstellung, Firefox/WebKit. Details: `docs/handoffs/L3b.md`.
+
+## Stand 14.10.2026 – Paket L4 (Branch l4-time-ui)
+
+Zeiterfassungs-Oberfläche gegen den Vertrag v0.2.0 (nur gegen die Mock-API, das Backend implementiert die Endpunkte erst in C6):
+Dashboard `/` (Timer, Tagesverlauf roh/bewertet, Soll/Differenz, Zeitkonto), `/time`, `/time/[date]`, `/suggestions`,
+`/settings/work-model|places|account-time|devices`. Beträge immer h:mm. Timer-Aufrufe idempotent (clientEventId, Wiederholung nur bei Netzfehlern).
+Geprüft: `npm run check` 0/0, `npm test` 101 grün, `npm run build`, `npm run test:e2e` (echtes Backend, unverändert) 15 grün,
+`npm run test:e2e:mock` 6 grün (startet `dev:mock`), Screenshots 390 px und Desktop, hell/dunkel (Chromium). Nicht geprüft: echtes Backend für die neuen Seiten,
+Firefox/WebKit, Pfeiltasten-/Screenreader-Durchlauf. Details und offene Vertragsfragen: `docs/handoffs/L4.md`.
