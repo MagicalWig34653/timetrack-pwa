@@ -781,3 +781,114 @@ test('shared views never contain file information', async () => {
 	await expect(bob.page.getByText('sichtbar-nicht')).toHaveCount(0);
 	expect((await api(page, 'DELETE', `/api/v1/shares/${share.body.id}`)).status).toBe(204);
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// S3: write-only secret in the admin form, upload to Adobe S3Mock (`scripts/dev-env.sh up-s3` in the backend repo)
+
+const S3_ENDPOINT = process.env.E2E_S3_ENDPOINT ?? 'http://127.0.0.1:19090';
+const S3_BUCKET = process.env.E2E_S3_BUCKET ?? 'timetrack-dev';
+// S3Mock accepts any credentials; the secret is random per run and only used by this spec (never logged)
+const S3_SECRET = randomBytes(18).toString('hex');
+
+async function s3Keys(): Promise<string[]> {
+	const res = await fetch(`${S3_ENDPOINT}/${S3_BUCKET}?list-type=2`);
+	if (!res.ok) throw new Error(`S3Mock list failed: ${res.status}`);
+	return [...(await res.text()).matchAll(/<Key>([^<]+)<\/Key>/g)].map((m) => m[1]);
+}
+
+async function s3MockReachable(): Promise<string | null> {
+	try {
+		await s3Keys();
+		return null;
+	} catch {
+		return `Adobe S3Mock is not reachable at ${S3_ENDPOINT}/${S3_BUCKET}. Start it with "scripts/dev-env.sh up-s3" in the backend repo (or set E2E_S3_ENDPOINT / E2E_S3_BUCKET).`;
+	}
+}
+
+test('S3 settings in the admin form: the secret is write-only and never shown again', async () => {
+	const { page } = alice;
+	await page.goto('/settings/storage');
+	await expect(page.getByText('Noch kein Geheimnis gespeichert.')).toBeVisible();
+	await page.getByRole('button', { name: 'Regel hinzufügen' }).click();
+	await ruleRow(page, 1).amount.fill('1');
+	await ruleRow(page, 1).unit.selectOption('MiB');
+	await ruleRow(page, 1).backend.selectOption('db');
+	await page.getByLabel('Speicherort für alle größeren Dateien').selectOption('s3');
+	// S3 rule without S3 settings: refused in the form
+	await page.getByRole('button', { name: 'Speichern' }).click();
+	await expect(page.getByText('Endpunkt, Region, Bucket und Schlüssel-ID sind nötig, weil eine Regel S3 verwendet.')).toBeVisible();
+	await page.locator('#s3-endpoint').fill(S3_ENDPOINT);
+	await page.locator('#s3-region').fill('us-east-1');
+	await page.locator('#s3-bucket').fill(S3_BUCKET);
+	await page.locator('#s3-key-id').fill('dummy-access-key');
+	await page.locator('#s3-secret').fill(S3_SECRET);
+	await page.getByRole('button', { name: 'Speichern' }).click();
+	await expect(page.getByTestId('storage-saved')).toBeVisible();
+
+	const never = async () => {
+		await expect(page.getByTestId('secret-stored')).toHaveText('Geheimnis gespeichert');
+		await expect(page.locator('#s3-secret')).toHaveValue('');
+		expect(await page.content()).not.toContain(S3_SECRET);
+		const web = await page.evaluate(() => JSON.stringify([{ ...localStorage }, { ...sessionStorage }]));
+		expect(web).not.toContain(S3_SECRET);
+	};
+	await never();
+	const saved = await api(page, 'GET', '/api/v1/admin/storage');
+	expect(saved.body).toMatchObject({ hasSecret: true, s3: { endpoint: S3_ENDPOINT, region: 'us-east-1', bucket: S3_BUCKET, pathStyle: true, accessKeyId: 'dummy-access-key' } });
+	expect(saved.body.rules).toEqual([{ maxBytes: MIB, backend: 'db' }, { backend: 's3' }]);
+	expect(JSON.stringify(saved.body)).not.toContain(S3_SECRET);
+	expect(JSON.stringify(saved.body)).not.toMatch(/secret(AccessKey)?"\s*:\s*"/i);
+	await page.reload();
+	await never();
+	// saving again without typing a secret keeps the stored one
+	await page.locator('#s3-region').fill('eu-central-1');
+	await page.getByRole('button', { name: 'Speichern' }).click();
+	await expect(page.getByTestId('storage-saved')).toBeVisible();
+	const kept = await api(page, 'GET', '/api/v1/admin/storage');
+	expect(kept.body).toMatchObject({ hasSecret: true, s3: { region: 'eu-central-1' } });
+	await page.locator('#s3-region').fill('us-east-1');
+	await page.getByRole('button', { name: 'Speichern' }).click();
+	await expect(page.getByTestId('storage-saved')).toBeVisible();
+	await never();
+});
+
+test('S3 upload above the threshold lands on S3Mock and downloads equal the upload', async () => {
+	const reason = await s3MockReachable();
+	test.skip(reason !== null, reason ?? '');
+	const { page } = alice;
+	const before = new Set(await s3Keys());
+	const small = textBytes(1024);
+	const big = pngBytes(2 * MIB);
+	const smallMeta = await apiUpload(page, '/api/v1/files', 's3-klein.txt', small, 'text/plain');
+	expect(smallMeta.status).toBe(201);
+	expect(smallMeta.body.backend).toBe('db');
+	expect([...(await s3Keys())].filter((k) => !before.has(k))).toEqual([]); // small files never touch S3
+	const bigMeta = await apiUpload(page, '/api/v1/files', 's3-gross.png', big, 'image/png');
+	expect(bigMeta.status, JSON.stringify(bigMeta.body)).toBe(201);
+	expect(bigMeta.body.backend).toBe('s3');
+	const created = (await s3Keys()).filter((k) => !before.has(k));
+	expect(created).toHaveLength(1);
+	// the object exists on S3Mock with the exact bytes
+	const object = await fetch(`${S3_ENDPOINT}/${S3_BUCKET}/${created[0].split('/').map(encodeURIComponent).join('/')}`);
+	expect(object.status).toBe(200);
+	expect(Buffer.from(await object.arrayBuffer()).equals(big)).toBe(true);
+	expect(created[0]).not.toContain('s3-gross'); // the key does not carry the user's file name
+	// and the API serves the same bytes
+	const dl = await apiDownload(page, `/api/v1/files/${bigMeta.body.id}`);
+	expect(dl.status).toBe(200);
+	expect(dl.body.equals(big)).toBe(true);
+	expect(dl.headers['content-disposition']).toContain('s3-gross.png');
+	// attach it to an absence and download through the UI
+	expect((await api(page, 'POST', `/api/v1/absences/${ids.absence}/attachments`, { fileId: bigMeta.body.id })).status).toBe(201);
+	const section = await openAbsenceEditor(page);
+	const row = section.getByTestId('attachment').filter({ hasText: 's3-gross.png' });
+	await expect(row).toContainText('2 MiB');
+	const ui = await downloadOf(page, () => row.getByRole('button', { name: 's3-gross.png herunterladen' }).click());
+	expect(ui.bytes.equals(big)).toBe(true);
+	// removing it in the UI deletes the object on S3Mock
+	await row.getByRole('button', { name: 's3-gross.png entfernen' }).click();
+	await expect(section.getByTestId('attachment-notice')).toHaveText('Anhang entfernt.');
+	await expect.poll(async () => (await s3Keys()).includes(created[0]), { timeout: 10_000 }).toBe(false);
+	expect((await apiDownload(page, `/api/v1/files/${bigMeta.body.id}`)).status).toBe(404);
+	expect((await api(page, 'DELETE', `/api/v1/files/${smallMeta.body.id}`)).status).toBe(204);
+});
