@@ -24,6 +24,18 @@ test.describe('screenshots', () => {
 				await page.getByTestId('week-list').getByRole('link').first().click();
 				await page.waitForLoadState('networkidle');
 				await page.screenshot({ path: `${dir}/${name}-${scheme}-day.png`, fullPage: true });
+				// forms and a running timer
+				await page.getByRole('button', { name: 'Korrigieren' }).first().click();
+				await page.getByLabel(/^Grund/).fill('x');
+				await page.screenshot({ path: `${dir}/${name}-${scheme}-day-correct.png`, fullPage: true });
+				await page.goto('/settings/work-model');
+				await page.getByRole('button', { name: 'Neue Version anlegen' }).click();
+				await page.screenshot({ path: `${dir}/${name}-${scheme}-work-model-form.png`, fullPage: true });
+				await page.goto('/');
+				await page.getByRole('heading', { name: 'Zeiterfassung' }).waitFor();
+				if (await page.getByRole('button', { name: 'Start' }).isVisible()) await page.getByRole('button', { name: 'Start' }).click();
+				await page.getByTestId('elapsed').waitFor();
+				await page.screenshot({ path: `${dir}/${name}-${scheme}-home-running.png`, fullPage: true });
 				await context.close();
 			});
 		}

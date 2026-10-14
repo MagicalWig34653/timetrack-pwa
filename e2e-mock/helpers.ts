@@ -38,3 +38,16 @@ export async function loginAsAdmin(
 	await expect(page.getByRole('heading', { name: /^Hallo, / })).toBeVisible();
 	return { context, page };
 }
+
+/** Berlin dates (newest first) of the mock's seeded working days with two work segments (Mon, Tue, Wed, Fri within 14 days). */
+export function seededWorkDays(): string[] {
+	const berlin = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' });
+	const today = berlin.format(new Date());
+	const days: string[] = [];
+	for (let offset = 1; offset <= 14; offset++) {
+		const [y, m, d] = today.split('-').map(Number);
+		const date = new Date(Date.UTC(y, m - 1, d - offset));
+		if ([1, 2, 3, 5].includes(date.getUTCDay())) days.push(date.toISOString().slice(0, 10));
+	}
+	return days;
+}
