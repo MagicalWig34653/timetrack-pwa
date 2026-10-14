@@ -65,10 +65,10 @@ export interface Api {
 }
 
 /** Same-origin API call from inside the page (session cookie + CSRF header, like the PWA client). */
-export async function apiCall(page: Page, method: string, path: string, body?: unknown): Promise<Api> {
+export async function apiCall(page: Page, method: string, path: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<Api> {
 	return page.evaluate(
-		async ({ method, path, body }) => {
-			const headers: Record<string, string> = { Accept: 'application/json' };
+		async ({ method, path, body, extraHeaders }) => {
+			const headers: Record<string, string> = { Accept: 'application/json', ...extraHeaders };
 			if (method !== 'GET') {
 				const session = await (await fetch('/api/v1/auth/session', { credentials: 'include' })).json();
 				headers['X-CSRF-Token'] = session.csrfToken;
@@ -89,7 +89,7 @@ export async function apiCall(page: Page, method: string, path: string, body?: u
 			}
 			return { status: res.status, body: parsed };
 		},
-		{ method, path, body }
+		{ method, path, body, extraHeaders }
 	);
 }
 

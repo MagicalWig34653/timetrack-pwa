@@ -158,6 +158,8 @@ export function evaluateDay(input: {
 		date,
 		modelId: model?.id ?? null,
 		mark,
+		markSource: explicit ? 'explicit' : derived ? (derived.mark === 'holiday' ? 'holiday' : 'absence') : 'none',
+		targetOverrideSeconds: mark === 'holiday' || mark === 'vacation' || mark === 'sick' ? (prefs.targetOverrideSeconds ?? (derived?.halfTarget ? target : null)) : null,
 		skipFixedBreaks: !!prefs.skipFixedBreaks,
 		targetSeconds: target,
 		rawWorkSeconds,

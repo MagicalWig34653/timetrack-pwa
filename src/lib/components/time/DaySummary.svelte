@@ -11,6 +11,9 @@
 	const targetNote = $derived(
 		!markedOff ? '' : evaluation.targetSeconds === 0 ? t('day.target_note_zero', { mark: markLabel(evaluation.mark!) }) : evaluation.mark === 'vacation' ? t('day.target_note_half') : ''
 	);
+	const sourceNote = $derived(
+		!markedOff || !evaluation.markSource || evaluation.markSource === 'none' ? '' : t(`day.mark_source_${evaluation.markSource}` as 'day.mark_source_explicit')
+	);
 	const rounding = $derived(evaluation.startAdjustSeconds + evaluation.endAdjustSeconds);
 </script>
 
@@ -20,6 +23,7 @@
 		{#if evaluation.mark && evaluation.mark !== 'none'}<Badge variant="outline">{markLabel(evaluation.mark)}</Badge>{/if}
 	</div>
 	{#if targetNote}<p class="text-sm text-muted-foreground" data-testid="day-target-note">{targetNote}</p>{/if}
+	{#if sourceNote}<p class="text-xs text-muted-foreground" data-testid="day-mark-source" data-source={evaluation.markSource}>{sourceNote}</p>{/if}
 	<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
 		<div><dt class="text-muted-foreground">{t('day.target')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-target">{formatDuration(evaluation.targetSeconds)}</dd></div>
 		<div><dt class="text-muted-foreground">{t('day.raw')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-raw">{formatDuration(evaluation.rawWorkSeconds)}</dd></div>

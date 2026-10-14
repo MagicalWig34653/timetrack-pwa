@@ -30,6 +30,22 @@ describe('DaySummary absence effects', () => {
 		expect(screen.getByTestId('day-target-note')).toHaveTextContent('Soll halbiert: halber Urlaubstag.');
 	});
 
+	it('names the origin of the mark neutrally (contract v0.3.2 markSource)', () => {
+		const { unmount } = render(DaySummary, { evaluation: evaluation({ mark: 'holiday', targetSeconds: 0, markSource: 'holiday' }) });
+		expect(screen.getByTestId('day-mark-source')).toHaveTextContent('Markierung: aus dem Feiertagskalender abgeleitet.');
+		unmount();
+		const second = render(DaySummary, { evaluation: evaluation({ mark: 'sick', targetSeconds: 0, markSource: 'absence' }) });
+		expect(screen.getByTestId('day-mark-source')).toHaveTextContent('aus einer Abwesenheit abgeleitet');
+		second.unmount();
+		render(DaySummary, { evaluation: evaluation({ mark: 'vacation', targetSeconds: 0, markSource: 'explicit' }) });
+		expect(screen.getByTestId('day-mark-source')).toHaveTextContent('manuell gesetzt');
+	});
+
+	it('shows no source line without a mark or with markSource none', () => {
+		render(DaySummary, { evaluation: evaluation({ mark: 'none', markSource: 'none' }) });
+		expect(screen.queryByTestId('day-mark-source')).toBeNull();
+	});
+
 	it('shows no note for unmarked days', () => {
 		render(DaySummary, { evaluation: evaluation({ mark: 'none' }) });
 		expect(screen.queryByTestId('day-target-note')).toBeNull();

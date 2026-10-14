@@ -148,6 +148,8 @@ export interface Segment {
 	revisions?: number;
 }
 
+export type DayMarkSource = 'none' | 'explicit' | 'absence' | 'holiday';
+
 export interface DayEvaluation {
 	date: string;
 	modelId?: string | null;
@@ -169,6 +171,10 @@ export interface DayEvaluation {
 	segments?: Segment[];
 	/** Contract v0.2.1: credit set on the day mark and the day note, so the form can be pre-filled. */
 	markCreditSeconds?: number | null;
+	/** Contract v0.3.2: origin of the effective mark (explicit = set manually). */
+	markSource?: DayMarkSource;
+	/** Contract v0.3.2: deviating target, e.g. half vacation day. */
+	targetOverrideSeconds?: number | null;
 	note?: string | null;
 	breakHints: { code: BreakHintCode }[];
 }
