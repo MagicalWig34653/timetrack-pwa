@@ -77,3 +77,13 @@ eigener Feiertag/Schulferien, Planung setzen/ändern/entfernen, Freigaben (Stand
 Kontentrennung mit fremden IDs (404). UI angepasst: `DayEvaluation.markSource`/`targetOverrideSeconds` (v0.3.2) in Typen, Tagesansicht zeigt die Herkunft der Markierung neutral; Mock liefert beide Felder.
 Geprüft: `npm run check` 0/0, `npm test` 186 grün, `npm run build`, `npm run test:e2e` 49 grün (15 + 14 + 20), `npm run test:e2e:mock` 15 grün (4 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR).
 Keine Backend-Fehler gefunden (Beobachtungen in `docs/handoffs/L7b.md`). Nicht geprüft: MariaDB-Modus, Firefox/WebKit, Jahreswechsel der Maschinenuhr (Spec nutzt feste Daten 2026).
+
+## Stand 14.10.2026 – Paket L9 (Branch l9-export-import-storage-ui)
+
+Oberfläche für Export, Import, Dateispeicher und Abwesenheitsanhänge gegen Vertrag v0.4.0 (nur gegen die Mock-API, das Backend implementiert die Endpunkte erst in C11–C13):
+`/export` (Zeitraum, Monatskürzel, xlsx/pdf/csv, Download per Blob mit Dateiname aus Content-Disposition, Hinweis tatsächlich vs. bewertet, `range_too_large`),
+`/import` (Assistent mit sechs Schritten: Datei, Blatt/Kopfzeile mit Rohvorschau, Spalten und Formate inkl. Dezimalstunden 7,7 = 7:42, Vorlagen, Vorschau, ausdrückliche Bestätigung, Ergebnis mit Rücknahme und Konfliktliste, Verwerfen),
+`/settings/storage` (nur Admin; Regeleditor, Geheimnis nur schreibend, 501-Hinweis zu STORAGE_SECRET_KEY, „gilt nur für neue Uploads“), Anhänge im Abwesenheitsformular (Whitelist, 413/415 deutsch, „nie geteilt“).
+Mock: TS-Port des Import-Parsings (`src/lib/transfer/import-parse.ts`), echtes CSV, Platzhalter für XLSX/PDF. Neue Seiten zeigen bei 404/501 „noch nicht verfügbar“.
+Geprüft: `npm run check` 0/0, `npm test` 262 grün, `npm run build`, `npm run test:e2e` (echtes Backend) 49 grün, `npm run test:e2e:mock` 23 grün (+4 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR), Screenshots 390 px/Desktop hell/dunkel gesichtet.
+Details und offene Vertragsfragen: `docs/handoffs/L9.md`.
