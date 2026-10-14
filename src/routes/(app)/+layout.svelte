@@ -10,12 +10,18 @@
 
 	const session = $derived(sessionStore.current);
 	const links = $derived([
-		{ href: '/', label: t('nav.home') },
-		{ href: '/settings/passkeys', label: t('nav.passkeys') },
-		{ href: '/settings/recovery', label: t('nav.recovery') },
-		{ href: '/settings/sessions', label: t('nav.sessions') },
-		...(session?.account.role === 'admin' ? [{ href: '/admin/invitations', label: t('nav.invitations') }] : [])
+		{ href: '/', label: t('nav.home'), prefix: false },
+		{ href: '/time', label: t('nav.time'), prefix: true },
+		{ href: '/suggestions', label: t('nav.suggestions'), prefix: true },
+		{ href: '/settings/work-model', label: t('nav.settings'), prefix: false, section: '/settings' },
+		...(session?.account.role === 'admin' ? [{ href: '/admin/invitations', label: t('nav.invitations'), prefix: true }] : [])
 	]);
+
+	function isActive(link: { href: string; prefix: boolean; section?: string }): boolean {
+		const path = page.url.pathname;
+		if (link.section) return path === link.section || path.startsWith(link.section + '/');
+		return link.prefix ? path === link.href || path.startsWith(link.href + '/') : path === link.href;
+	}
 
 	async function signOut() {
 		try {
@@ -44,7 +50,7 @@
 						<li>
 							<a
 								href={link.href}
-								aria-current={page.url.pathname === link.href ? 'page' : undefined}
+								aria-current={isActive(link) ? 'page' : undefined}
 								class="inline-block rounded-md px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground"
 							>
 								{link.label}

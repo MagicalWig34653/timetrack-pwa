@@ -1,3 +1,5 @@
+import { createTimeMock } from './time.ts';
+
 // In-memory mock of the happy paths in contracts/openapi.yaml (backend repo), API v0.1.0.
 // Framework-free so it can back both the Vite dev middleware and vitest fetch stubs.
 // Demo data: admin handle `admin`, valid invitation token `demo-invite`, recovery code
@@ -9,6 +11,10 @@ export interface MockRequest {
 	body?: any;
 	cookies: Record<string, string>;
 	csrfToken?: string;
+	/** value of the If-Match header */
+	ifMatch?: string;
+	/** value of the Authorization header (device tokens for /automation/events) */
+	authorization?: string;
 }
 
 export interface MockResponse {
@@ -56,6 +62,10 @@ interface MockInvitation {
 export interface MockOptions {
 	/** false mimics a server without mail delivery (email.available = false) */
 	mailAvailable?: boolean;
+	/** clock in epoch ms; defaults to Date.now. Lets tests freeze time for deterministic demo data. */
+	now?: () => number;
+	/** false skips the demo time-tracking data for the admin account */
+	seedTime?: boolean;
 }
 
 const uuid = () => crypto.randomUUID();
@@ -72,6 +82,7 @@ function error(status: number, code: string, message = code): MockResponse {
 
 export function createMockApi(options: MockOptions = {}) {
 	const mailAvailable = options.mailAvailable ?? true;
+	const time = createTimeMock(options.now ?? Date.now);
 	const accounts = new Map<string, MockAccount>();
 	const passkeys: MockPasskey[] = [];
 	const sessions = new Map<string, MockSession>();
@@ -96,6 +107,7 @@ export function createMockApi(options: MockOptions = {}) {
 	accounts.set(admin.id, admin);
 	lastAccountId = admin.id;
 	seedPasskey(admin.id, 'Demo-Passkey');
+	if (options.seedTime ?? true) time.seedDemo(admin.id);
 	invitations.push({
 		id: uuid(),
 		token: 'demo-invite',
@@ -246,6 +258,11 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 200, body: sessionBody(opened), sessionCookie: id };
 		}
 
+		// Shortcuts: device token instead of cookie/CSRF.
+		if (path === '/api/v1/automation/events' && method === 'POST') {
+			return time.automationEvent(req.authorization, body);
+		}
+
 		// --- authenticated endpoints ---
 		if (!session || !account) return error(401, 'unauthorized');
 		if (mutating && req.csrfToken !== session.csrfToken) return error(403, 'csrf_invalid');
@@ -352,6 +369,14 @@ export function createMockApi(options: MockOptions = {}) {
 			account.emailRecovery = { active: true, verified: true };
 			return { status: 204 };
 		}
+
+		const timeResponse = time.handle(account.id, {
+			method,
+			path: req.path,
+			body: req.body,
+			ifMatch: req.ifMatch
+		});
+		if (timeResponse) return timeResponse;
 
 		if (path.startsWith('/api/v1/admin/')) {
 			if (account.role !== 'admin') return error(403, 'forbidden');

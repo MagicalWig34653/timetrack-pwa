@@ -17,7 +17,9 @@ export function createMockFetch(options?: MockOptions) {
 			path,
 			body: typeof init.body === 'string' ? JSON.parse(init.body) : undefined,
 			cookies: sessionCookie ? { tt_session: sessionCookie } : {},
-			csrfToken
+			csrfToken,
+			ifMatch: headers.get('If-Match') ?? undefined,
+			authorization: headers.get('Authorization') ?? undefined
 		});
 		if (result.sessionCookie !== undefined) sessionCookie = result.sessionCookie;
 		return new Response(result.body === undefined ? null : JSON.stringify(result.body), {
