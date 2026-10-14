@@ -10,6 +10,7 @@
 		{ href: '/settings/places', label: 'nav.places' },
 		{ href: '/settings/account-time', label: 'nav.account_time' },
 		{ href: '/settings/devices', label: 'nav.devices' },
+		{ href: '/settings/sharing', label: 'nav.sharing' },
 		{ href: '/settings/passkeys', label: 'nav.passkeys' },
 		{ href: '/settings/recovery', label: 'nav.recovery' },
 		{ href: '/settings/sessions', label: 'nav.sessions' }

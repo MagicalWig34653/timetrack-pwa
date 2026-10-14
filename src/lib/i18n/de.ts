@@ -1,6 +1,9 @@
+import { dePlanning } from './de-planning';
+
 // German UI texts. Keys are English; values are the only user-visible strings.
 // Technical API error codes are mapped via `error.<code>` and `error.status_<http status>`.
 export const de = {
+	...dePlanning,
 	'app.name': 'Timetrack',
 
 	'common.loading': 'Wird geladen …',
@@ -198,9 +201,6 @@ export const de = {
 	'error.model_overlap': 'Die neue Version überschneidet sich mit einer späteren Arbeitsmodell-Version.',
 	'error.opening_exists': 'Es gibt bereits einen Anfangsstand. Weitere Änderungen erfasst du als Korrektur.',
 	'error.suggestion_resolved': 'Dieser Vorschlag wurde bereits bearbeitet.',
-	'error.absence_overlap': 'In diesem Zeitraum gibt es bereits eine andere Abwesenheit. Abwesenheiten dürfen sich nicht überschneiden.',
-	'error.recipient_not_found': 'Dieses Konto wurde nicht gefunden. Prüfe den Kontonamen.',
-	'error.share_exists': 'Für dieses Konto gibt es bereits eine Freigabe. Ändere die vorhandene Freigabe.',
 	'error.range_too_large': 'Der Zeitraum ist zu groß (höchstens 93 Tage).',
 
 	'common.yes': 'Ja',
