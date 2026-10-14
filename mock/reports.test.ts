@@ -71,9 +71,10 @@ describe('reports mock: entries and weeks', () => {
 	});
 
 	it('validates entries', async () => {
-		for (const bad of [{ date: '2026-02-30' }, { learningField: '' }, { durationSeconds: 86401 }, { durationSeconds: -1 }, { durationSeconds: 1.5 }, { notes: 'x'.repeat(4001) }, { learningFieldId: crypto.randomUUID() }]) {
+		for (const bad of [{ date: '2026-02-30' }, { learningField: '' }, { durationSeconds: 86401 }, { durationSeconds: -1 }, { durationSeconds: 1.5 }, { notes: 'x'.repeat(4001) }]) {
 			expect(await status(api.createReportEntry(entry(bad))), JSON.stringify(bad).slice(0, 40)).toBe(400);
 		}
+		expect(await status(api.createReportEntry(entry({ learningFieldId: crypto.randomUUID() })))).toBe(404);
 		expect((await api.createReportEntry({ date: '2026-10-13', learningField: 'A' })).durationSeconds).toBe(0);
 	});
 
@@ -117,7 +118,7 @@ describe('reports mock: text output', () => {
 	it('answers text/plain in the standard format', async () => {
 		await api.createReportEntry(entry({ notes: 'Subnetze' }));
 		const text = await api.getReportWeekText(2026, 42);
-		expect(text).toBe('Berichtsheft KW 42/2026 (12.10.2026 – 18.10.2026)\n\nDienstag, 13.10.2026\nLernfeld 4 | 1:00 h | Subnetze\n\nWochensumme: 1:00 h\n');
+		expect(text).toBe('Berichtsheft KW 42/2026 (12.10.2026 – 18.10.2026)\n\nDienstag, 13.10.2026\nLernfeld 4 | 1:00 h | Subnetze\n\nSumme: 1:00 h\n');
 		expect(await status(api.getReportWeekText(2027, 53))).toBe(400);
 	});
 });

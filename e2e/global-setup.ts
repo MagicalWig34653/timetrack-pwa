@@ -96,6 +96,7 @@ export default async function globalSetup() {
 	const timePort = Number(process.env.E2E_TIME_PORT ?? port + 1);
 	const planningPort = Number(process.env.E2E_PLANNING_PORT ?? port + 2);
 	const transferPort = Number(process.env.E2E_TRANSFER_PORT ?? port + 3);
+	const reportsPort = Number(process.env.E2E_REPORTS_PORT ?? port + 4);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -151,7 +152,23 @@ export default async function globalSetup() {
 	process.env.E2E_TRANSFER_BOOTSTRAP_LINK = stage4.link;
 	process.env.E2E_STORAGE_LOCAL_DIR = storageDir;
 
+	// Stage 4a (Berichtsheft) gets a fifth instance with its own database. The default storage rules (database backend)
+	// stay untouched, so report source uploads go through the DB backend.
+	let stage5: Instance;
+	try {
+		stage5 = await startInstance(binary, reportsPort, { STORAGE_SECRET_KEY: randomBytes(32).toString('base64') });
+	} catch (e) {
+		await stage4.stop();
+		await stage3.stop();
+		await stage2.stop();
+		await stage1.stop();
+		throw e;
+	}
+	process.env.E2E_REPORTS_BASE_URL = `http://localhost:${reportsPort}`;
+	process.env.E2E_REPORTS_BOOTSTRAP_LINK = stage5.link;
+
 	return async () => {
+		await stage5.stop();
 		await stage4.stop();
 		await stage3.stop();
 		await stage2.stop();

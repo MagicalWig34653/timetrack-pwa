@@ -268,7 +268,7 @@ describe('reports page', () => {
 		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 		await u.click(screen.getByTestId('copy-text'));
 		await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-		expect(writeText.mock.calls[0][0]).toBe('Berichtsheft KW 42/2026 (12.10.2026 – 18.10.2026)\n\nDienstag, 13.10.2026\nNetzwerke | 1:30 h | Subnetze\n\nWochensumme: 1:30 h\n');
+		expect(writeText.mock.calls[0][0]).toBe('Berichtsheft KW 42/2026 (12.10.2026 – 18.10.2026)\n\nDienstag, 13.10.2026\nNetzwerke | 1:30 h | Subnetze\n\nSumme: 1:30 h\n');
 		await waitFor(() => expect(screen.getByTestId('toast')).toHaveTextContent('In die Zwischenablage kopiert'));
 	});
 
@@ -280,7 +280,7 @@ describe('reports page', () => {
 		await u.click(screen.getByTestId('copy-text'));
 		const dialog = await screen.findByTestId('text-dialog');
 		expect(within(dialog).getByTestId('copy-fallback')).toHaveTextContent('Strg+C');
-		expect((within(dialog).getByTestId('text-preview') as HTMLTextAreaElement).value).toContain('Netzwerke | 1:30 h |');
+		expect((within(dialog).getByTestId('text-preview') as HTMLTextAreaElement).value).toContain('Netzwerke | 1:30 h');
 		expect(screen.queryByText('In die Zwischenablage kopiert')).toBeNull();
 	});
 
@@ -292,7 +292,7 @@ describe('reports page', () => {
 		Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 		await u.click(screen.getByTestId('copy-preview'));
 		const dialog = await screen.findByTestId('text-dialog');
-		expect((within(dialog).getByTestId('text-preview') as HTMLTextAreaElement).value).toContain('Wochensumme: 1:30 h');
+		expect((within(dialog).getByTestId('text-preview') as HTMLTextAreaElement).value).toContain('Summe: 1:30 h');
 		expect(writeText).not.toHaveBeenCalled();
 		await u.click(within(dialog).getByTestId('text-copy-again'));
 		await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
