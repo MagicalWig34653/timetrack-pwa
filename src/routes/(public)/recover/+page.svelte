@@ -38,7 +38,7 @@
 		busy = true;
 		error = '';
 		try {
-			sessionStore.set(await api.recoveryComplete(recoveryId, proof.trim()));
+			sessionStore.set(await api.recoveryComplete(recoveryId, method === 'fallback-password' ? proof : proof.trim()));
 			proof = '';
 			await goto('/recover/passkey', { replaceState: true });
 		} catch (e) {

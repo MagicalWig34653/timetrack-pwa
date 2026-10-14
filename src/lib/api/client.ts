@@ -52,8 +52,9 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
 		}
 		throw new ApiError(response.status, code, message);
 	}
-	if (response.status === 204) return undefined as T;
-	return (await response.json()) as T;
+	// 204 and bodyless 202 (e.g. PUT /me/recovery/email) carry no JSON.
+	const text = await response.text();
+	return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** Session-returning calls refresh the CSRF token held by the client. */
