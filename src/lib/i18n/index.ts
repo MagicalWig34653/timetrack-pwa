@@ -24,3 +24,9 @@ export function errorMessage(error: unknown): string {
 	}
 	return t('error.unknown');
 }
+
+/** German text for an `oidc_error` code from the callback redirect; unknown codes fall back to `oidc_failed`. */
+export function oidcErrorMessage(code: string): string {
+	const key = `oidc.error.${code}`;
+	return t(hasKey(key) ? key : 'oidc.error.oidc_failed');
+}

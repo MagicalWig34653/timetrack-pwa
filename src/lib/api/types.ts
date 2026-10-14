@@ -475,3 +475,38 @@ export interface DownloadedFile {
 	/** filename from Content-Disposition, if the server sent one */
 	filename: string | null;
 }
+
+/** GET /auth/oidc/config (contract v0.5.0). `name` is the provider display name. */
+export interface OidcConfig {
+	enabled: boolean;
+	name?: string;
+}
+
+export type OidcPurpose = 'login' | 'link' | 'register';
+
+/** Error codes the callback puts into `/login?oidc_error=<code>`. */
+export const OIDC_ERROR_CODES = [
+	'oidc_not_linked',
+	'oidc_state_invalid',
+	'oidc_token_invalid',
+	'oidc_identity_taken',
+	'oidc_invite_invalid',
+	'oidc_reauth_required',
+	'oidc_failed'
+] as const;
+export type OidcErrorCode = (typeof OIDC_ERROR_CODES)[number];
+
+export interface OidcRegisterInput {
+	pendingId: string;
+	handle: string;
+	displayName: string;
+}
+
+export interface ExternalIdentity {
+	id: string;
+	providerName: string;
+	/** Provider e-mail, display hint only, never a linking criterion. */
+	emailHint?: string | null;
+	linkedAt: string;
+	lastUsedAt?: string | null;
+}

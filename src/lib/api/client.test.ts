@@ -79,4 +79,21 @@ describe('range helpers', () => {
 		expect(merged.vacation).toEqual([{ startDate: '2026-12-28', endDate: '2027-01-03' }]);
 		expect(merged.actual).toBeUndefined();
 	});
+
+	it('sends the OIDC start purpose and invite token and adopts the CSRF token from oidcRegister', async () => {
+		const fetchSpy = vi.fn(async (_url: unknown, init?: RequestInit) => {
+			const body = JSON.parse(String(init?.body));
+			if (body.pendingId) {
+				return new Response(JSON.stringify({ account: { id: 'a', handle: 'x', displayName: 'X', role: 'member' }, csrfToken: 'csrf-oidc', recovery: false, expiresAt: '2030-01-01T00:00:00Z' }), { status: 201 });
+			}
+			return new Response(JSON.stringify({ authorizationUrl: 'https://idp.example/auth' }), { status: 200 });
+		});
+		vi.stubGlobal('fetch', fetchSpy);
+		await expect(api.oidcStart('register', 'tok')).resolves.toEqual({ authorizationUrl: 'https://idp.example/auth' });
+		expect(fetchSpy.mock.calls[0][0]).toBe('/api/v1/auth/oidc/start');
+		expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toEqual({ purpose: 'register', inviteToken: 'tok' });
+		await api.oidcRegister({ pendingId: 'p', handle: 'xyz', displayName: 'X' });
+		await api.unlinkIdentity('11111111-1111-1111-1111-111111111111').catch(() => undefined);
+		expect((fetchSpy.mock.calls.at(-1)![1]!.headers as Record<string, string>)['X-CSRF-Token']).toBe('csrf-oidc');
+	});
 });

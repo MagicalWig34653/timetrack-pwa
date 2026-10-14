@@ -13,6 +13,7 @@
 		{ href: '/settings/devices', label: 'nav.devices' },
 		{ href: '/settings/sharing', label: 'nav.sharing' },
 		{ href: '/settings/passkeys', label: 'nav.passkeys' },
+		{ href: '/settings/identities', label: 'nav.identities' },
 		{ href: '/settings/recovery', label: 'nav.recovery' },
 		{ href: '/settings/sessions', label: 'nav.sessions' }
 	] as const;

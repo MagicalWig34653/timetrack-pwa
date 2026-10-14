@@ -87,3 +87,14 @@ Oberfläche für Export, Import, Dateispeicher und Abwesenheitsanhänge gegen Ve
 Mock: TS-Port des Import-Parsings (`src/lib/transfer/import-parse.ts`), echtes CSV, Platzhalter für XLSX/PDF. Neue Seiten zeigen bei 404/501 „noch nicht verfügbar“.
 Geprüft: `npm run check` 0/0, `npm test` 262 grün, `npm run build`, `npm run test:e2e` (echtes Backend) 49 grün, `npm run test:e2e:mock` 23 grün (+4 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR), Screenshots 390 px/Desktop hell/dunkel gesichtet.
 Details und offene Vertragsfragen: `docs/handoffs/L9.md`.
+
+## Stand 14.10.2026 – Paket L11 (Branch l11-oidc-ui)
+
+Oberfläche für optionales OIDC gegen Vertrag v0.5.0 und ADR-0007 (nur gegen die Mock-API, das Backend implementiert die Endpunkte erst in C14):
+`/login` zeigt bei `GET auth/oidc/config` `enabled` unter dem Passkey-Button „Mit <Name> anmelden“ (sekundär; Fehler der Config-Abfrage verstecken ihn nur) und liest `?oidc_error=<code>` (alle sieben Codes auf Deutsch, URL wird bereinigt);
+`/invite/[token]` bietet „Stattdessen mit <Name> registrieren“, nach Rückkehr mit `?oidc=<pendingId>` Formular für Kontoname/Anzeigename (`POST auth/oidc/register`) und danach die Aufforderung „Passkey einrichten“;
+neue Seite `/settings/identities` (Liste mit E-Mail nur als Hinweis, Verknüpfen mit `purpose=link`, Entfernen mit Bestätigung, `409 last_login_method`, `403 reauth_required` -> „Abmelden und neu anmelden“, Banner `?linked=1`), Eintrag in der Einstellungsnavigation.
+Angemeldete Nutzer, die per Fehler-Redirect auf `/login?oidc_error=…` landen (z. B. Verknüpfen fehlgeschlagen), werden zu `/settings/identities?oidc_error=…` weitergeleitet, damit die Meldung nicht verloren geht.
+Mock: Config (standardmäßig an in `dev:mock`, `MOCK_OIDC=0` schaltet aus, `MOCK_OIDC_NAME`), In-App-Anbieter `/mock-idp` (nur mit `VITE_MOCK=1`; Demo-Nutzer 1/2, Fehlercodes), Callback als 302, Identitäten mit Regeln (`last_login_method`, `identity_taken`, frische Sitzung), Test-Hook `POST /api/v1/mock/oidc` (nicht im Vertrag).
+Geprüft: `npm run check` 0/0, `npm test` 297 grün, `npm run build`, `npm run test:e2e` (echtes Backend, unverändert) 49 grün, `npm run test:e2e:mock` 29 grün (+4 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR), Screenshots 390 px hell/dunkel (Login, Einladung, Identitäten, Mock-IdP).
+Nicht geprüft: echtes Backend/Dex (E2E folgt mit C14), Firefox/WebKit. Details und offene Fragen: `docs/handoffs/L11.md`.
