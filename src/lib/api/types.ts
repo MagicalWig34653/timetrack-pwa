@@ -351,3 +351,127 @@ export interface SharedView {
 	actual?: { date: string; evaluatedStart?: string | null; evaluatedEnd?: string | null; evaluatedWorkSeconds: number }[];
 	vacation?: { startDate: string; endDate: string }[];
 }
+
+// --- Export, import, file storage (contract v0.4.0, ADR-0006) ---
+
+export type ExportFormat = 'xlsx' | 'pdf' | 'csv';
+
+export type ImportKind = 'csv' | 'xlsx';
+export type ImportStatus = 'uploaded' | 'mapped' | 'committed' | 'rolled_back';
+export type ImportDateFormat = 'dd.MM.yyyy' | 'yyyy-MM-dd' | 'excel_serial';
+export type ImportTimeFormat = 'HH:mm' | 'excel_fraction' | 'decimal_hours';
+
+export interface ImportJob {
+	id: string;
+	filename: string;
+	kind: ImportKind;
+	status: ImportStatus;
+	sheets: string[];
+	sha256?: string;
+	createdAt: string;
+}
+
+export interface ImportColumns {
+	date: number;
+	start?: number | null;
+	end?: number | null;
+	duration?: number | null;
+	kind?: number | null;
+	place?: number | null;
+	note?: number | null;
+}
+
+export interface ImportMapping {
+	sheet: string;
+	/** 1-based row number of the header row; 0 = no header row */
+	headerRow: number;
+	timezone?: string;
+	dateFormat: ImportDateFormat;
+	timeFormat: ImportTimeFormat;
+	defaultKind?: SegmentKind;
+	columns: ImportColumns;
+	skipSummaryRows?: boolean;
+}
+
+export type ImportErrorCode =
+	| 'date_invalid'
+	| 'time_invalid'
+	| 'end_before_start'
+	| 'missing_value'
+	| 'overlap'
+	| 'formula_without_value'
+	| 'summary_row'
+	| 'unknown_place';
+
+export interface ImportPreview {
+	rows: number;
+	valid: number;
+	duplicates: number;
+	errors: { row: number; code: ImportErrorCode }[];
+	sample: { date?: string; startedAt?: string; endedAt?: string; kind?: SegmentKind }[];
+}
+
+export interface ImportResult {
+	batchId: string;
+	created: number;
+	skipped: number;
+	conflicts?: string[];
+}
+
+export interface ImportTemplate {
+	id: string;
+	name: string;
+	mapping: ImportMapping;
+}
+
+export interface RawPreview {
+	sheet: string;
+	rows: (string | null)[][];
+}
+
+export type StorageBackend = 'db' | 's3' | 'local';
+
+export interface StorageRule {
+	/** upper bound (inclusive); null = everything above / the rest */
+	maxBytes?: number | null;
+	backend: StorageBackend;
+}
+
+export interface StorageS3 {
+	endpoint?: string;
+	region?: string;
+	bucket?: string;
+	pathStyle?: boolean;
+	accessKeyId?: string;
+}
+
+export interface StorageSettings {
+	rules: StorageRule[];
+	maxUploadBytes: number;
+	localPath?: string | null;
+	s3?: StorageS3 | null;
+	hasSecret: boolean;
+}
+
+export interface StorageSettingsInput {
+	rules: StorageRule[];
+	maxUploadBytes?: number;
+	localPath?: string | null;
+	s3?: (StorageS3 & { secretAccessKey?: string }) | null;
+}
+
+export interface FileMeta {
+	id: string;
+	name: string;
+	size: number;
+	sha256: string;
+	contentType: string;
+	backend: StorageBackend;
+	createdAt: string;
+}
+
+export interface DownloadedFile {
+	blob: Blob;
+	/** filename from Content-Disposition, if the server sent one */
+	filename: string | null;
+}

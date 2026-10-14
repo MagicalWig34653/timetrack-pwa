@@ -1,5 +1,16 @@
 import { createMockApi, type MockOptions } from './api.ts';
 
+/** Blob.arrayBuffer is missing in some jsdom versions; fall back to FileReader. */
+async function readBytes(blob: Blob): Promise<Uint8Array> {
+	if (typeof blob.arrayBuffer === 'function') return new Uint8Array(await blob.arrayBuffer());
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+		reader.onerror = () => reject(reader.error);
+		reader.readAsArrayBuffer(blob);
+	});
+}
+
 /** fetch replacement backed by the mock API with a tiny cookie jar; used by tests. */
 export function createMockFetch(options?: MockOptions) {
 	const api = createMockApi(options);
@@ -12,16 +23,25 @@ export function createMockFetch(options?: MockOptions) {
 		const path = String(input);
 		const csrfToken = headers.get('X-CSRF-Token') ?? undefined;
 		calls.push({ method, path, csrf: csrfToken, credentials: init.credentials });
+		let file;
+		if (init.body instanceof FormData) {
+			const entry = init.body.get('file');
+			if (entry instanceof Blob) file = { name: (entry as File).name ?? 'file', type: entry.type, bytes: await readBytes(entry) };
+		}
 		const result = api.handle({
 			method,
 			path,
 			body: typeof init.body === 'string' ? JSON.parse(init.body) : undefined,
+			file,
 			cookies: sessionCookie ? { tt_session: sessionCookie } : {},
 			csrfToken,
 			ifMatch: headers.get('If-Match') ?? undefined,
 			authorization: headers.get('Authorization') ?? undefined
 		});
 		if (result.sessionCookie !== undefined) sessionCookie = result.sessionCookie;
+		if (result.binary) {
+			return new Response(result.binary.bytes as BodyInit, { status: result.status, headers: { 'Content-Type': result.binary.contentType, ...result.binary.headers } });
+		}
 		return new Response(result.body === undefined ? null : JSON.stringify(result.body), {
 			status: result.status,
 			headers: { 'Content-Type': 'application/json' }

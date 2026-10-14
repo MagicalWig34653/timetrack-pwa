@@ -17,6 +17,8 @@
 		{ href: '/vacation', label: t('nav.vacation'), prefix: true },
 		{ href: '/absences', label: t('nav.absences'), prefix: true },
 		{ href: '/shared', label: t('nav.shared'), prefix: true },
+		{ href: '/export', label: t('nav.export'), prefix: true },
+		{ href: '/import', label: t('nav.import'), prefix: true },
 		{ href: '/settings/work-model', label: t('nav.settings'), prefix: false, section: '/settings' },
 		...(session?.account.role === 'admin' ? [{ href: '/admin/invitations', label: t('nav.invitations'), prefix: true }] : [])
 	]);

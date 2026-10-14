@@ -1,6 +1,17 @@
 import { splitRange } from '../time/dates';
 import { ApiError } from './errors';
 import type {
+	DownloadedFile,
+	ExportFormat,
+	FileMeta,
+	ImportJob,
+	ImportMapping,
+	ImportPreview,
+	ImportResult,
+	ImportTemplate,
+	RawPreview,
+	StorageSettings,
+	StorageSettingsInput,
 	Absence,
 	AbsenceInput,
 	AccountAdjustmentInput,
@@ -52,6 +63,65 @@ export function setCsrfToken(token: string | null): void {
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
+async function toApiError(response: Response): Promise<ApiError> {
+	let code = `http_${response.status}`;
+	let message = response.statusText;
+	let body: unknown;
+	try {
+		body = await response.json();
+		const payload = body as { error?: { code?: unknown; message?: unknown } };
+		if (payload?.error?.code) code = String(payload.error.code);
+		if (payload?.error?.message) message = String(payload.error.message);
+	} catch {
+		// non-JSON error body (e.g. proxy error page): keep the generic code
+	}
+	return new ApiError(response.status, code, message, body);
+}
+
+/** Extracts the filename from a Content-Disposition header (RFC 6266: filename* wins over filename). */
+export function filenameFromDisposition(header: string | null): string | null {
+	if (!header) return null;
+	const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/.exec(header);
+	if (star) {
+		try {
+			return decodeURIComponent(star[1].trim());
+		} catch {
+			// fall through to the plain filename
+		}
+	}
+	const plain = /filename\s*=\s*"((?:[^"\\]|\\.)*)"/.exec(header) ?? /filename\s*=\s*([^;]+)/.exec(header);
+	return plain ? plain[1].trim().replace(/\\(.)/g, '$1') : null;
+}
+
+/** Binary download (GET); errors are parsed like JSON errors. */
+async function download(path: string): Promise<DownloadedFile> {
+	let response: Response;
+	try {
+		response = await fetch(BASE + path, { method: 'GET', credentials: 'include' });
+	} catch {
+		throw new ApiError(0, 'network_error');
+	}
+	if (!response.ok) throw await toApiError(response);
+	return { blob: await response.blob(), filename: filenameFromDisposition(response.headers.get('Content-Disposition')) };
+}
+
+/** multipart/form-data upload with field `file`; the browser sets the boundary, so no Content-Type header here. */
+async function upload<T>(path: string, file: File): Promise<T> {
+	const headers: Record<string, string> = { Accept: 'application/json' };
+	if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+	const form = new FormData();
+	form.append('file', file, file.name);
+	let response: Response;
+	try {
+		response = await fetch(BASE + path, { method: 'POST', headers, credentials: 'include', body: form });
+	} catch {
+		throw new ApiError(0, 'network_error');
+	}
+	if (!response.ok) throw await toApiError(response);
+	const text = await response.text();
+	return (text ? JSON.parse(text) : undefined) as T;
+}
+
 async function request<T>(
 	method: Method,
 	path: string,
@@ -74,18 +144,7 @@ async function request<T>(
 		throw new ApiError(0, 'network_error');
 	}
 
-	if (!response.ok) {
-		let code = `http_${response.status}`;
-		let message = response.statusText;
-		try {
-			const payload = await response.json();
-			if (payload?.error?.code) code = String(payload.error.code);
-			if (payload?.error?.message) message = String(payload.error.message);
-		} catch {
-			// non-JSON error body (e.g. proxy error page): keep the generic code
-		}
-		throw new ApiError(response.status, code, message);
-	}
+	if (!response.ok) throw await toApiError(response);
 	// 204 and bodyless 202 (e.g. PUT /me/recovery/email) carry no JSON.
 	const text = await response.text();
 	return (text ? JSON.parse(text) : undefined) as T;
@@ -268,5 +327,32 @@ export const api = {
 	viewShared: async (shareId: string, from: string, to: string): Promise<SharedView> => {
 		const parts = await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<SharedView>('GET', `/shares/incoming/${shareId}/view?from=${r.from}&to=${r.to}`)));
 		return mergeSharedViews(parts);
-	}
+	},
+
+	// export, contract v0.4.0: the file comes as an attachment (blob); at most 366 days (else 400 range_too_large)
+	exportTime: (from: string, to: string, format: ExportFormat) =>
+		download(`/export/time?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&format=${format}`),
+
+	// import (CSV/XLSX -> segments); nothing is written before commitImport
+	uploadImport: (file: File) => upload<ImportJob>('/imports', file),
+	getImport: (id: string) => request<ImportJob>('GET', `/imports/${id}`),
+	discardImport: (id: string) => request<void>('DELETE', `/imports/${id}`),
+	previewImportRows: (id: string, sheet?: string) =>
+		request<RawPreview>('GET', `/imports/${id}/preview${sheet ? `?sheet=${encodeURIComponent(sheet)}` : ''}`),
+	putImportMapping: (id: string, mapping: ImportMapping) => request<ImportPreview>('PUT', `/imports/${id}/mapping`, mapping),
+	commitImport: (id: string, ignoreErrors = false) => request<ImportResult>('POST', `/imports/${id}/commit`, { ignoreErrors }),
+	rollbackImport: (id: string) => request<ImportResult>('POST', `/imports/${id}/rollback`),
+	listImportTemplates: () => request<ImportTemplate[]>('GET', '/import-templates'),
+	createImportTemplate: (name: string, mapping: ImportMapping) => request<ImportTemplate>('POST', '/import-templates', { name, mapping }),
+	deleteImportTemplate: (id: string) => request<void>('DELETE', `/import-templates/${id}`),
+
+	// file storage (admin) and files
+	getStorageSettings: () => request<StorageSettings>('GET', '/admin/storage'),
+	putStorageSettings: (input: StorageSettingsInput) => request<StorageSettings>('PUT', '/admin/storage', input),
+	uploadFile: (file: File) => upload<FileMeta>('/files', file),
+	downloadFile: (id: string) => download(`/files/${id}`),
+	deleteFile: (id: string) => request<void>('DELETE', `/files/${id}`),
+	listAbsenceAttachments: (absenceId: string) => request<FileMeta[]>('GET', `/absences/${absenceId}/attachments`),
+	attachFile: (absenceId: string, fileId: string) => request<FileMeta>('POST', `/absences/${absenceId}/attachments`, { fileId }),
+	detachFile: (absenceId: string, fileId: string) => request<void>('DELETE', `/absences/${absenceId}/attachments/${fileId}`)
 };
