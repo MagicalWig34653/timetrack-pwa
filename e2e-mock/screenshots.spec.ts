@@ -3,7 +3,7 @@ import { loginAsAdmin } from './helpers';
 
 // Only runs when SCREENSHOT_DIR is set; used for the manual layout review (390 px phone and desktop, light and dark).
 const dir = process.env.SCREENSHOT_DIR;
-const routes = ['/', '/time', '/settings/work-model', '/settings/places', '/settings/account-time', '/settings/devices', '/suggestions'];
+const routes = ['/', '/time', '/settings/work-model', '/settings/places', '/settings/account-time', '/settings/devices', '/suggestions', '/vacation', '/calendar', '/absences', '/settings/sharing', '/shared'];
 
 test.describe('screenshots', () => {
 	test.skip(!dir, 'set SCREENSHOT_DIR to capture screenshots');
@@ -36,6 +36,16 @@ test.describe('screenshots', () => {
 				if (await page.getByRole('button', { name: 'Start' }).isVisible()) await page.getByRole('button', { name: 'Start' }).click();
 				await page.getByTestId('elapsed').waitFor();
 				await page.screenshot({ path: `${dir}/${name}-${scheme}-home-running.png`, fullPage: true });
+				// planning: day panel with the absence form, shared view
+				await page.goto('/calendar');
+				await page.locator('[data-date]:visible').nth(2).click();
+				await page.getByTestId('day-panel').getByRole('button', { name: 'Abwesenheit anlegen' }).click();
+				await page.getByLabel('Art').selectOption('sick');
+				await page.screenshot({ path: `${dir}/${name}-${scheme}-calendar-absence-form.png`, fullPage: true });
+				await page.goto('/shared');
+				await page.getByTestId('incoming-list').getByRole('button').first().click();
+				await page.getByTestId('shared-plan').waitFor();
+				await page.screenshot({ path: `${dir}/${name}-${scheme}-shared-view.png`, fullPage: true });
 				await context.close();
 			});
 		}
