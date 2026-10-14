@@ -97,6 +97,7 @@ export default async function globalSetup() {
 	const planningPort = Number(process.env.E2E_PLANNING_PORT ?? port + 2);
 	const transferPort = Number(process.env.E2E_TRANSFER_PORT ?? port + 3);
 	const reportsPort = Number(process.env.E2E_REPORTS_PORT ?? port + 4);
+	const mcpPort = Number(process.env.E2E_MCP_PORT ?? port + 5);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -167,7 +168,24 @@ export default async function globalSetup() {
 	process.env.E2E_REPORTS_BASE_URL = `http://localhost:${reportsPort}`;
 	process.env.E2E_REPORTS_BOOTSTRAP_LINK = stage5.link;
 
+	// Package X1 (OAuth + MCP end to end) gets a sixth instance with its own database. PUBLIC_BASE_URL is the instance
+	// origin, so the issuer / resource in the OAuth metadata can be asserted exactly.
+	let stage6: Instance;
+	try {
+		stage6 = await startInstance(binary, mcpPort);
+	} catch (e) {
+		await stage5.stop();
+		await stage4.stop();
+		await stage3.stop();
+		await stage2.stop();
+		await stage1.stop();
+		throw e;
+	}
+	process.env.E2E_MCP_BASE_URL = `http://localhost:${mcpPort}`;
+	process.env.E2E_MCP_BOOTSTRAP_LINK = stage6.link;
+
 	return async () => {
+		await stage6.stop();
 		await stage5.stop();
 		await stage4.stop();
 		await stage3.stop();

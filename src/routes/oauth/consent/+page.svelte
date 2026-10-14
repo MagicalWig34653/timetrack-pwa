@@ -105,6 +105,7 @@
 			<span data-testid="signed-in-as">{t('consent.account', { name: accountName })}</span>
 			<Button variant="outline" size="sm" onclick={useOtherAccount} disabled={busy !== null}>{t('consent.other_account')}</Button>
 		</div>
+		<p class="-mt-2 text-xs text-muted-foreground" data-testid="other-account-hint">{t('consent.other_account_hint')}</p>
 
 		<ScopePicker scopes={request.scopes} bind:selected legend={t('consent.scopes_title', { client: request.clientName })} hint={t('consent.scopes_hint')} disabled={busy !== null} idPrefix="consent-scope" />
 

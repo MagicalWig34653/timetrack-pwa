@@ -31,6 +31,7 @@ export const deMcp = {
 	'consent.redirect_label': 'Weiterleitung nach der Entscheidung',
 	'consent.account': 'Angemeldet als {name}',
 	'consent.other_account': 'Anderes Konto verwenden',
+	'consent.other_account_hint': 'Nach dem Wechsel musst du die Verbindung in der Anwendung neu starten, denn diese Anfrage gehört zu deiner jetzigen Anmeldung.',
 	'consent.scopes_title': 'Das darf {client}',
 	'consent.scopes_hint': 'Wähle ab, was nicht erlaubt sein soll. Schreibrechte sind hervorgehoben.',
 	'consent.write_warning': 'Du erlaubst auch das Ändern von Daten. Erlaube nur, was du wirklich brauchst.',
