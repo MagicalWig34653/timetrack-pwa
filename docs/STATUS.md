@@ -104,3 +104,10 @@ Nicht geprüft: echtes Backend/Dex (E2E folgt mit C14), Firefox/WebKit. Details 
 Export, Import-Assistent, Dateispeicher-Admin und Abwesenheitsanhänge laufen gegen das echte Swift-Backend (C1–C13, Vertrag v0.5.1): neue Spec `e2e/stage3b.spec.ts` (25 Tests, vierte Instanz auf `E2E_PORT`+3 mit `STORAGE_SECRET_KEY` und temporärem lokalem Speicherverzeichnis), inkl. S3-Variante gegen Adobe S3Mock (wird ohne S3Mock übersprungen).
 UI behoben: Fehlercodes an das Backend angepasst (`import_not_ready`, `rollback_conflict`, `unsupported_type`) plus Texte für `too_many_rows`, `storage_unavailable`, `storage_corrupt`; Mock angeglichen.
 Geprüft: `npm run check` 0/0, `npm test` 297, `npm run build`, `npm run test:e2e` 74 grün, `npm run test:e2e:mock` 29 grün. Keine Backend-Fehler (Beobachtungen in `docs/handoffs/L12.md`).
+
+## Stand 15.10.2026 – Paket L13 (Branch l13-reports-ui)
+
+Berichtsheft-Oberfläche gegen Vertrag v0.6.0 / ADR-0008 (nur gegen die Mock-API, das Backend implementiert die Endpunkte erst in C15):
+`/reports` (ISO-Wochennavigation mit Jahr/KW, Vor/Zurück, aktuelle Woche, KW 53; Einträge je Tag mit Lernfeld, Zeit h:mm, Notizen; Anlegen/Bearbeiten/Löschen mit Bestätigung, If-Match und 412-Ablauf; Zeiteingabe h:mm oder Dezimalstunden mit Komma, live gelesen als h:mm; Lernfeld-Combobox mit Freitext; Wochen- und Lernfeldsummen; neutraler Hinweis „Arbeitszeit laut Zeiterfassung“; Status Entwurf/Erledigt; „Als Text kopieren“ mit Zwischenablage, Vorschau-Dialog, Fallback mit markiertem Text, Toast; Quellen mit Notizen und Dateien),
+`/settings/learning-fields` (CRUD), Dashboard-Karte „Berichtsheft“ (blendet sich bei 404/501 aus). Neue Seiten zeigen bei 404/501 „noch nicht verfügbar“. Details, Annahmen, offene Fragen: `docs/handoffs/L13.md`.
+Geprüft: `npm run check` 0/0, `npm test` 346 grün (+49), `npm run build`, `npm run test:e2e` (echtes Backend) 74 grün, `npm run test:e2e:mock` 39 grün (+10; 8 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR), Screenshots 390 px/Desktop hell/dunkel ohne horizontales Scrollen. Nicht geprüft: echtes Backend für das Berichtsheft, Firefox/WebKit, Screenreader.
