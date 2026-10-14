@@ -1,6 +1,18 @@
 import { ApiError } from './errors';
 import type {
+	Absence,
+	AbsenceInput,
 	AccountAdjustmentInput,
+	CalendarDay,
+	CustomDayInput,
+	IncomingShare,
+	PlanDay,
+	PlanDayInput,
+	Share,
+	ShareScopes,
+	SharedView,
+	VacationBalance,
+	VacationSettings,
 	CreationOptions,
 	DayEvaluation,
 	DayPreferences,
@@ -187,5 +199,39 @@ export const api = {
 	listDeviceTokens: () => request<DeviceToken[]>('GET', '/me/device-tokens'),
 	createDeviceToken: (input: { name: string; expiresInDays?: number }) =>
 		request<DeviceTokenCreated>('POST', '/me/device-tokens', input),
-	revokeDeviceToken: (id: string) => request<void>('DELETE', `/me/device-tokens/${id}`)
+	revokeDeviceToken: (id: string) => request<void>('DELETE', `/me/device-tokens/${id}`),
+
+	// vacation (contract v0.3.0); amounts are half days
+	getVacationSettings: () => request<VacationSettings>('GET', '/vacation/settings'),
+	putVacationSettings: (input: VacationSettings) => request<VacationSettings>('PUT', '/vacation/settings', input),
+	getVacationBalance: (year: number) => request<VacationBalance>('GET', `/vacation/balance?year=${year}`),
+	createVacationSnapshot: (input: { date: string; remainingHalfDays: number }) =>
+		request<VacationBalance>('POST', '/vacation/snapshots', input),
+	createVacationAdjustment: (input: { date: string; halfDays: number; reason: string }) =>
+		request<VacationBalance>('POST', '/vacation/adjustments', input),
+
+	// absences; `ifMatchVersion` becomes the If-Match header
+	listAbsences: (from: string, to: string) => request<Absence[]>('GET', `/absences?from=${from}&to=${to}`),
+	createAbsence: (input: AbsenceInput) => request<Absence>('POST', '/absences', input),
+	updateAbsence: (id: string, input: AbsenceInput, ifMatchVersion: number) =>
+		request<Absence>('PUT', `/absences/${id}`, input, { 'If-Match': String(ifMatchVersion) }),
+	deleteAbsence: (id: string) => request<void>('DELETE', `/absences/${id}`),
+
+	// calendar and plan
+	listHolidays: (year: number, region?: string) =>
+		request<CalendarDay[]>('GET', `/calendar/holidays?year=${year}${region ? `&region=${encodeURIComponent(region)}` : ''}`),
+	createCustomDay: (input: CustomDayInput) => request<CalendarDay>('POST', '/calendar/custom-days', input),
+	deleteCustomDay: (id: string) => request<void>('DELETE', `/calendar/custom-days/${id}`),
+	listPlanDays: (from: string, to: string) => request<PlanDay[]>('GET', `/plan/days?from=${from}&to=${to}`),
+	putPlanDay: (date: string, input: PlanDayInput) => request<PlanDay>('PUT', `/plan/days/${date}`, input),
+	deletePlanDay: (date: string) => request<void>('DELETE', `/plan/days/${date}`),
+
+	// shares
+	listShares: () => request<Share[]>('GET', '/shares'),
+	createShare: (input: { recipientHandle: string; scopes: ShareScopes }) => request<Share>('POST', '/shares', input),
+	updateShare: (id: string, scopes: ShareScopes) => request<Share>('PATCH', `/shares/${id}`, { scopes }),
+	revokeShare: (id: string) => request<void>('DELETE', `/shares/${id}`),
+	listIncomingShares: () => request<IncomingShare[]>('GET', '/shares/incoming'),
+	viewShared: (shareId: string, from: string, to: string) =>
+		request<SharedView>('GET', `/shares/incoming/${shareId}/view?from=${from}&to=${to}`)
 };

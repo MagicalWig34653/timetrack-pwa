@@ -1,6 +1,9 @@
+import { dePlanning } from './de-planning';
+
 // German UI texts. Keys are English; values are the only user-visible strings.
 // Technical API error codes are mapped via `error.<code>` and `error.status_<http status>`.
 export const de = {
+	...dePlanning,
 	'app.name': 'Timetrack',
 
 	'common.loading': 'Wird geladen …',

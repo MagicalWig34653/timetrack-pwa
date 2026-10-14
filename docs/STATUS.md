@@ -45,3 +45,13 @@ Browser-Kontext, Storno, Tagesmarkierung, Anfangsstand, Gerätetoken (nur einmal
 Geprüft: `npm run check` 0/0, `npm test` 101 grün, `npm run build`, `npm run test:e2e` 29 grün (15 alt + 14 neu), `npm run test:e2e:mock` 6 grün.
 UI behoben: Tagesnotiz/Gutschrift werden aus v0.2.1 vorbelegt, Anfangsstand auch nach erstem Modell erfassbar, Meldung `suggestion_resolved`.
 Keine Backend-Fehler gefunden. Neue Anleitung `docs/SHORTCUTS.md` (nicht auf echtem Gerät geprüft). Details: `docs/handoffs/L5.md`.
+
+## Stand 14.10.2026 – Paket L6 (Branch l6-planning-ui)
+
+Oberfläche für Urlaub, Abwesenheiten, Kalender/Planung und Freigaben gegen den Vertrag v0.3.0 (nur gegen die Mock-API, das Backend implementiert die Endpunkte erst in C8/C9):
+`/vacation` (Saldo je Jahr mit Erklärtexten, Stichtagsbestand, Korrekturen, Einstellungen mit Vorschlagswerten 30 Tage/DE-ST nur vorbelegt),
+`/calendar` (Monatsraster, auf dem Handy Wochenliste; Feiertage, Ferien, Abwesenheiten, Planung, Ist-Hinweise; Tag anklicken zum Anlegen),
+`/absences` (Jahresliste, Filter, Bearbeiten mit If-Match), `/settings/sharing` (ausgehende Freigaben), `/shared` (eingehende Freigaben, nur Lesen).
+Urlaub wird aus ganzzahligen halben Tagen als „12,5 Tage“ gezeigt. Mock enthält TS-Port der ADR-0005-Regeln und einen Feiertagsrechner (DE-ST u. a.).
+Neue Seiten zeigen bei 404/501 „noch nicht verfügbar“. Details, Mock-Annahmen und offene Vertragsfragen: `docs/handoffs/L6.md`.
+Geprüft: `npm run check` 0/0, `npm test` 158 grün, `npm run build`, `npm run test:e2e` (echtes Backend) 29 grün, `npm run test:e2e:mock` 13 grün (+4 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR), Screenshots 390 px/Desktop hell/dunkel.

@@ -178,6 +178,8 @@ export interface DayPreferences {
 	creditSeconds?: number | null;
 	skipFixedBreaks?: boolean;
 	note?: string | null;
+	/** Contract v0.3.0: half vacation days halve the target. */
+	targetOverrideSeconds?: number | null;
 }
 
 export interface TimeAccount {
@@ -216,4 +218,107 @@ export interface DeviceToken {
 
 export interface DeviceTokenCreated extends DeviceToken {
 	token: string;
+}
+
+// --- Planning and vacation (contracts/openapi.yaml v0.3.0) ---
+
+export interface VacationSettings {
+	/** ISO 3166-2, e.g. DE-ST */
+	region: string;
+	/** half days: 30 days = 60 */
+	annualEntitlementHalfDays: number;
+	carryOverHalfDays?: number;
+	/** MM-DD or null */
+	carryOverExpiry?: string | null;
+}
+
+export interface VacationBalance {
+	year: number;
+	snapshotDate?: string | null;
+	entitlementHalfDays: number;
+	carryOverHalfDays: number;
+	adjustmentHalfDays: number;
+	bookedHalfDays: number;
+	plannedHalfDays: number;
+	availableHalfDays: number;
+	availableAfterPlannedHalfDays: number;
+}
+
+export type AbsenceKind = 'vacation' | 'sick' | 'other';
+export type AbsenceStatus = 'planned' | 'requested' | 'approved' | 'rejected' | 'cancelled' | 'taken';
+export type DocumentStatus = 'not_needed' | 'pending' | 'submitted';
+
+export interface AbsenceInput {
+	kind: AbsenceKind;
+	startDate: string;
+	endDate: string;
+	halfDayStart?: boolean;
+	halfDayEnd?: boolean;
+	status: AbsenceStatus;
+	note?: string | null;
+	documentStatus?: DocumentStatus;
+	documentSubmittedOn?: string | null;
+	documentReferenceStart?: string | null;
+	documentReferenceEnd?: string | null;
+}
+
+export interface Absence extends AbsenceInput {
+	id: string;
+	version: number;
+	countedHalfDays: number;
+}
+
+export type CalendarDayKind = 'holiday' | 'school_holiday';
+
+export interface CalendarDay {
+	id?: string | null;
+	startDate: string;
+	endDate: string;
+	name: string;
+	kind: CalendarDayKind;
+	source: 'builtin' | 'custom';
+}
+
+export interface CustomDayInput {
+	kind: CalendarDayKind;
+	startDate: string;
+	endDate: string;
+	name: string;
+}
+
+export type PlanMode = 'office' | 'home' | 'customer' | 'school' | 'off';
+
+export interface PlanDayInput {
+	mode: PlanMode;
+	placeId?: string | null;
+	note?: string | null;
+}
+
+export interface PlanDay extends PlanDayInput {
+	date: string;
+}
+
+export interface ShareScopes {
+	plan?: boolean;
+	actual?: boolean;
+	vacation?: boolean;
+}
+
+export interface Share {
+	id: string;
+	recipientHandle: string;
+	scopes: ShareScopes;
+	createdAt: string;
+}
+
+export interface IncomingShare {
+	id: string;
+	ownerDisplayName: string;
+	scopes: ShareScopes;
+}
+
+export interface SharedView {
+	plan?: { date: string; mode: PlanMode }[];
+	actual?: { date: string; evaluatedStart?: string | null; evaluatedEnd?: string | null; evaluatedWorkSeconds: number }[];
+	vacation?: { startDate: string; endDate: string }[];
 }

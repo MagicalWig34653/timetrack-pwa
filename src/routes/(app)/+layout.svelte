@@ -13,6 +13,10 @@
 		{ href: '/', label: t('nav.home'), prefix: false },
 		{ href: '/time', label: t('nav.time'), prefix: true },
 		{ href: '/suggestions', label: t('nav.suggestions'), prefix: true },
+		{ href: '/calendar', label: t('nav.calendar'), prefix: true },
+		{ href: '/vacation', label: t('nav.vacation'), prefix: true },
+		{ href: '/absences', label: t('nav.absences'), prefix: true },
+		{ href: '/shared', label: t('nav.shared'), prefix: true },
 		{ href: '/settings/work-model', label: t('nav.settings'), prefix: false, section: '/settings' },
 		...(session?.account.role === 'admin' ? [{ href: '/admin/invitations', label: t('nav.invitations'), prefix: true }] : [])
 	]);
