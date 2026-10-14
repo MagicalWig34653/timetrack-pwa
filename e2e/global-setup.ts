@@ -86,6 +86,7 @@ async function startInstance(binary: string, port: number): Promise<Instance & {
 export default async function globalSetup() {
 	const port = Number(process.env.E2E_PORT ?? 18090);
 	const timePort = Number(process.env.E2E_TIME_PORT ?? port + 1);
+	const planningPort = Number(process.env.E2E_PLANNING_PORT ?? port + 2);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -112,8 +113,20 @@ export default async function globalSetup() {
 	}
 	process.env.E2E_TIME_BASE_URL = `http://localhost:${timePort}`;
 	process.env.E2E_TIME_BOOTSTRAP_LINK = stage2.link;
+	// Stage 3a (planning, vacation, sharing) gets a third instance with its own database.
+	let stage3: Instance;
+	try {
+		stage3 = await startInstance(binary, planningPort);
+	} catch (e) {
+		await stage2.stop();
+		await stage1.stop();
+		throw e;
+	}
+	process.env.E2E_PLANNING_BASE_URL = `http://localhost:${planningPort}`;
+	process.env.E2E_PLANNING_BOOTSTRAP_LINK = stage3.link;
 
 	return async () => {
+		await stage3.stop();
 		await stage2.stop();
 		await stage1.stop();
 	};

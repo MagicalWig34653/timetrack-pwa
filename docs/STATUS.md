@@ -66,3 +66,14 @@ PWA und Mock an Vertrag v0.3.1 angepasst (weiterhin nur gegen die Mock-API für 
 (Soll 0 bzw. halbiert, expliziter Marker gewinnt); Tagesansicht zeigt dazu einen neutralen Hinweis.
 Geprüft: `npm run check` 0/0, `npm test` 184 grün (+26), `npm run build`, `npm run test:e2e` (echtes Backend) 29 grün, `npm run test:e2e:mock` 15 grün (+4 Screenshot-Specs übersprungen).
 Details, Annahmen und offene Fragen: `docs/handoffs/L7a.md`.
+
+## Stand 14.10.2026 – Paket L7b (Branch l7b-planning-e2e)
+
+Urlaub, Abwesenheiten, Kalender/Planung und Freigaben laufen gegen das echte Swift-Backend (C1–C9, Vertrag v0.3.2): neue Spec `e2e/stage3-planning.spec.ts`
+(20 Tests, dritte Backend-Instanz auf `E2E_PORT`+2 / `E2E_PLANNING_PORT`, eigene SQLite-DB): Arbeitsmodell, Urlaubseinstellungen (Standard nur vorgeschlagen, erst nach Speichern `configured`),
+Stichtagsbestand ersetzt Anspruch (nicht additiv), Korrekturen/Einträge löschen, Osterurlaub (Feiertage/Wochenende nicht gezählt, geplant -> genehmigt -> genommen, Saldo nur einmal gebucht, Vorschau),
+Feiertag vor Urlaub (`markSource`), Halbtage (Soll halbiert), Überlappung 409 deutsch, Krankheit mit Unterlagenfeldern (Zeitkonto +2 x 7:42, kein negatives Delta), 412 mit „Aktuelle Fassung laden“,
+eigener Feiertag/Schulferien, Planung setzen/ändern/entfernen, Freigaben (Standard nichts, Umfänge einzeln, strenge Feldliste ohne Notizen/Orte/Krankheit/Unterlagen, Widerruf sofort 404, 409/400/404),
+Kontentrennung mit fremden IDs (404). UI angepasst: `DayEvaluation.markSource`/`targetOverrideSeconds` (v0.3.2) in Typen, Tagesansicht zeigt die Herkunft der Markierung neutral; Mock liefert beide Felder.
+Geprüft: `npm run check` 0/0, `npm test` 186 grün, `npm run build`, `npm run test:e2e` 49 grün (15 + 14 + 20), `npm run test:e2e:mock` 15 grün (4 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR).
+Keine Backend-Fehler gefunden (Beobachtungen in `docs/handoffs/L7b.md`). Nicht geprüft: MariaDB-Modus, Firefox/WebKit, Jahreswechsel der Maschinenuhr (Spec nutzt feste Daten 2026).

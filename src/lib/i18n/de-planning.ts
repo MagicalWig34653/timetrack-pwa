@@ -236,6 +236,9 @@ export const dePlanning = {
 
 	// day view hints (absences and holidays feed into the evaluation)
 	'day.target_note_zero': 'Soll 0: Der Tag ist als „{mark}“ gewertet.',
+	'day.mark_source_explicit': 'Markierung: manuell gesetzt.',
+	'day.mark_source_absence': 'Markierung: aus einer Abwesenheit abgeleitet.',
+	'day.mark_source_holiday': 'Markierung: aus dem Feiertagskalender abgeleitet.',
 	'day.target_note_half': 'Soll halbiert: halber Urlaubstag.',
 
 	// errors
