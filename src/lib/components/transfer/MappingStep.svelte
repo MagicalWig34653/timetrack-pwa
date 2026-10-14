@@ -98,10 +98,7 @@
 </script>
 
 <div class="flex flex-col gap-6">
-	<div>
-		<h3 class="font-medium">{t('import.mapping_title')}</h3>
-		<p class="text-sm text-muted-foreground">{t('import.mapping_text')}</p>
-	</div>
+	<p class="text-sm text-muted-foreground">{t('import.mapping_text')}</p>
 
 	<section class="flex flex-col gap-3 rounded-lg border p-4" aria-labelledby="templates-heading">
 		<h4 id="templates-heading" class="text-sm font-medium">{t('import.templates_title')}</h4>

@@ -113,9 +113,9 @@
 		<ul class="flex flex-col gap-2" aria-label={t('attachments.list')} data-testid="attachment-list">
 			{#each files as file (file.id)}
 				<li class="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background p-2 text-sm" data-testid="attachment">
-					<span class="min-w-0 break-all">
+					<span class="min-w-0 break-words">
 						<span class="font-medium">{file.name}</span>
-						<span class="text-muted-foreground"> · {formatBytes(file.size)} · {formatDateNumeric(localDateOf(file.createdAt))}</span>
+						<span class="block text-xs whitespace-nowrap text-muted-foreground">{formatBytes(file.size)} · {formatDateNumeric(localDateOf(file.createdAt))}</span>
 					</span>
 					<span class="flex gap-2">
 						<Button type="button" variant="outline" size="sm" aria-label={t('attachments.download_label', { name: file.name })} onclick={() => download(file)}>{t('attachments.download')}</Button>

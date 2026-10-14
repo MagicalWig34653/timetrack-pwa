@@ -2,7 +2,6 @@
 	import { api, ApiError } from '#lib/api/client.js';
 	import type { ImportJob, ImportPreview, ImportResult, ImportTemplate, RawPreview } from '#lib/api/types.js';
 	import { Alert } from '#lib/components/ui/alert/index.js';
-	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent } from '#lib/components/ui/card/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
@@ -466,7 +465,7 @@
 		{:else}
 			<Card>
 				<CardContent class="flex flex-col gap-2">
-					<p class="flex items-center gap-2 text-lg font-semibold" data-testid="result-created"><Badge>{result.created}</Badge>{t('import.result_created', { count: result.created })}</p>
+					<p class="flex items-center gap-2 text-lg font-semibold" data-testid="result-created">{t('import.result_created', { count: result.created })}</p>
 					<p class="text-sm text-muted-foreground" data-testid="result-skipped">{t('import.result_skipped', { count: result.skipped })}</p>
 					{#if result.created === 0}<p class="text-sm">{t('import.result_none_created')}</p>{/if}
 				</CardContent>
