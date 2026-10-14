@@ -1,4 +1,4 @@
-import { addDays, isoWeekday, startOfWeek } from '../time/dates';
+import { addDays, isoWeekday, startOfWeek } from '../time/dates.ts';
 
 /** ISO 8601 weeks (Monday to Sunday; week 1 contains the first Thursday of the year). */
 export interface IsoWeek {

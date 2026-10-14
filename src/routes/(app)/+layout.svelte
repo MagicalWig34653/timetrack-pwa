@@ -13,6 +13,7 @@
 		{ href: '/', label: t('nav.home'), prefix: false },
 		{ href: '/time', label: t('nav.time'), prefix: true },
 		{ href: '/suggestions', label: t('nav.suggestions'), prefix: true },
+		{ href: '/reports', label: t('nav.reports'), prefix: true },
 		{ href: '/calendar', label: t('nav.calendar'), prefix: true },
 		{ href: '/vacation', label: t('nav.vacation'), prefix: true },
 		{ href: '/absences', label: t('nav.absences'), prefix: true },

@@ -1,6 +1,6 @@
-import { formatDateNumeric } from '../time/dates';
-import { formatDuration } from '../time/format';
-import { weekDates, type IsoWeek } from './weeks';
+import { formatDateNumeric } from '../time/dates.ts';
+import { formatDuration } from '../time/format.ts';
+import { weekDates, type IsoWeek } from './weeks.ts';
 
 /**
  * Standard text format of ADR-0008 (`GET /reports/weeks/{year}/{week}/text`): per day lines

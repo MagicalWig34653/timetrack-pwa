@@ -10,6 +10,7 @@
 		{ href: '/settings/work-model', label: 'nav.work_model' },
 		{ href: '/settings/places', label: 'nav.places' },
 		{ href: '/settings/account-time', label: 'nav.account_time' },
+		{ href: '/settings/learning-fields', label: 'nav.learning_fields' },
 		{ href: '/settings/devices', label: 'nav.devices' },
 		{ href: '/settings/sharing', label: 'nav.sharing' },
 		{ href: '/settings/passkeys', label: 'nav.passkeys' },
