@@ -1,4 +1,5 @@
 import { createPlanningMock } from './planning.ts';
+import { createReportsMock } from './reports.ts';
 import { createTimeMock } from './time.ts';
 import { createTransferMock, type UploadedFile } from './transfer.ts';
 
@@ -131,6 +132,14 @@ export function createMockApi(options: MockOptions = {}) {
 		call: (accountId, method, path, body) => time.handle(accountId, { method, path, body }),
 		absenceExists: (accountId, absenceId) => !!planning.states.get(accountId)?.absences.some((a) => a.id === absenceId),
 		storageSecretKey: options.storageSecretKey ?? true
+	});
+	const reports = createReportsMock({
+		clock: options.now ?? Date.now,
+		call: (accountId, method, path, body) => time.handle(accountId, { method, path, body }),
+		fileOf: (accountId, fileId) => {
+			const file = transfer.files.get(fileId);
+			return file && file.ownerId === accountId ? file.meta : null;
+		}
 	});
 	const oidc = {
 		enabled: !!options.oidc,
@@ -581,6 +590,9 @@ export function createMockApi(options: MockOptions = {}) {
 
 		const transferResponse = transfer.handle(account.id, { method, path: req.path, body: req.body, file: req.file, role: account.role });
 		if (transferResponse) return transferResponse;
+
+		const reportsResponse = reports.handle(account.id, { method, path: req.path, body: req.body, ifMatch: req.ifMatch });
+		if (reportsResponse) return reportsResponse;
 
 		const planningResponse = planning.handle(account.id, {
 			method,

@@ -12,6 +12,14 @@ import type {
 	RawPreview,
 	StorageSettings,
 	StorageSettingsInput,
+	LearningField,
+	LearningFieldInput,
+	ReportEntry,
+	ReportEntryInput,
+	ReportSource,
+	ReportSourceInput,
+	ReportStatus,
+	ReportWeek,
 	Absence,
 	AbsenceInput,
 	AccountAdjustmentInput,
@@ -124,6 +132,18 @@ async function upload<T>(path: string, file: File): Promise<T> {
 	if (!response.ok) throw await toApiError(response);
 	const text = await response.text();
 	return (text ? JSON.parse(text) : undefined) as T;
+}
+
+/** text/plain GET (report text output). */
+async function requestText(path: string): Promise<string> {
+	let response: Response;
+	try {
+		response = await fetch(BASE + path, { method: 'GET', headers: { Accept: 'text/plain' }, credentials: 'include' });
+	} catch {
+		throw new ApiError(0, 'network_error');
+	}
+	if (!response.ok) throw await toApiError(response);
+	return response.text();
 }
 
 async function request<T>(
@@ -366,5 +386,21 @@ export const api = {
 	deleteFile: (id: string) => request<void>('DELETE', `/files/${id}`),
 	listAbsenceAttachments: (absenceId: string) => request<FileMeta[]>('GET', `/absences/${absenceId}/attachments`),
 	attachFile: (absenceId: string, fileId: string) => request<FileMeta>('POST', `/absences/${absenceId}/attachments`, { fileId }),
-	detachFile: (absenceId: string, fileId: string) => request<void>('DELETE', `/absences/${absenceId}/attachments/${fileId}`)
+	detachFile: (absenceId: string, fileId: string) => request<void>('DELETE', `/absences/${absenceId}/attachments/${fileId}`),
+
+	// Berichtsheft, contract v0.6.0; entry updates carry the version as If-Match (412 stale_version)
+	listLearningFields: () => request<LearningField[]>('GET', '/reports/learning-fields'),
+	createLearningField: (input: LearningFieldInput) => request<LearningField>('POST', '/reports/learning-fields', input),
+	updateLearningField: (id: string, input: LearningFieldInput) => request<LearningField>('PUT', `/reports/learning-fields/${id}`, input),
+	deleteLearningField: (id: string) => request<void>('DELETE', `/reports/learning-fields/${id}`),
+	getReportWeek: (year: number, week: number) => request<ReportWeek>('GET', `/reports/weeks/${year}/${week}`),
+	putReportWeekStatus: (year: number, week: number, status: ReportStatus) => request<ReportWeek>('PUT', `/reports/weeks/${year}/${week}`, { status }),
+	getReportWeekText: (year: number, week: number) => requestText(`/reports/weeks/${year}/${week}/text`),
+	createReportEntry: (input: ReportEntryInput) => request<ReportEntry>('POST', '/reports/entries', input),
+	updateReportEntry: (id: string, input: ReportEntryInput, ifMatchVersion: number) =>
+		request<ReportEntry>('PUT', `/reports/entries/${id}`, input, { 'If-Match': String(ifMatchVersion) }),
+	deleteReportEntry: (id: string) => request<void>('DELETE', `/reports/entries/${id}`),
+	listReportSources: (year: number, week: number) => request<ReportSource[]>('GET', `/reports/sources?year=${year}&week=${week}`),
+	createReportSource: (input: ReportSourceInput) => request<ReportSource>('POST', '/reports/sources', input),
+	deleteReportSource: (id: string) => request<void>('DELETE', `/reports/sources/${id}`)
 };
