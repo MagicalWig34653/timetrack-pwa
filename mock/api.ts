@@ -1,3 +1,4 @@
+import { createMcpMock } from './mcp.ts';
 import { createPlanningMock } from './planning.ts';
 import { createReportsMock } from './reports.ts';
 import { createTimeMock } from './time.ts';
@@ -141,6 +142,7 @@ export function createMockApi(options: MockOptions = {}) {
 			return file && file.ownerId === accountId ? file.meta : null;
 		}
 	});
+	const mcp = createMcpMock({ clock: options.now ?? Date.now });
 	const oidc = {
 		enabled: !!options.oidc,
 		name: typeof options.oidc === 'object' ? (options.oidc.name ?? 'Mock-IdP') : 'Mock-IdP'
@@ -456,6 +458,10 @@ export function createMockApi(options: MockOptions = {}) {
 			return time.automationEvent(req.authorization, body);
 		}
 
+		// --- MCP/OAuth entry points of the authorization server (public, ADR-0009) ---
+		if (path === '/oauth/register' && method === 'POST') return mcp.register(req.body);
+		if (path === '/oauth/authorize' && method === 'GET') return mcp.authorize(req.path);
+
 		// --- authenticated endpoints ---
 		if (!session || !account) return error(401, 'unauthorized');
 		if (mutating && req.csrfToken !== session.csrfToken) return error(403, 'csrf_invalid');
@@ -580,6 +586,9 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 204 };
 		}
 
+		const mcpResponse = mcp.handle(account.id, session, { method, path: req.path, body: req.body });
+		if (mcpResponse) return mcpResponse;
+
 		const timeResponse = time.handle(account.id, {
 			method,
 			path: req.path,
@@ -635,5 +644,5 @@ export function createMockApi(options: MockOptions = {}) {
 		return error(404, 'not_found');
 	}
 
-	return { handle, state: { accounts, passkeys, sessions, invitations, identities } };
+	return { handle, state: { accounts, passkeys, sessions, invitations, identities, mcp: mcp.state } };
 }

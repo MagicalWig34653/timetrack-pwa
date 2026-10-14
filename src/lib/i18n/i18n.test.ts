@@ -5,7 +5,8 @@ import { ApiError } from '../api/errors.js';
 import { WebAuthnError } from '../webauthn.js';
 import { de } from './de.js';
 import { OIDC_ERROR_CODES } from '../api/types.js';
-import { errorMessage, oidcErrorMessage, t } from './index.js';
+import { MCP_SCOPES } from '../mcp/scopes.js';
+import { errorMessage, oidcErrorMessage, scopeText, t } from './index.js';
 
 function sourceFiles(dir: string): string[] {
 	return readdirSync(dir).flatMap((name) => {
@@ -35,7 +36,7 @@ describe('localization resource', () => {
 	});
 
 	it('maps every error code emitted by the mock API to a German message', () => {
-		const mockSource = readFileSync('mock/api.ts', 'utf8') + readFileSync('mock/time.ts', 'utf8') + readFileSync('mock/planning.ts', 'utf8') + readFileSync('mock/transfer.ts', 'utf8') + readFileSync('mock/reports.ts', 'utf8');
+		const mockSource = readFileSync('mock/api.ts', 'utf8') + readFileSync('mock/time.ts', 'utf8') + readFileSync('mock/planning.ts', 'utf8') + readFileSync('mock/transfer.ts', 'utf8') + readFileSync('mock/reports.ts', 'utf8') + readFileSync('mock/mcp.ts', 'utf8');
 		const codes = [...mockSource.matchAll(/(?:error|fail)\(\d+, '([a-z_]+)'/g)].map((m) => m[1]);
 		expect(codes.length).toBeGreaterThan(5);
 		for (const code of codes) expect(`error.${code}` in de, code).toBe(true);
@@ -67,5 +68,16 @@ describe('localization resource', () => {
 	it('maps last_login_method and reauth_required to German', () => {
 		expect(errorMessage(new ApiError(409, 'last_login_method'))).toBe(de['error.last_login_method']);
 		expect(errorMessage(new ApiError(403, 'reauth_required'))).toContain('erneut an');
+	});
+
+	it('has a plain-language German label and description for every MCP scope', () => {
+		for (const scope of MCP_SCOPES) {
+			const { label, description } = scopeText(scope);
+			expect(label.trim(), scope).not.toBe('');
+			expect(description.length, scope).toBeGreaterThan(15);
+			expect(label + description, scope).not.toContain(':');
+		}
+		expect(scopeText('time:read').description).toBe('Zeitbuchungen, Tagesübersichten und Zeitkonto lesen');
+		expect(scopeText('time:write').description).toBe('Zeiten erfassen und korrigieren');
 	});
 });

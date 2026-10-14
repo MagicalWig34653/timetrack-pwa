@@ -14,6 +14,18 @@ export async function loginAsAdmin(
 	browser: Browser,
 	options: { viewport?: { width: number; height: number }; colorScheme?: 'light' | 'dark' } = {}
 ): Promise<MockActor> {
+	const { context, page } = await newAuthenticatorContext(browser, options);
+	await page.goto('/login');
+	await page.getByRole('button', { name: 'Mit Passkey anmelden' }).click();
+	await expect(page.getByRole('heading', { name: /^Hallo, / })).toBeVisible();
+	return { context, page };
+}
+
+/** A fresh browser context with a virtual authenticator holding a resident credential, not yet signed in. */
+export async function newAuthenticatorContext(
+	browser: Browser,
+	options: { viewport?: { width: number; height: number }; colorScheme?: 'light' | 'dark' } = {}
+): Promise<MockActor> {
 	const context = await browser.newContext({ viewport: options.viewport, colorScheme: options.colorScheme });
 	const page = await context.newPage();
 	const cdp = await context.newCDPSession(page);
@@ -33,9 +45,6 @@ export async function loginAsAdmin(
 			signCount: 0
 		}
 	});
-	await page.goto('/login');
-	await page.getByRole('button', { name: 'Mit Passkey anmelden' }).click();
-	await expect(page.getByRole('heading', { name: /^Hallo, / })).toBeVisible();
 	return { context, page };
 }
 

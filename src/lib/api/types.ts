@@ -568,3 +568,43 @@ export interface ReportSource extends ReportSourceInput {
 	createdAt: string;
 	file?: FileMeta | null;
 }
+
+/** Scopes of the MCP server (ADR-0009). */
+export type McpScope = 'time:read' | 'time:write' | 'schedule:read' | 'schedule:write' | 'reports:read' | 'reports:write' | 'documents:read';
+
+/** GET oauth/requests/{id} (contract v0.7.0): consent data for the signed-in person. */
+export interface OAuthRequest {
+	id: string;
+	clientName: string;
+	redirectHost: string;
+	scopes: McpScope[];
+	expiresAt: string;
+}
+
+export interface OAuthGrant {
+	id: string;
+	clientName: string;
+	scopes: McpScope[];
+	createdAt: string;
+	lastUsedAt?: string | null;
+}
+
+export interface ApiToken {
+	id: string;
+	name: string;
+	scopes: McpScope[];
+	createdAt: string;
+	expiresAt: string;
+	lastUsedAt?: string | null;
+}
+
+/** POST me/api-tokens: the plaintext `token` is only in this response. */
+export interface ApiTokenCreated extends ApiToken {
+	token: string;
+}
+
+export interface ApiTokenInput {
+	name: string;
+	scopes: McpScope[];
+	expiresInDays: number;
+}

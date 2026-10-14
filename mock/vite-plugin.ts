@@ -9,7 +9,11 @@ export function mockApiPlugin(): Plugin {
 		name: 'timetrack-mock-api',
 		apply: 'serve',
 		configureServer(server) {
-			server.middlewares.use('/api', async (req, res) => {
+			// /api is the REST mock; /oauth/register and /oauth/authorize mimic the authorization server endpoints (ADR-0009)
+			for (const prefix of ['/api', '/oauth/register', '/oauth/authorize']) {
+				server.middlewares.use(prefix, (req, res) => handleRequest(prefix, req, res));
+			}
+			const handleRequest = async (prefix: string, req: any, res: any) => {
 				const chunks: Buffer[] = [];
 				for await (const chunk of req) chunks.push(chunk as Buffer);
 				const buffer = Buffer.concat(chunks);
@@ -29,7 +33,7 @@ export function mockApiPlugin(): Plugin {
 				const csrf = req.headers['x-csrf-token'];
 				const result = api.handle({
 					method: req.method ?? 'GET',
-					path: '/api' + (req.url ?? ''),
+					path: (prefix === '/api' ? '/api' : prefix) + (req.url === '/' ? '' : (req.url ?? '')),
 					body: raw ? JSON.parse(raw) : undefined,
 					file,
 					cookies,
@@ -57,7 +61,7 @@ export function mockApiPlugin(): Plugin {
 					res.setHeader('Content-Type', 'application/json');
 					res.end(JSON.stringify(result.body));
 				} else res.end();
-			});
+			};
 		}
 	};
 }
