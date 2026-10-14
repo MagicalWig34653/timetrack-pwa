@@ -8,6 +8,11 @@ declare global {
 		// interface PageState {}
 		// interface Platform {}
 	}
+
+	interface ImportMetaEnv {
+		/** '1' when started via `npm run dev:mock`: in-repo mock API and fake authenticator */
+		readonly VITE_MOCK?: string;
+	}
 }
 
 export {};

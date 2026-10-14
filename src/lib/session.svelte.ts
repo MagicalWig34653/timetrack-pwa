@@ -1,0 +1,43 @@
+import { api, ApiError, setCsrfToken } from '#lib/api/client.js';
+import type { Session } from '#lib/api/types.js';
+
+class SessionStore {
+	current = $state<Session | null>(null);
+	loaded = $state(false);
+
+	/** Reads GET /auth/session. 401 means signed out; other errors propagate. */
+	async refresh(): Promise<Session | null> {
+		try {
+			this.current = await api.currentSession();
+		} catch (error) {
+			if (error instanceof ApiError && error.status === 401) {
+				this.current = null;
+				setCsrfToken(null);
+			} else throw error;
+		}
+		this.loaded = true;
+		return this.current;
+	}
+
+	set(session: Session): void {
+		this.current = session;
+		this.loaded = true;
+		setCsrfToken(session.csrfToken);
+	}
+
+	async signOut(): Promise<void> {
+		try {
+			await api.logout();
+		} finally {
+			this.current = null;
+			setCsrfToken(null);
+		}
+	}
+}
+
+export const sessionStore = new SessionStore();
+
+/** Only allow same-origin absolute paths as post-login targets. */
+export function safeNext(next: string | null | undefined): string {
+	return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+}
