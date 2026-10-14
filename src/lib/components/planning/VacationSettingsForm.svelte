@@ -13,15 +13,17 @@
 	import { formatHalfDays, halfDaysToInput, parseDaysInput } from '#lib/vacation/halfdays.js';
 	import { untrack } from 'svelte';
 
-	let { settings, onsaved }: { settings: VacationSettings | null; onsaved: (settings: VacationSettings) => void } = $props();
+	let { settings, year, onsaved }: { settings: VacationSettings; year: number; onsaved: (settings: VacationSettings) => void } = $props();
 
-	// Initial values are read once; with no stored settings the ADR-0005 defaults are prefilled but never saved on their own.
+	// Initial values are read once (the page re-creates the form per year). Until settings are saved (`configured: false`) the server's
+	// defaults are shown but never saved on their own. The carry-over field edits the selected year only; other years are kept.
 	const initial = untrack(() => settings);
-	let suggested = $state(initial === null);
-	let region = $state(initial?.region ?? SUGGESTED_SETTINGS.region);
-	let entitlement = $state(halfDaysToInput(initial?.annualEntitlementHalfDays ?? SUGGESTED_SETTINGS.annualEntitlementHalfDays));
-	let carryOver = $state(halfDaysToInput(initial?.carryOverHalfDays ?? 0));
-	let expiry = $state(initial?.carryOverExpiry ? formatDayMonth(initial.carryOverExpiry) : '');
+	const selectedYear = untrack(() => year);
+	let suggested = $state(initial.configured === false);
+	let region = $state(initial.region || SUGGESTED_SETTINGS.region);
+	let entitlement = $state(halfDaysToInput(initial.annualEntitlementHalfDays));
+	let carryOver = $state(halfDaysToInput(initial.carryOverByYear?.[String(selectedYear)] ?? 0));
+	let expiry = $state(initial.carryOverExpiry ? formatDayMonth(initial.carryOverExpiry) : '');
 	let errors = $state<Record<string, string>>({});
 	let formError = $state('');
 	let notice = $state('');
@@ -45,7 +47,8 @@
 		if (Object.keys(next).length > 0 || annual === null || carry === null) return;
 		pending = true;
 		try {
-			const saved = await api.putVacationSettings({ region, annualEntitlementHalfDays: annual, carryOverHalfDays: carry, carryOverExpiry: expiryValue });
+			const carryOverByYear = { ...(settings.carryOverByYear ?? {}), [String(selectedYear)]: carry };
+			const saved = await api.putVacationSettings({ region, annualEntitlementHalfDays: annual, carryOverByYear, carryOverExpiry: expiryValue });
 			notice = t('vacation.settings_saved');
 			suggested = false;
 			onsaved(saved);
@@ -78,7 +81,7 @@
 					<p class="text-xs text-muted-foreground">{t('vacation.region_hint')}</p>
 				</div>
 				<Field id="vs-entitlement" label={t('vacation.entitlement')} hint={t('vacation.entitlement_hint')} inputmode="decimal" bind:value={entitlement} error={errors.entitlement} disabled={pending} />
-				<Field id="vs-carry" label={t('vacation.carry')} hint={t('vacation.carry_hint')} inputmode="decimal" bind:value={carryOver} error={errors.carryOver} disabled={pending} />
+				<Field id="vs-carry" label={t('vacation.carry', { year: selectedYear })} hint={t('vacation.carry_hint', { year: selectedYear })} inputmode="decimal" bind:value={carryOver} error={errors.carryOver} disabled={pending} />
 				<Field id="vs-expiry" label={t('vacation.expiry')} hint={t('vacation.expiry_hint')} placeholder="31.03." bind:value={expiry} error={errors.expiry} disabled={pending} />
 			</div>
 			<div><Button type="submit" disabled={pending}>{t('common.save')}</Button></div>

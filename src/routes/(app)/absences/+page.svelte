@@ -70,10 +70,16 @@
 		}
 	}
 
-	async function reloadAfterConflict() {
-		editing = null;
+	/** 412: continue with the current server version of just this absence (GET absences/{id}). */
+	async function reopenFresh(fresh: Absence | null) {
 		notice = '';
-		await refresh();
+		if (!fresh) {
+			editing = null;
+			await refresh();
+			return;
+		}
+		absences = absences.map((a) => (a.id === fresh.id ? fresh : a));
+		editing = fresh;
 	}
 
 	const countsNot = (a: Absence) => a.status === 'rejected' || a.status === 'cancelled';
@@ -128,7 +134,7 @@
 						<Card data-testid="absence-row">
 							<CardContent class="flex flex-col gap-3">
 								{#if editing !== null && editing !== 'new' && editing.id === absence.id}
-									<AbsenceForm {absence} date={absence.startDate} onsaved={saved} oncancel={() => (editing = null)} onstale={reloadAfterConflict} />
+									{#key absence.version}<AbsenceForm {absence} date={absence.startDate} onsaved={saved} oncancel={() => (editing = null)} onstale={reopenFresh} />{/key}
 								{:else}
 									<div class="flex flex-wrap items-center gap-2">
 										<span class="rounded px-2 py-0.5 text-sm font-medium {ABSENCE_CLASSES[absence.kind]}">{absenceKindLabel(absence.kind)}</span>
@@ -143,7 +149,7 @@
 										{:else if absence.kind === 'vacation'}
 											{t('absence.counted', { days: formatHalfDays(absence.countedHalfDays) })}
 										{:else}
-											{t('absence.workdays', { days: formatHalfDays(absence.countedHalfDays) })}
+											{t('absence.no_vacation_use')}
 										{/if}
 										{#if absence.halfDayStart} · {t('absence.half_start')}{/if}
 										{#if absence.halfDayEnd} · {t('absence.half_end')}{/if}

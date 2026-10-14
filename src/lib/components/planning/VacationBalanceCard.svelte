@@ -9,9 +9,8 @@
 	let { balance, settings = null }: { balance: VacationBalance; settings?: VacationSettings | null } = $props();
 
 	const snapshot = $derived(balance.snapshotDate ?? null);
-	// With a snapshot the contract reports entitlement and carry-over as replaced; the stored remaining days follow from
-	// available = snapshot + adjustments - booked (ADR-0005).
-	const snapshotRemaining = $derived(balance.availableHalfDays - balance.adjustmentHalfDays + balance.bookedHalfDays);
+	// With a snapshot the contract reports entitlement and carry-over as 0 and the stored remaining days as snapshotRemainingHalfDays (v0.3.1).
+	const snapshotRemaining = $derived(balance.snapshotRemainingHalfDays ?? 0);
 	const rows = $derived(
 		snapshot
 			? [

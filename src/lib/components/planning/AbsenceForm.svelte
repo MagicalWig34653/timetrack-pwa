@@ -25,8 +25,8 @@
 		date: string;
 		onsaved: (absence: Absence) => void;
 		oncancel: () => void;
-		/** called when the server holds a newer version (412); the parent reloads and reopens the form */
-		onstale?: () => void;
+		/** called when the server holds a newer version (412) with that version (GET absences/{id}); null = it no longer exists */
+		onstale?: (fresh: Absence | null) => void;
 	} = $props();
 
 	const initial = untrack(() => absence);
@@ -79,6 +79,8 @@
 		};
 	}
 
+	let fresh = $state<Absence | null>(null);
+
 	async function submit(event: Event) {
 		event.preventDefault();
 		if (pending) return;
@@ -91,8 +93,11 @@
 			const saved = initial ? await api.updateAbsence(initial.id, input, initial.version) : await api.createAbsence(input);
 			onsaved(saved);
 		} catch (e) {
-			if (e instanceof ApiError && (e.status === 412 || e.code === 'stale_version')) stale = true;
-			else formError = errorMessage(e);
+			if (initial && e instanceof ApiError && (e.status === 412 || e.code === 'stale_version')) {
+				// v0.3.1: read the single absence instead of reloading the whole list.
+				fresh = await api.getAbsence(initial.id).catch(() => null);
+				stale = true;
+			} else formError = errorMessage(e);
 		} finally {
 			pending = false;
 		}
@@ -106,7 +111,7 @@
 		<Alert variant="warning" data-testid="absence-stale">
 			<p class="font-medium">{t('absence.stale_title')}</p>
 			<p class="mt-1">{t('absence.stale_text')}</p>
-			{#if onstale}<Button class="mt-2" type="button" variant="outline" size="sm" onclick={onstale}>{t('absence.stale_reload')}</Button>{/if}
+			{#if onstale}<Button class="mt-2" type="button" variant="outline" size="sm" onclick={() => onstale(fresh)}>{t('absence.stale_reload')}</Button>{/if}
 		</Alert>
 	{/if}
 	<div class="grid gap-3 sm:grid-cols-2">

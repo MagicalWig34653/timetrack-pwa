@@ -7,6 +7,10 @@
 	import { hintLabel, markLabel } from '#lib/time/labels.js';
 
 	let { evaluation, showHints = true }: { evaluation: DayEvaluation; showHints?: boolean } = $props();
+	const markedOff = $derived(evaluation.mark === 'holiday' || evaluation.mark === 'vacation' || evaluation.mark === 'sick');
+	const targetNote = $derived(
+		!markedOff ? '' : evaluation.targetSeconds === 0 ? t('day.target_note_zero', { mark: markLabel(evaluation.mark!) }) : evaluation.mark === 'vacation' ? t('day.target_note_half') : ''
+	);
 	const rounding = $derived(evaluation.startAdjustSeconds + evaluation.endAdjustSeconds);
 </script>
 
@@ -15,6 +19,7 @@
 		{#if evaluation.provisional}<Badge variant="secondary" data-testid="provisional-badge">{t('day.provisional')}</Badge>{/if}
 		{#if evaluation.mark && evaluation.mark !== 'none'}<Badge variant="outline">{markLabel(evaluation.mark)}</Badge>{/if}
 	</div>
+	{#if targetNote}<p class="text-sm text-muted-foreground" data-testid="day-target-note">{targetNote}</p>{/if}
 	<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
 		<div><dt class="text-muted-foreground">{t('day.target')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-target">{formatDuration(evaluation.targetSeconds)}</dd></div>
 		<div><dt class="text-muted-foreground">{t('day.raw')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-raw">{formatDuration(evaluation.rawWorkSeconds)}</dd></div>

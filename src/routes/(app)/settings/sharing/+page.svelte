@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { api } from '#lib/api/client.js';
+	import { api, ApiError } from '#lib/api/client.js';
 	import type { Share, ShareScopes } from '#lib/api/types.js';
 	import Field from '#lib/components/app/Field.svelte';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
@@ -10,6 +10,7 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
+	import { sessionStore } from '#lib/session.svelte.js';
 	import { SHARE_SCOPE_KEYS, scopeLabel } from '#lib/planning/labels.js';
 	import { localDateOf } from '#lib/time/dates.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
@@ -45,6 +46,7 @@
 		notice = '';
 		handleError = '';
 		if (!handle.trim()) handleError = t('share.error_handle');
+		else if (handle.trim().toLowerCase() === sessionStore.current?.account.handle.toLowerCase()) handleError = t('error.share_self');
 		else if (!scopes.plan && !scopes.actual && !scopes.vacation) formError = t('share.error_scope');
 		if (handleError || formError) return;
 		pending = true;
@@ -55,7 +57,8 @@
 			scopes = { plan: false, actual: false, vacation: false };
 			await refresh();
 		} catch (e) {
-			formError = errorMessage(e);
+			// 409 share_exists and 404 recipient_not_found have their own texts; a plain 400 means e.g. a share to oneself (v0.3.1).
+			formError = e instanceof ApiError && e.status === 400 ? t('error.share_invalid') : errorMessage(e);
 		} finally {
 			pending = false;
 		}
