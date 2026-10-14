@@ -101,7 +101,7 @@
 			<CardContent class="flex flex-col gap-5">
 				{#if day}<DaySummary evaluation={day} />{/if}
 				<DayTimeline date={today} {timeZone} {segments} evaluation={day} {now} />
-				<SegmentList {segments} {places} {timeZone} {now} />
+				{#if segments.length > 0}<SegmentList {segments} {places} {timeZone} {now} />{/if}
 				<div><Button variant="outline" size="sm" href="/time/{today}">{t('home.open_day')}</Button></div>
 			</CardContent>
 		</Card>

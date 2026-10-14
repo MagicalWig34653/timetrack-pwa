@@ -13,7 +13,8 @@
     "dev:mock": "VITE_MOCK=1 vite dev",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:mock": "playwright test -c playwright.mock.config.ts"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.3.0",

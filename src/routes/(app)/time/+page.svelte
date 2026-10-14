@@ -84,28 +84,28 @@
 							class="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 outline-none hover:bg-muted/50 focus-visible:bg-muted/50 sm:grid-cols-[9rem_1fr_auto_auto_auto]"
 							aria-current={day.date === today ? 'date' : undefined}
 						>
-							<span class="font-medium {day.date === today ? 'underline underline-offset-4' : ''}">
+							<span class="font-medium sm:order-1 {day.date === today ? 'underline underline-offset-4' : ''}">
 								{formatDateShort(day.date)}
 								{#if isoWeekday(day.date) > 5}<span class="sr-only"> {t('week.weekend')}</span>{/if}
 							</span>
-							<span class="order-3 col-span-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:order-none sm:col-span-1">
+							<span class="text-right font-medium tabular-nums sm:order-5 {day.date <= today && day.deltaSeconds < 0 ? 'text-destructive' : ''}" title={t('day.delta')}>
+								{day.date <= today ? formatDelta(day.deltaSeconds) : '–'}
+							</span>
+							<span class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:order-2">
 								{#if day.evaluatedStart && day.evaluatedEnd}
 									<span class="tabular-nums">{localTimeOf(day.evaluatedStart, timeZone)}–{localTimeOf(day.evaluatedEnd, timeZone)}</span>
 								{:else if day.segmentIds.length === 0}
 									<span>{t('week.no_entries')}</span>
 								{/if}
 								{#if day.mark && day.mark !== 'none'}<Badge variant="outline">{markLabel(day.mark)}</Badge>{/if}
-								{#if day.provisional}<Badge variant="secondary">{t('day.provisional')}</Badge>{/if}
+								{#if day.provisional && day.date <= today}<Badge variant="secondary">{t('day.provisional')}</Badge>{/if}
 								{#if day.breakHints.length > 0}<Badge variant="outline">{t('week.hints', { count: day.breakHints.length })}</Badge>{/if}
 							</span>
-							<span class="text-right text-sm tabular-nums" title={t('day.target')}>
+							<span class="text-right text-sm tabular-nums sm:order-3" title={t('day.target')}>
 								<span class="text-muted-foreground">{t('week.target_short')}</span> {formatDuration(day.targetSeconds)}
 							</span>
-							<span class="hidden text-right text-sm tabular-nums sm:inline" title={t('day.evaluated')}>
+							<span class="hidden text-right text-sm tabular-nums sm:order-4 sm:inline" title={t('day.evaluated')}>
 								<span class="text-muted-foreground">{t('week.evaluated_short')}</span> {formatDuration(day.evaluatedWorkSeconds + day.creditSeconds)}
-							</span>
-							<span class="text-right font-medium tabular-nums {day.date <= today && day.deltaSeconds < 0 ? 'text-destructive' : ''}" title={t('day.delta')}>
-								{day.date <= today ? formatDelta(day.deltaSeconds) : '–'}
 							</span>
 						</a>
 					</li>

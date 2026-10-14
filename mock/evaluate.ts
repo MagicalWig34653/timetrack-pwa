@@ -75,7 +75,7 @@ export function evaluateDay(input: {
 	const mark: DayMarkKind = prefs.mark ?? 'none';
 	const baseTarget = model ? dailyTarget(model, date) : 0;
 	const segments = [...input.segments].sort((a, b) => a.startedAt - b.startedAt);
-	const provisional = segments.some((s) => s.endedAt === null) || date >= localDateOf(now, zone);
+	const provisional = segments.some((s) => s.endedAt === null) || date === localDateOf(now, zone);
 
 	const intervals = segments
 		.map((s) => ({ ...s, interval: { start: s.startedAt, end: Math.max(s.startedAt, s.endedAt ?? now) } }))

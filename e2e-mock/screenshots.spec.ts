@@ -1,0 +1,31 @@
+import { test } from '@playwright/test';
+import { loginAsAdmin } from './helpers';
+
+// Only runs when SCREENSHOT_DIR is set; used for the manual layout review (390 px phone and desktop, light and dark).
+const dir = process.env.SCREENSHOT_DIR;
+const routes = ['/', '/time', '/settings/work-model', '/settings/places', '/settings/account-time', '/settings/devices', '/suggestions'];
+
+test.describe('screenshots', () => {
+	test.skip(!dir, 'set SCREENSHOT_DIR to capture screenshots');
+
+	for (const [name, viewport] of [['phone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 900 }]] as const) {
+		for (const scheme of ['light', 'dark'] as const) {
+			test(`${name} ${scheme}`, async ({ browser }) => {
+				const { page, context } = await loginAsAdmin(browser, { viewport, colorScheme: scheme });
+				const pages = [...routes];
+				for (const route of pages) {
+					await page.goto(route);
+					await page.waitForLoadState('networkidle');
+					const file = `${dir}/${name}-${scheme}-${route === '/' ? 'home' : route.slice(1).replace(/\//g, '_')}.png`;
+					await page.screenshot({ path: file, fullPage: true });
+				}
+				// day detail of the most recent weekday with data
+				await page.goto('/time');
+				await page.getByTestId('week-list').getByRole('link').first().click();
+				await page.waitForLoadState('networkidle');
+				await page.screenshot({ path: `${dir}/${name}-${scheme}-day.png`, fullPage: true });
+				await context.close();
+			});
+		}
+	}
+});

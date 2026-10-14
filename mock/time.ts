@@ -103,7 +103,7 @@ export function createTimeMock(clock: () => number) {
 		const school: Place = { id: uuid(), name: 'Berufsschule', kind: 'school', automationMode: 'suggest', latitude: null, longitude: null, radiusMeters: null, confirmAfterSeconds: 300, defaultSegmentKind: 'school', archived: false };
 		const home: Place = { id: uuid(), name: 'Zuhause', kind: 'home', automationMode: 'off', latitude: null, longitude: null, radiusMeters: null, confirmAfterSeconds: 300, defaultSegmentKind: 'work', archived: false };
 		state.places.push(office, school, home);
-		state.adjustments.push({ kind: 'opening', date: addDays(today, -21), seconds: 4500, reason: 'Anfangsstand' });
+		state.adjustments.push({ kind: 'opening', date: addDays(today, -14), seconds: 4500, reason: 'Anfangsstand' });
 
 		const add = (date: string, from: string, to: string, kind: Segment['kind'], placeId: string, source: Segment['source'] = 'timer') => {
 			const startedAt = zonedTimeToInstant(date, from).toISOString();
