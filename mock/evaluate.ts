@@ -12,10 +12,19 @@ export interface EvalSegment {
 	endedAt: number | null;
 }
 
+/** Effect of absences/holidays on a day (ADR-0005, derived by the planning mock). An explicit mark always wins. */
+export interface DerivedDayContext {
+	mark: 'holiday' | 'vacation' | 'sick';
+	/** half vacation day: the target is halved */
+	halfTarget?: boolean;
+}
+
 export interface DayPrefs {
 	mark?: DayMarkKind;
 	creditSeconds?: number | null;
 	skipFixedBreaks?: boolean;
+	/** explicit target override (contract v0.3.0); only used together with a holiday/vacation/sick mark */
+	targetOverrideSeconds?: number | null;
 }
 
 const MINUTE = 60_000;
@@ -67,12 +76,16 @@ export function evaluateDay(input: {
 	/** non-voided segments belonging to the day */
 	segments: EvalSegment[];
 	prefs?: DayPrefs;
+	/** absence/holiday effect from the planning data; ignored when the user set an explicit mark */
+	derived?: DerivedDayContext | null;
 	now: number;
 }): DayEvaluation {
 	const { date, models, prefs = {}, now } = input;
 	const model = modelForDate(models, date);
 	const zone = model?.timezone ?? DEFAULT_TIMEZONE;
-	const mark: DayMarkKind = prefs.mark ?? 'none';
+	const explicit = prefs.mark !== undefined && prefs.mark !== 'none';
+	const derived = explicit ? null : (input.derived ?? null);
+	const mark: DayMarkKind = explicit ? prefs.mark! : (derived?.mark ?? 'none');
 	const baseTarget = model ? dailyTarget(model, date) : 0;
 	const segments = [...input.segments].sort((a, b) => a.startedAt - b.startedAt);
 	const provisional = segments.some((s) => s.endedAt === null) || date === localDateOf(now, zone);
@@ -91,7 +104,8 @@ export function evaluateDay(input: {
 	let target = baseTarget;
 	let credit = 0;
 	if (mark === 'holiday' || mark === 'vacation' || mark === 'sick') {
-		target = 0;
+		const halved = derived?.halfTarget ? Math.round(baseTarget / 2) : 0;
+		target = prefs.targetOverrideSeconds ?? halved;
 		credit = prefs.creditSeconds ?? 0;
 	} else if (markCreditsSchool) {
 		credit = prefs.creditSeconds ?? schoolCredit;

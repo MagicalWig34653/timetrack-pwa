@@ -1,3 +1,4 @@
+import { splitRange } from '../time/dates';
 import { ApiError } from './errors';
 import type {
 	Absence,
@@ -12,6 +13,7 @@ import type {
 	ShareScopes,
 	SharedView,
 	VacationBalance,
+	VacationEntries,
 	VacationSettings,
 	CreationOptions,
 	DayEvaluation,
@@ -94,6 +96,30 @@ async function sessionRequest(method: Method, path: string, body?: unknown): Pro
 	const session = await request<Session>(method, path, body);
 	setCsrfToken(session.csrfToken);
 	return session;
+}
+
+/** Contract v0.3.1: absences, plan/days and shared views take at most 366 days, time/days at most 93 (else 400 range_too_large). */
+export const MAX_DAYS_RANGE = 366;
+export const MAX_DAYS_EVALUATIONS = 93;
+
+/** Concatenates the scopes of chunked shared views; a scope missing in all parts stays missing. */
+export function mergeSharedViews(parts: SharedView[]): SharedView {
+	const merged: SharedView = {};
+	for (const part of parts) {
+		if (part.plan) merged.plan = [...(merged.plan ?? []), ...part.plan];
+		if (part.actual) merged.actual = [...(merged.actual ?? []), ...part.actual];
+		if (part.vacation) {
+			// A vacation spanning a chunk border may arrive in both parts; merge overlapping periods.
+			const all = [...(merged.vacation ?? []), ...part.vacation].sort((a, b) => a.startDate.localeCompare(b.startDate));
+			merged.vacation = [];
+			for (const v of all) {
+				const last = merged.vacation.at(-1);
+				if (last && v.startDate <= last.endDate) last.endDate = v.endDate > last.endDate ? v.endDate : last.endDate;
+				else merged.vacation.push({ ...v });
+			}
+		}
+	}
+	return merged;
 }
 
 export const api = {
@@ -180,8 +206,9 @@ export const api = {
 	stopTimer: (input: { clientEventId: string }) => request<Segment>('POST', '/time/timer/stop', input),
 
 	// day evaluations and time account
-	listDays: (from: string, to: string) =>
-		request<DayEvaluation[]>('GET', `/time/days?from=${from}&to=${to}`),
+	/** time/days allows at most 93 days per request (range_too_large); longer ranges are loaded in chunks. */
+	listDays: async (from: string, to: string) =>
+		(await Promise.all(splitRange(from, to, MAX_DAYS_EVALUATIONS).map((r) => request<DayEvaluation[]>('GET', `/time/days?from=${r.from}&to=${r.to}`)))).flat(),
 	getDay: (date: string) => request<DayEvaluation>('GET', `/time/days/${date}`),
 	setDayPreferences: (date: string, input: DayPreferences) =>
 		request<DayEvaluation>('PUT', `/time/days/${date}`, input),
@@ -201,7 +228,7 @@ export const api = {
 		request<DeviceTokenCreated>('POST', '/me/device-tokens', input),
 	revokeDeviceToken: (id: string) => request<void>('DELETE', `/me/device-tokens/${id}`),
 
-	// vacation (contract v0.3.0); amounts are half days
+	// vacation (contract v0.3.1); amounts are half days; GET settings answers 200 with `configured: false` until saved
 	getVacationSettings: () => request<VacationSettings>('GET', '/vacation/settings'),
 	putVacationSettings: (input: VacationSettings) => request<VacationSettings>('PUT', '/vacation/settings', input),
 	getVacationBalance: (year: number) => request<VacationBalance>('GET', `/vacation/balance?year=${year}`),
@@ -210,8 +237,13 @@ export const api = {
 	createVacationAdjustment: (input: { date: string; halfDays: number; reason: string }) =>
 		request<VacationBalance>('POST', '/vacation/adjustments', input),
 
-	// absences; `ifMatchVersion` becomes the If-Match header
-	listAbsences: (from: string, to: string) => request<Absence[]>('GET', `/absences?from=${from}&to=${to}`),
+	listVacationEntries: (year: number) => request<VacationEntries>('GET', `/vacation/entries?year=${year}`),
+	deleteVacationEntry: (id: string) => request<void>('DELETE', `/vacation/entries/${id}`),
+
+	// absences; `ifMatchVersion` becomes the If-Match header; ranges above 366 days are loaded in chunks
+	listAbsences: async (from: string, to: string) =>
+		(await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<Absence[]>('GET', `/absences?from=${r.from}&to=${r.to}`)))).flat(),
+	getAbsence: (id: string) => request<Absence>('GET', `/absences/${id}`),
 	createAbsence: (input: AbsenceInput) => request<Absence>('POST', '/absences', input),
 	updateAbsence: (id: string, input: AbsenceInput, ifMatchVersion: number) =>
 		request<Absence>('PUT', `/absences/${id}`, input, { 'If-Match': String(ifMatchVersion) }),
@@ -222,7 +254,8 @@ export const api = {
 		request<CalendarDay[]>('GET', `/calendar/holidays?year=${year}${region ? `&region=${encodeURIComponent(region)}` : ''}`),
 	createCustomDay: (input: CustomDayInput) => request<CalendarDay>('POST', '/calendar/custom-days', input),
 	deleteCustomDay: (id: string) => request<void>('DELETE', `/calendar/custom-days/${id}`),
-	listPlanDays: (from: string, to: string) => request<PlanDay[]>('GET', `/plan/days?from=${from}&to=${to}`),
+	listPlanDays: async (from: string, to: string) =>
+		(await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<PlanDay[]>('GET', `/plan/days?from=${r.from}&to=${r.to}`)))).flat(),
 	putPlanDay: (date: string, input: PlanDayInput) => request<PlanDay>('PUT', `/plan/days/${date}`, input),
 	deletePlanDay: (date: string) => request<void>('DELETE', `/plan/days/${date}`),
 
@@ -232,6 +265,8 @@ export const api = {
 	updateShare: (id: string, scopes: ShareScopes) => request<Share>('PATCH', `/shares/${id}`, { scopes }),
 	revokeShare: (id: string) => request<void>('DELETE', `/shares/${id}`),
 	listIncomingShares: () => request<IncomingShare[]>('GET', '/shares/incoming'),
-	viewShared: (shareId: string, from: string, to: string) =>
-		request<SharedView>('GET', `/shares/incoming/${shareId}/view?from=${from}&to=${to}`)
+	viewShared: async (shareId: string, from: string, to: string): Promise<SharedView> => {
+		const parts = await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<SharedView>('GET', `/shares/incoming/${shareId}/view?from=${r.from}&to=${r.to}`)));
+		return mergeSharedViews(parts);
+	}
 };

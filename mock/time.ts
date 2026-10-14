@@ -11,7 +11,7 @@ import type {
 	WorkModel,
 	WorkModelInput
 } from '../src/lib/api/types.ts';
-import { daysBetween, evaluateDay, modelForDate, workDayOf, type DayPrefs, type EvalSegment } from './evaluate.ts';
+import { daysBetween, evaluateDay, modelForDate, workDayOf, type DayPrefs, type DerivedDayContext, type EvalSegment } from './evaluate.ts';
 
 export interface TimeRequest {
 	method: string;
@@ -38,6 +38,7 @@ interface StoredToken extends DeviceToken {
 }
 
 interface TimeState {
+	accountId: string;
 	models: WorkModel[];
 	places: Place[];
 	segments: Segment[];
@@ -59,11 +60,14 @@ const SEGMENT_KINDS = ['work', 'travel', 'school'];
 
 export function createTimeMock(clock: () => number) {
 	const states = new Map<string, TimeState>();
+	/** Set by the API mock: how absences and holidays change a day (planning data lives in another module). */
+	let dayContext: (accountId: string, date: string) => DerivedDayContext | null = () => null;
 
 	function stateOf(accountId: string): TimeState {
 		let state = states.get(accountId);
 		if (!state) {
 			state = {
+				accountId,
 				models: [],
 				places: [],
 				segments: [],
@@ -152,6 +156,7 @@ export function createTimeMock(clock: () => number) {
 			models: state.models,
 			segments: toEval(segmentsOfDay(state, date)),
 			prefs: state.prefs.get(date),
+			derived: dayContext(state.accountId, date),
 			now: clock()
 		});
 	}
@@ -404,12 +409,14 @@ export function createTimeMock(clock: () => number) {
 				if (body.mark !== undefined && !DAY_MARKS.includes(body.mark)) return fail(400, 'bad_request');
 				if (body.creditSeconds != null && !(Number.isInteger(body.creditSeconds) && body.creditSeconds >= 0)) return fail(400, 'bad_request');
 				if (typeof body.note === 'string' && body.note.length > 200) return fail(400, 'bad_request');
+				if (body.targetOverrideSeconds != null && !(Number.isInteger(body.targetOverrideSeconds) && body.targetOverrideSeconds >= 0)) return fail(400, 'bad_request');
 				const current = state.prefs.get(date) ?? {};
 				const next = { ...current };
 				if (body.mark !== undefined) next.mark = body.mark === 'none' ? undefined : body.mark;
 				if ('creditSeconds' in body) next.creditSeconds = body.creditSeconds;
 				if (body.skipFixedBreaks !== undefined) next.skipFixedBreaks = body.skipFixedBreaks;
 				if ('note' in body) next.note = body.note;
+				if ('targetOverrideSeconds' in body) next.targetOverrideSeconds = body.targetOverrideSeconds;
 				state.prefs.set(date, next);
 				return ok(evaluate(state, date));
 			}
@@ -535,5 +542,8 @@ export function createTimeMock(clock: () => number) {
 
 	const modelsOf = (accountId: string) => stateOf(accountId).models;
 	const evaluateFor = (accountId: string, date: string) => evaluate(stateOf(accountId), date);
-	return { handle, seedDemo, automationEvent, states, modelsOf, evaluateFor };
+	const setDayContext = (fn: (accountId: string, date: string) => DerivedDayContext | null) => {
+		dayContext = fn;
+	};
+	return { handle, seedDemo, automationEvent, states, modelsOf, evaluateFor, setDayContext };
 }

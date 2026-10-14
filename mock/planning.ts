@@ -1,4 +1,4 @@
-// Mock of the planning and vacation endpoints in contracts/openapi.yaml v0.3.0 (vacation settings/balance/snapshots/adjustments,
+// Mock of the planning and vacation endpoints in contracts/openapi.yaml v0.3.1 (vacation settings/balance/snapshots/adjustments,
 // absences, calendar holidays/custom days, plan days, shares). The backend implements these in C8/C9.
 // Rules follow "Fachregeln Etappe 3a" in ADR-0005 (backend repo); assumptions are listed in docs/handoffs/L6.md.
 import { addDays, isoWeekday, startOfWeek, todayLocal } from '../src/lib/time/dates.ts';
@@ -16,7 +16,7 @@ import type {
 	WorkModel
 } from '../src/lib/api/types.ts';
 import { holidaysFor } from './holidays.ts';
-import { daysBetween, modelForDate } from './evaluate.ts';
+import { daysBetween, modelForDate, type DerivedDayContext } from './evaluate.ts';
 
 export interface PlanningRequest {
 	method: string;
@@ -41,6 +41,7 @@ export interface PlanningDeps {
 }
 
 interface AdjustmentEntry {
+	id: string;
 	date: string;
 	halfDays: number;
 	reason: string;
@@ -48,7 +49,7 @@ interface AdjustmentEntry {
 
 interface PlanningState {
 	settings: VacationSettings | null;
-	snapshots: { date: string; remainingHalfDays: number }[];
+	snapshots: { id: string; date: string; remainingHalfDays: number }[];
 	adjustments: AdjustmentEntry[];
 	absences: Absence[];
 	customDays: (CalendarDay & { id: string })[];
@@ -71,8 +72,10 @@ const PLAN_MODES: PlanMode[] = ['office', 'home', 'customer', 'school', 'off'];
 const BOOKED = ['approved', 'taken'];
 const PLANNED = ['planned', 'requested'];
 const MAX_SPAN_DAYS = 800;
+/** Contract v0.3.1: absences, plan/days and shared views accept at most 366 days (else 400 range_too_large). */
+const MAX_RANGE_DAYS = 366;
 
-export const DEFAULT_VACATION_SETTINGS: VacationSettings = { region: 'DE-ST', annualEntitlementHalfDays: 60, carryOverHalfDays: 0, carryOverExpiry: null };
+export const DEFAULT_VACATION_SETTINGS: VacationSettings = { region: 'DE-ST', annualEntitlementHalfDays: 60, carryOverByYear: {}, carryOverExpiry: null };
 
 export function createPlanningMock(deps: PlanningDeps) {
 	const states = new Map<string, PlanningState>();
@@ -126,7 +129,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 
 	function balance(accountId: string, year: number): VacationBalance {
 		const state = stateOf(accountId);
-		const settings = state.settings ?? { region: DEFAULT_VACATION_SETTINGS.region, annualEntitlementHalfDays: 0, carryOverHalfDays: 0 };
+		const settings = state.settings ?? { region: DEFAULT_VACATION_SETTINGS.region, annualEntitlementHalfDays: 0, carryOverByYear: {} };
 		const snapshot = state.snapshots.filter((s) => s.date.startsWith(`${year}-`)).sort((a, b) => b.date.localeCompare(a.date))[0];
 		const clip = { from: snapshot?.date ?? `${year}-01-01`, to: `${year}-12-31` };
 		let booked = 0;
@@ -139,11 +142,12 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const adjustments = state.adjustments.filter((x) => x.date >= clip.from && x.date <= clip.to).reduce((sum, x) => sum + x.halfDays, 0);
 		// With a snapshot the stored remaining days replace entitlement and carry-over of the year (not additive).
 		const entitlement = snapshot ? 0 : settings.annualEntitlementHalfDays;
-		const carryOver = snapshot ? 0 : (settings.carryOverHalfDays ?? 0);
+		const carryOver = snapshot ? 0 : (settings.carryOverByYear?.[String(year)] ?? 0);
 		const available = (snapshot ? snapshot.remainingHalfDays : entitlement + carryOver) + adjustments - booked;
 		return {
 			year,
 			snapshotDate: snapshot?.date ?? null,
+			snapshotRemainingHalfDays: snapshot?.remainingHalfDays ?? null,
 			entitlementHalfDays: entitlement,
 			carryOverHalfDays: carryOver,
 			adjustmentHalfDays: adjustments,
@@ -154,8 +158,29 @@ export function createPlanningMock(deps: PlanningDeps) {
 		};
 	}
 
+	/** v0.3.1: only vacation counts half days, and not once rejected or cancelled. */
 	function withCount(accountId: string, absence: Omit<Absence, 'countedHalfDays'>): Absence {
-		return { ...absence, countedHalfDays: countHalfDays(accountId, absence) };
+		const counts = absence.kind === 'vacation' && absence.status !== 'rejected' && absence.status !== 'cancelled';
+		return { ...absence, countedHalfDays: counts ? countHalfDays(accountId, absence) : 0 };
+	}
+
+	/**
+	 * Effect of absences and holidays on one day for the time mock (ADR-0005): holiday on a workday -> mark holiday; approved/taken
+	 * vacation or sick -> mark vacation/sick (target 0); a half vacation day halves the target. planned/requested/rejected/cancelled
+	 * and kind=other change nothing. An explicit day mark is applied by the evaluation and wins.
+	 * Assumption: a holiday wins over an absence on the same day (vacation is not consumed there either).
+	 */
+	function dayContext(accountId: string, date: string): DerivedDayContext | null {
+		const model = modelForDate(deps.modelsOf(accountId), date);
+		if (!model || !model.workdays.includes(isoWeekday(date))) return null;
+		const state = stateOf(accountId);
+		if (holidayDates(state, date, date).has(date)) return { mark: 'holiday' };
+		const absence = state.absences.find((a) => BOOKED.includes(a.status) && (a.kind === 'vacation' || a.kind === 'sick') && a.startDate <= date && a.endDate >= date);
+		if (!absence) return null;
+		if (absence.kind === 'sick') return { mark: 'sick' };
+		const single = absence.startDate === absence.endDate;
+		const half = single ? !!(absence.halfDayStart || absence.halfDayEnd) : (date === absence.startDate && !!absence.halfDayStart) || (date === absence.endDate && !!absence.halfDayEnd);
+		return half ? { mark: 'vacation', halfTarget: true } : { mark: 'vacation' };
 	}
 
 	function normalize(input: any): AbsenceInput | null {
@@ -183,7 +208,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 		};
 	}
 
-	/** Assumption: cancelled and rejected absences do not block other ones (question in the handoff). */
+	/** Contract v0.3.1: cancelled and rejected absences do not block other ones. */
 	const blocks = (a: Pick<Absence, 'status'>) => a.status !== 'cancelled' && a.status !== 'rejected';
 
 	function overlaps(state: PlanningState, input: AbsenceInput, ignoreId?: string): boolean {
@@ -212,7 +237,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 				.map((d) => ({ date: d.date, evaluatedStart: d.evaluatedStart ?? null, evaluatedEnd: d.evaluatedEnd ?? null, evaluatedWorkSeconds: d.evaluatedWorkSeconds }));
 		}
 		if (share.scopes.vacation) {
-			// Assumption: only approved/taken vacation is visible to the recipient; never sick/other, notes or documents.
+			// v0.3.1: only approved/taken vacation is visible to the recipient; never sick/other, notes or documents.
 			view.vacation = state.absences
 				.filter((a) => a.kind === 'vacation' && BOOKED.includes(a.status) && a.startDate <= to && a.endDate >= from)
 				.sort((a, b) => a.startDate.localeCompare(b.startDate))
@@ -258,7 +283,8 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const range = (): { from: string; to: string } | PlanningResponse => {
 			const from = query.get('from');
 			const to = query.get('to');
-			if (!isDate(from) || !isDate(to) || to < from || daysBetween(from, to).length > MAX_SPAN_DAYS) return fail(400, 'bad_request');
+			if (!isDate(from) || !isDate(to) || to < from) return fail(400, 'bad_request');
+			if (daysBetween(from, to).length > MAX_RANGE_DAYS) return fail(400, 'range_too_large');
 			return { from, to };
 		};
 		const yearOf = (): number | null => {
@@ -269,18 +295,19 @@ export function createPlanningMock(deps: PlanningDeps) {
 
 		// --- vacation ---
 		if (route === 'vacation/settings') {
-			if (method === 'GET') return state.settings ? ok(state.settings) : fail(404, 'not_found');
+			if (method === 'GET') return ok(state.settings ? { ...state.settings, configured: true } : { ...DEFAULT_VACATION_SETTINGS, carryOverByYear: {}, configured: false });
 			if (method === 'PUT') {
-				const carry = body.carryOverHalfDays ?? 0;
+				const carry = body.carryOverByYear ?? {};
 				const expiry = body.carryOverExpiry ?? null;
 				if (
 					typeof body.region !== 'string' || !/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/.test(body.region) ||
 					!Number.isInteger(body.annualEntitlementHalfDays) || body.annualEntitlementHalfDays < 0 ||
-					!Number.isInteger(carry) || carry < 0 ||
+					carry === null || typeof carry !== 'object' || Array.isArray(carry) ||
+					Object.entries(carry).some(([year, value]) => !/^\d{4}$/.test(year) || !Number.isInteger(value) || (value as number) < 0) ||
 					(expiry !== null && !/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(expiry))
 				) return fail(400, 'bad_request');
-				state.settings = { region: body.region, annualEntitlementHalfDays: body.annualEntitlementHalfDays, carryOverHalfDays: carry, carryOverExpiry: expiry };
-				return ok(state.settings);
+				state.settings = { region: body.region, annualEntitlementHalfDays: body.annualEntitlementHalfDays, carryOverByYear: { ...carry }, carryOverExpiry: expiry };
+				return ok({ ...state.settings, configured: true });
 			}
 		}
 		if (route === 'vacation/balance' && method === 'GET') {
@@ -290,15 +317,35 @@ export function createPlanningMock(deps: PlanningDeps) {
 		if (route === 'vacation/snapshots' && method === 'POST') {
 			if (!isDate(body.date) || !Number.isInteger(body.remainingHalfDays) || body.remainingHalfDays < 0) return fail(400, 'bad_request');
 			state.snapshots = state.snapshots.filter((s) => s.date !== body.date);
-			state.snapshots.push({ date: body.date, remainingHalfDays: body.remainingHalfDays });
+			state.snapshots.push({ id: uuid(), date: body.date, remainingHalfDays: body.remainingHalfDays });
 			return ok(balance(accountId, Number(body.date.slice(0, 4))), 201);
 		}
 		if (route === 'vacation/adjustments' && method === 'POST') {
 			if (!isDate(body.date) || !Number.isInteger(body.halfDays) || body.halfDays === 0 || typeof body.reason !== 'string' || !body.reason.trim() || body.reason.length > 200) {
 				return fail(400, 'bad_request');
 			}
-			state.adjustments.push({ date: body.date, halfDays: body.halfDays, reason: body.reason.trim() });
+			state.adjustments.push({ id: uuid(), date: body.date, halfDays: body.halfDays, reason: body.reason.trim() });
 			return ok(balance(accountId, Number(body.date.slice(0, 4))), 201);
+		}
+
+		if (route === 'vacation/entries' && method === 'GET') {
+			const year = yearOf();
+			if (year === null) return fail(400, 'bad_request');
+			const inYear = (e: { date: string }) => e.date.startsWith(`${year}-`);
+			return ok({
+				snapshots: state.snapshots.filter(inYear).sort((a, b) => a.date.localeCompare(b.date)),
+				adjustments: state.adjustments.filter(inYear).sort((a, b) => a.date.localeCompare(b.date))
+			});
+		}
+		if ((m = route.match(/^vacation\/entries\/([^/]+)$/)) && method === 'DELETE') {
+			const snapshot = state.snapshots.findIndex((s) => s.id === m![1]);
+			if (snapshot >= 0) state.snapshots.splice(snapshot, 1);
+			else {
+				const adjustment = state.adjustments.findIndex((a) => a.id === m![1]);
+				if (adjustment < 0) return fail(404, 'not_found');
+				state.adjustments.splice(adjustment, 1);
+			}
+			return { status: 204 };
 		}
 
 		// --- absences ---
@@ -325,6 +372,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 		if ((m = route.match(/^absences\/([^/]+)$/))) {
 			const absence = state.absences.find((a) => a.id === m![1]);
 			if (!absence) return fail(404, 'not_found');
+			if (method === 'GET') return ok(withCount(accountId, absence));
 			if (method === 'PUT') {
 				if (req.ifMatch === undefined) return fail(400, 'bad_request');
 				if (String(absence.version) !== req.ifMatch) return fail(412, 'stale_version');
@@ -427,5 +475,5 @@ export function createPlanningMock(deps: PlanningDeps) {
 		return null;
 	}
 
-	return { handle, seedDemo, seedShare, states, shares };
+	return { handle, seedDemo, seedShare, dayContext, states, shares };
 }

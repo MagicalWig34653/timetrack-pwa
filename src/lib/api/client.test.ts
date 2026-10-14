@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockFetch } from '../../../mock/fetch.ts';
-import { api, ApiError, setCsrfToken } from './client.js';
+import { splitRange } from '../time/dates.js';
+import { api, ApiError, mergeSharedViews, setCsrfToken } from './client.js';
 
 describe('api client', () => {
 	let mock: ReturnType<typeof createMockFetch>;
@@ -56,5 +57,26 @@ describe('api client', () => {
 		const options = await api.loginOptions();
 		await api.loginVerify(options.challengeId, { id: 'mock-login' });
 		await expect(api.revokeOtherSessions()).resolves.toBeUndefined();
+	});
+});
+
+describe('range helpers', () => {
+	it('splits ranges into chunks of at most N days', () => {
+		expect(splitRange('2026-01-01', '2026-01-03', 5)).toEqual([{ from: '2026-01-01', to: '2026-01-03' }]);
+		expect(splitRange('2026-01-01', '2026-01-10', 4)).toEqual([
+			{ from: '2026-01-01', to: '2026-01-04' },
+			{ from: '2026-01-05', to: '2026-01-08' },
+			{ from: '2026-01-09', to: '2026-01-10' }
+		]);
+	});
+
+	it('merges chunked shared views and overlapping vacation periods', () => {
+		const merged = mergeSharedViews([
+			{ plan: [{ date: '2026-01-01', mode: 'office' }], vacation: [{ startDate: '2026-12-28', endDate: '2027-01-01' }] },
+			{ plan: [{ date: '2027-01-05', mode: 'home' }], vacation: [{ startDate: '2026-12-30', endDate: '2027-01-03' }] }
+		]);
+		expect(merged.plan).toHaveLength(2);
+		expect(merged.vacation).toEqual([{ startDate: '2026-12-28', endDate: '2027-01-03' }]);
+		expect(merged.actual).toBeUndefined();
 	});
 });

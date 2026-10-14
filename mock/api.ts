@@ -94,6 +94,7 @@ export function createMockApi(options: MockOptions = {}) {
 		findByHandle: (handle) => [...accounts.values()].find((a) => a.handle === handle),
 		displayNameOf: (id) => accounts.get(id)?.displayName ?? ''
 	});
+	time.setDayContext(planning.dayContext);
 	const passkeys: MockPasskey[] = [];
 	const sessions = new Map<string, MockSession>();
 	const invitations: MockInvitation[] = [];
