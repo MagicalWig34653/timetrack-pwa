@@ -150,9 +150,9 @@ test('copy as text: clipboard receives the standard format and a toast confirms'
 		'Schule | 3:00 h | meine Notiz',
 		'',
 		'Dienstag, 08.03.2033',
-		'Betrieb | 0:30 h |',
+		'Betrieb | 0:30 h',
 		'',
-		'Wochensumme: 3:30 h',
+		'Summe: 3:30 h',
 		''
 	]);
 
@@ -175,7 +175,7 @@ test('copy as text without clipboard permission falls back to a selected text in
 	await expect(dialog).toBeVisible();
 	await expect(dialog.getByTestId('copy-fallback')).toContainText('Strg+C');
 	const selected = await dialog.getByTestId('text-preview').evaluate((el: HTMLTextAreaElement) => el.value.slice(el.selectionStart, el.selectionEnd));
-	expect(selected).toContain('Wochensumme: 3:30 h');
+	expect(selected).toContain('Summe: 3:30 h');
 	await page.keyboard.press('Escape');
 	await expect(dialog).toBeHidden();
 	await context.close();

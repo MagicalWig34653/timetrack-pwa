@@ -133,7 +133,7 @@ export function createReportsMock(deps: ReportsDeps) {
 		const learningFieldId = input.learningFieldId ?? null;
 		if (learningFieldId) {
 			const field = s.fields.find((f) => f.id === learningFieldId);
-			if (!field) return fail(400, 'bad_request');
+			if (!field) return fail(404, 'not_found'); // like the real server: unknown or foreign field id
 			learningField = field.name; // the current name becomes the snapshot
 		}
 		if (learningField.length < 1 || learningField.length > 120) return fail(400, 'bad_request');
@@ -158,7 +158,7 @@ export function createReportsMock(deps: ReportsDeps) {
 		const entry = s.entries.find((e) => e.id === m[1]);
 		if (!entry) return fail(404, 'not_found');
 		if (method === 'PUT') {
-			if (req.ifMatch === undefined) return fail(400, 'bad_request');
+			if (req.ifMatch === undefined) return fail(412, 'stale_version'); // like the real server: a missing If-Match is a stale version
 			if (String(entry.version) !== req.ifMatch.replace(/^W\/|"/g, '')) return fail(412, 'stale_version');
 			const parsed = entryInput(s, req.body);
 			if ('status' in parsed) return parsed;

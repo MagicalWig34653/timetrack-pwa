@@ -125,7 +125,8 @@
 		busy = true;
 		try {
 			await api.deleteReportSource(source.id);
-			// the uploaded file belongs to nothing else: delete it too (best effort)
+			// the backend keeps the file when a source is deleted (C15). The file was uploaded for this source only, so it is deleted
+			// here exactly once (best effort; a 404 means it is already gone), otherwise it would stay behind as an orphan.
 			if (source.file) await api.deleteFile(source.file.id).catch(() => undefined);
 			notice = t('reports.sources.removed');
 			await refresh();

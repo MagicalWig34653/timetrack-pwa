@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { durationInputValue, parseReportDuration } from './duration';
-import { formatWeekText } from './text';
+import { formatWeekText, singleLine } from './text';
 import { compareWeeks, isoWeekOf, isoWeeksInYear, isValidIsoWeek, shiftWeek, weekDates, weekStartDate } from './weeks';
 
 describe('parseReportDuration', () => {
@@ -97,19 +97,25 @@ describe('formatWeekText (ADR-0008 standard format)', () => {
 				'',
 				'Montag, 12.10.2026',
 				'Lernfeld 1 Betrieb | 2:30 h | Einführung ins Ticketsystem',
-				'Freitext | 0:30 h |',
+				'Freitext | 0:30 h',
 				'',
 				'Dienstag, 13.10.2026',
-				'Lernfeld 4 Netzwerke | 1:00 h | Subnetze berechnet',
+				'Lernfeld 4 Netzwerke | 1:00 h | Subnetze / berechnet',
 				'',
-				'Wochensumme: 4:00 h',
+				'Summe: 4:00 h',
 				''
 			].join('\n')
 		);
 	});
 
+	it('single-lines notes like the server and omits an empty note part', () => {
+		const text = formatWeekText({ year: 2026, week: 42 }, [{ date: '2026-10-12', learningField: 'A\nB', durationSeconds: 3659, notes: ' eins \r\n\r\n zwei\u2028drei\n' }]);
+		expect(text).toContain('A / B | 1:00 h | eins / zwei / drei\n');
+		expect(singleLine('  \n ')).toBe('');
+	});
+
 	it('produces only the header and a zero total for an empty week', () => {
-		expect(formatWeekText({ year: 2026, week: 53 }, [])).toBe('Berichtsheft KW 53/2026 (28.12.2026 – 03.01.2027)\n\nWochensumme: 0:00 h\n');
+		expect(formatWeekText({ year: 2026, week: 53 }, [])).toBe('Berichtsheft KW 53/2026 (28.12.2026 – 03.01.2027)\n\nSumme: 0:00 h\n');
 	});
 
 	it('includes days that fall into the next calendar year in week 53', () => {
