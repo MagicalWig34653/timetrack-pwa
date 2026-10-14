@@ -55,3 +55,14 @@ Oberfläche für Urlaub, Abwesenheiten, Kalender/Planung und Freigaben gegen den
 Urlaub wird aus ganzzahligen halben Tagen als „12,5 Tage“ gezeigt. Mock enthält TS-Port der ADR-0005-Regeln und einen Feiertagsrechner (DE-ST u. a.).
 Neue Seiten zeigen bei 404/501 „noch nicht verfügbar“. Details, Mock-Annahmen und offene Vertragsfragen: `docs/handoffs/L6.md`.
 Geprüft: `npm run check` 0/0, `npm test` 158 grün, `npm run build`, `npm run test:e2e` (echtes Backend) 29 grün, `npm run test:e2e:mock` 13 grün (+4 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR), Screenshots 390 px/Desktop hell/dunkel.
+
+## Stand 14.10.2026 – Paket L7a (Branch l7a-contract-0-3-1)
+
+PWA und Mock an Vertrag v0.3.1 angepasst (weiterhin nur gegen die Mock-API für die Planungsseiten): `GET vacation/settings` immer 200 mit `configured`
+(Hinweis „noch nicht gespeichert“ statt 404-Behandlung), Übertrag je Jahr (`carryOverByYear`, Formular bearbeitet nur das gewählte Jahr),
+`snapshotRemainingHalfDays` statt Ableitung, `GET/DELETE vacation/entries` (Liste auf `/vacation`, Löschen mit Bestätigung), `GET absences/{id}` nach 412,
+`countedHalfDays` nur für Urlaub und 0 bei abgelehnt/storniert (blockieren keine Überlappung), Freigabe-Fehler (`share_exists`, Eigenfreigabe) auf Deutsch,
+`range_too_large` (Client teilt Anfragen: 366 Tage, `time/days` 93 Tage). Mock speist Abwesenheiten, Feiertage und halbe Urlaubstage in `time/days` ein
+(Soll 0 bzw. halbiert, expliziter Marker gewinnt); Tagesansicht zeigt dazu einen neutralen Hinweis.
+Geprüft: `npm run check` 0/0, `npm test` 184 grün (+26), `npm run build`, `npm run test:e2e` (echtes Backend) 29 grün, `npm run test:e2e:mock` 15 grün (+4 Screenshot-Specs übersprungen).
+Details, Annahmen und offene Fragen: `docs/handoffs/L7a.md`.
