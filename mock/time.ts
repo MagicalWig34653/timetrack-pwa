@@ -533,5 +533,7 @@ export function createTimeMock(clock: () => number) {
 		return ok(result);
 	}
 
-	return { handle, seedDemo, automationEvent, states };
+	const modelsOf = (accountId: string) => stateOf(accountId).models;
+	const evaluateFor = (accountId: string, date: string) => evaluate(stateOf(accountId), date);
+	return { handle, seedDemo, automationEvent, states, modelsOf, evaluateFor };
 }

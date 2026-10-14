@@ -1,3 +1,4 @@
+import { createPlanningMock } from './planning.ts';
 import { createTimeMock } from './time.ts';
 
 // In-memory mock of the happy paths in contracts/openapi.yaml (backend repo), API v0.1.0.
@@ -66,6 +67,8 @@ export interface MockOptions {
 	now?: () => number;
 	/** false skips the demo time-tracking data for the admin account */
 	seedTime?: boolean;
+	/** false skips the demo vacation/plan data, the second demo account and the demo share */
+	seedPlanning?: boolean;
 }
 
 const uuid = () => crypto.randomUUID();
@@ -84,6 +87,13 @@ export function createMockApi(options: MockOptions = {}) {
 	const mailAvailable = options.mailAvailable ?? true;
 	const time = createTimeMock(options.now ?? Date.now);
 	const accounts = new Map<string, MockAccount>();
+	const planning = createPlanningMock({
+		clock: options.now ?? Date.now,
+		modelsOf: time.modelsOf,
+		evaluateFor: time.evaluateFor,
+		findByHandle: (handle) => [...accounts.values()].find((a) => a.handle === handle),
+		displayNameOf: (id) => accounts.get(id)?.displayName ?? ''
+	});
 	const passkeys: MockPasskey[] = [];
 	const sessions = new Map<string, MockSession>();
 	const invitations: MockInvitation[] = [];
@@ -108,6 +118,23 @@ export function createMockApi(options: MockOptions = {}) {
 	lastAccountId = admin.id;
 	seedPasskey(admin.id, 'Demo-Passkey');
 	if (options.seedTime ?? true) time.seedDemo(admin.id);
+	if (options.seedPlanning ?? true) {
+		// Second demo account `lena` (no passkey, cannot sign in) shares plan and vacation (not actual time) with the admin.
+		const lena: MockAccount = {
+			id: uuid(),
+			handle: 'lena',
+			displayName: 'Lena Beispiel',
+			role: 'member',
+			recoveryCodes: null,
+			fallbackPassword: null,
+			emailRecovery: { active: false, verified: false }
+		};
+		accounts.set(lena.id, lena);
+		time.seedDemo(lena.id);
+		planning.seedDemo(admin.id);
+		planning.seedDemo(lena.id);
+		planning.seedShare(lena.id, admin.id, 'admin', { plan: true, actual: false, vacation: true });
+	}
 	invitations.push({
 		id: uuid(),
 		token: 'demo-invite',
@@ -377,6 +404,14 @@ export function createMockApi(options: MockOptions = {}) {
 			ifMatch: req.ifMatch
 		});
 		if (timeResponse) return timeResponse;
+
+		const planningResponse = planning.handle(account.id, {
+			method,
+			path: req.path,
+			body: req.body,
+			ifMatch: req.ifMatch
+		});
+		if (planningResponse) return planningResponse;
 
 		if (path.startsWith('/api/v1/admin/')) {
 			if (account.role !== 'admin') return error(403, 'forbidden');

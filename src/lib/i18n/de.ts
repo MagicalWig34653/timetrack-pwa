@@ -198,6 +198,9 @@ export const de = {
 	'error.model_overlap': 'Die neue Version überschneidet sich mit einer späteren Arbeitsmodell-Version.',
 	'error.opening_exists': 'Es gibt bereits einen Anfangsstand. Weitere Änderungen erfasst du als Korrektur.',
 	'error.suggestion_resolved': 'Dieser Vorschlag wurde bereits bearbeitet.',
+	'error.absence_overlap': 'In diesem Zeitraum gibt es bereits eine andere Abwesenheit. Abwesenheiten dürfen sich nicht überschneiden.',
+	'error.recipient_not_found': 'Dieses Konto wurde nicht gefunden. Prüfe den Kontonamen.',
+	'error.share_exists': 'Für dieses Konto gibt es bereits eine Freigabe. Ändere die vorhandene Freigabe.',
 	'error.range_too_large': 'Der Zeitraum ist zu groß (höchstens 93 Tage).',
 
 	'common.yes': 'Ja',
