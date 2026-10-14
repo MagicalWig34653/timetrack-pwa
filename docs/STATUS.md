@@ -19,3 +19,9 @@ Admin-Einladungen), SPA ohne SSR mit Routenwächter, getippter API-Client, WebAu
 Mock-API (`npm run dev:mock`), Dev-Proxy `/api` -> 127.0.0.1:18080. Geprüft: `npm run check` (0 Fehler), `npm test` (31 grün),
 `npm run build`, Mock-Durchlauf in Headless-Chromium. NICHT geprüft: echtes Backend, echter Authenticator, mobile Breite/Dunkelmodus per Screenshot.
 Details und offene Vertragsfragen: `docs/handoffs/L1.md`. Noch kein Manifest/Service Worker.
+
+## Stand 14.10.2026 – Paket L3b (Branch l3b-e2e)
+
+Playwright-E2E gegen das echte Swift-Backend (`npm run test:e2e`, Port `E2E_PORT`, Standard 18090, SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator):
+15 Tests grün (Bootstrap, Registrierung, Login/Logout, Passkeys, Recovery-Codes/Passwort, Einladungen, Kontentrennung, Sitzungen, Vertrag).
+Keine Backend- oder UI-Fehler gefunden. Nicht geprüft: MariaDB-Modus, E-Mail-Wiederherstellung, Firefox/WebKit. Details: `docs/handoffs/L3b.md`.
