@@ -30,8 +30,8 @@ async function addAuthenticator(cdp: CDPSession): Promise<string> {
 }
 
 /** New isolated browser context with a CDP virtual authenticator (resident key + user verification). */
-export async function newActor(browser: Browser, credentials: Credential[] = []): Promise<Actor> {
-	const context = await browser.newContext();
+export async function newActor(browser: Browser, credentials: Credential[] = [], baseURL?: string): Promise<Actor> {
+	const context = await browser.newContext(baseURL ? { baseURL } : {});
 	const page = await context.newPage();
 	const cdp = await context.newCDPSession(page);
 	await cdp.send('WebAuthn.enable');

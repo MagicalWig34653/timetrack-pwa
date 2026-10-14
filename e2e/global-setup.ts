@@ -33,28 +33,20 @@ async function waitReady(base: string, child: ChildProcess) {
 	throw new Error('backend did not become ready within 60 s');
 }
 
-export default async function globalSetup() {
-	const port = Number(process.env.E2E_PORT ?? 18090);
-	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
-	const base = `http://localhost:${port}`;
+interface Instance {
+	link: string;
+	stop: () => Promise<void>;
+}
 
+/** Starts one backend instance with its own SQLite DB, mints the bootstrap invite and waits until it is ready. */
+async function startInstance(binary: string, port: number): Promise<Instance & { sqlitePath: string }> {
+	const base = `http://localhost:${port}`;
 	if (await portInUse(port)) {
 		throw new Error(
 			`Port ${port} is already in use. Not killing foreign processes; set E2E_PORT to a free port ` +
 				`(18080 is usually the compose backend).`
 		);
 	}
-	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
-		throw new Error('build/index.html missing. Run `npm run build` first (`npm run test:e2e` does this).');
-	}
-
-	if (process.env.E2E_SKIP_BUILD !== '1') {
-		const build = spawnSync('swift', ['build', '--build-system', 'native'], { cwd: backendDir, stdio: 'inherit' });
-		if (build.status !== 0) throw new Error('swift build failed');
-	}
-	const binary = path.join(backendDir, '.build', 'debug', 'App');
-	if (!fs.existsSync(binary)) throw new Error(`backend binary not found: ${binary}`);
-
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'timetrack-e2e-'));
 	const sqlitePath = path.join(tmp, 'e2e.sqlite');
 	const env = {
@@ -68,31 +60,61 @@ export default async function globalSetup() {
 		WEBAUTHN_RP_ID: 'localhost',
 		SESSION_TTL_HOURS: '24'
 	};
-	process.env.E2E_SQLITE_PATH = sqlitePath;
 
 	// Bootstrap admin: the invite link is printed on stdout. It is kept in memory only (env of this process tree).
 	const boot = spawnSync(binary, ['bootstrap-admin'], { env, encoding: 'utf8' });
 	if (boot.status !== 0) throw new Error(`bootstrap-admin failed (exit ${boot.status})`);
 	const match = boot.stdout.match(/https?:\/\/\S+\/invite\/\S+/);
 	if (!match) throw new Error('bootstrap-admin printed no invite link');
-	process.env.E2E_BOOTSTRAP_LINK = match[0];
 
-	const server = spawn(binary, ['serve', '--hostname', '127.0.0.1', '--port', String(port)], {
-		env,
-		stdio: 'ignore'
-	});
-	try {
-		await waitReady(base, server);
-	} catch (e) {
-		server.kill('SIGTERM');
-		fs.rmSync(tmp, { recursive: true, force: true });
-		throw e;
-	}
-
-	return async () => {
+	const server = spawn(binary, ['serve', '--hostname', '127.0.0.1', '--port', String(port)], { env, stdio: 'ignore' });
+	const stop = async () => {
 		server.kill('SIGTERM');
 		await new Promise((r) => setTimeout(r, 500));
 		if (server.exitCode === null) server.kill('SIGKILL');
 		fs.rmSync(tmp, { recursive: true, force: true });
+	};
+	try {
+		await waitReady(base, server);
+	} catch (e) {
+		await stop();
+		throw e;
+	}
+	return { link: match[0], sqlitePath, stop };
+}
+
+export default async function globalSetup() {
+	const port = Number(process.env.E2E_PORT ?? 18090);
+	const timePort = Number(process.env.E2E_TIME_PORT ?? port + 1);
+	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
+
+	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
+		throw new Error('build/index.html missing. Run `npm run build` first (`npm run test:e2e` does this).');
+	}
+	if (process.env.E2E_SKIP_BUILD !== '1') {
+		const build = spawnSync('swift', ['build', '--build-system', 'native'], { cwd: backendDir, stdio: 'inherit' });
+		if (build.status !== 0) throw new Error('swift build failed');
+	}
+	const binary = path.join(backendDir, '.build', 'debug', 'App');
+	if (!fs.existsSync(binary)) throw new Error(`backend binary not found: ${binary}`);
+
+	// Stage 1 (accounts) and stage 2 (time tracking) each get their own instance and database, so the specs do not
+	// depend on each other: a bootstrap invite can be used once, and only for the first account of a database.
+	const stage1 = await startInstance(binary, port);
+	process.env.E2E_SQLITE_PATH = stage1.sqlitePath;
+	process.env.E2E_BOOTSTRAP_LINK = stage1.link;
+	let stage2: Instance;
+	try {
+		stage2 = await startInstance(binary, timePort);
+	} catch (e) {
+		await stage1.stop();
+		throw e;
+	}
+	process.env.E2E_TIME_BASE_URL = `http://localhost:${timePort}`;
+	process.env.E2E_TIME_BOOTSTRAP_LINK = stage2.link;
+
+	return async () => {
+		await stage2.stop();
+		await stage1.stop();
 	};
 }
