@@ -1,4 +1,5 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -39,7 +40,12 @@ interface Instance {
 }
 
 /** Starts one backend instance with its own SQLite DB, mints the bootstrap invite and waits until it is ready. */
-async function startInstance(binary: string, port: number): Promise<Instance & { sqlitePath: string }> {
+async function startInstance(
+	binary: string,
+	port: number,
+	extraEnv: Record<string, string> = {},
+	extraCleanup: string[] = []
+): Promise<Instance & { sqlitePath: string }> {
 	const base = `http://localhost:${port}`;
 	if (await portInUse(port)) {
 		throw new Error(
@@ -58,7 +64,8 @@ async function startInstance(binary: string, port: number): Promise<Instance & {
 		PUBLIC_BASE_URL: base,
 		WEBAUTHN_ORIGIN: base,
 		WEBAUTHN_RP_ID: 'localhost',
-		SESSION_TTL_HOURS: '24'
+		SESSION_TTL_HOURS: '24',
+		...extraEnv
 	};
 
 	// Bootstrap admin: the invite link is printed on stdout. It is kept in memory only (env of this process tree).
@@ -73,6 +80,7 @@ async function startInstance(binary: string, port: number): Promise<Instance & {
 		await new Promise((r) => setTimeout(r, 500));
 		if (server.exitCode === null) server.kill('SIGKILL');
 		fs.rmSync(tmp, { recursive: true, force: true });
+		for (const dir of extraCleanup) fs.rmSync(dir, { recursive: true, force: true });
 	};
 	try {
 		await waitReady(base, server);
@@ -87,6 +95,7 @@ export default async function globalSetup() {
 	const port = Number(process.env.E2E_PORT ?? 18090);
 	const timePort = Number(process.env.E2E_TIME_PORT ?? port + 1);
 	const planningPort = Number(process.env.E2E_PLANNING_PORT ?? port + 2);
+	const transferPort = Number(process.env.E2E_TRANSFER_PORT ?? port + 3);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -125,7 +134,25 @@ export default async function globalSetup() {
 	process.env.E2E_PLANNING_BASE_URL = `http://localhost:${planningPort}`;
 	process.env.E2E_PLANNING_BOOTSTRAP_LINK = stage3.link;
 
+	// Stage 3b (export, import, file storage) gets a fourth instance. It has a storage secret key (random per run, only
+	// handed to the child process, never logged or written to process.env) and an empty temp dir for the local file backend.
+	const storageDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'timetrack-e2e-files-')));
+	let stage4: Instance;
+	try {
+		stage4 = await startInstance(binary, transferPort, { STORAGE_SECRET_KEY: randomBytes(32).toString('base64') }, [storageDir]);
+	} catch (e) {
+		fs.rmSync(storageDir, { recursive: true, force: true });
+		await stage3.stop();
+		await stage2.stop();
+		await stage1.stop();
+		throw e;
+	}
+	process.env.E2E_TRANSFER_BASE_URL = `http://localhost:${transferPort}`;
+	process.env.E2E_TRANSFER_BOOTSTRAP_LINK = stage4.link;
+	process.env.E2E_STORAGE_LOCAL_DIR = storageDir;
+
 	return async () => {
+		await stage4.stop();
 		await stage3.stop();
 		await stage2.stop();
 		await stage1.stop();

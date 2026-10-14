@@ -169,10 +169,10 @@ export function createTransferMock(deps: TransferDeps) {
 			const kind = /\.csv$/i.test(req.file.name) ? 'csv' : /\.xlsx$/i.test(req.file.name) ? 'xlsx' : null;
 			if (!kind) return fail(415, 'unsupported_type');
 			// the mock only reads CSV; a workbook would need a ZIP/XML reader
-			if (kind === 'xlsx') return fail(400, 'import_unreadable');
+			if (kind === 'xlsx') return fail(415, 'unsupported_type');
 			const text = decodeText(req.file.bytes);
 			const rows = parseCsv(text, detectDelimiter(text));
-			if (rows.length === 0) return fail(400, 'import_unreadable');
+			if (rows.length === 0) return fail(415, 'unsupported_type');
 			const job: ImportJob = {
 				id: uuid(),
 				filename: sanitizeFilename(req.file.name),
@@ -208,7 +208,7 @@ export function createTransferMock(deps: TransferDeps) {
 		if (!action) {
 			if (method === 'GET') return ok(state.job);
 			if (method === 'DELETE') {
-				if (state.job.status === 'committed') return fail(409, 'import_already_committed');
+				if (state.job.status === 'committed') return fail(409, 'import_not_ready');
 				s.imports.delete(state.job.id);
 				return { status: 204 };
 			}
@@ -220,15 +220,15 @@ export function createTransferMock(deps: TransferDeps) {
 			return ok({ sheet: sheet ?? state.job.sheets[0], rows: state.rows.slice(0, 50) });
 		}
 		if (action === 'mapping' && method === 'PUT') {
-			if (state.job.status === 'committed') return fail(409, 'import_already_committed');
+			if (state.job.status === 'committed') return fail(409, 'import_not_ready');
 			if (!validMapping(state, req.body)) return fail(400, 'bad_request');
 			state.mapping = req.body;
 			state.job.status = 'mapped';
 			return ok(preview(accountId, state, req.body).preview);
 		}
 		if (action === 'commit' && method === 'POST') {
-			if (state.job.status === 'committed') return fail(409, 'import_already_committed');
-			if (state.job.status !== 'mapped' || !state.mapping) return fail(409, 'import_not_mapped');
+			if (state.job.status === 'committed') return fail(409, 'import_not_ready');
+			if (state.job.status !== 'mapped' || !state.mapping) return fail(409, 'import_not_ready');
 			// validated again against the current data: a second import of the same file finds every row as duplicate
 			const { preview: p, items } = preview(accountId, state, state.mapping);
 			const ignoreErrors = req.body?.ignoreErrors === true;
@@ -250,12 +250,12 @@ export function createTransferMock(deps: TransferDeps) {
 			return ok(result);
 		}
 		if (action === 'rollback' && method === 'POST') {
-			if (state.job.status !== 'committed' || !state.batchId) return fail(409, 'import_not_committed');
+			if (state.job.status !== 'committed' || !state.batchId) return fail(409, 'import_not_ready');
 			const all = (deps.call(accountId, 'GET', '/api/v1/time/segments?from=1970-01-01T00:00:00Z&to=2100-01-01T00:00:00Z&includeVoided=true')?.body ?? []) as { id: string; version: number; voided: boolean }[];
 			const mine = all.filter((x) => state.segmentIds.includes(x.id) && !x.voided);
 			const conflicts = mine.filter((x) => x.version !== 1).map((x) => x.id);
 			if (conflicts.length > 0) {
-				return { status: 409, body: { error: { code: 'import_rollback_conflict', message: 'import_rollback_conflict' }, conflicts } };
+				return { status: 409, body: { error: { code: 'rollback_conflict', message: 'rollback_conflict' }, conflicts } };
 			}
 			for (const segment of mine) deps.call(accountId, 'DELETE', `/api/v1/time/segments/${segment.id}?reason=${encodeURIComponent('Import zurückgenommen')}`);
 			state.job.status = 'rolled_back';

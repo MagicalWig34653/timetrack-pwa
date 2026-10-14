@@ -144,3 +144,43 @@ export async function recover(page: Page, handle: string, method: 'Recovery-Code
 	await page.locator('#recover-proof').fill(proof);
 	await page.getByRole('button', { name: 'Bestätigen' }).click();
 }
+
+export interface ApiBinary {
+	status: number;
+	headers: Record<string, string>;
+	body: Buffer;
+}
+
+/** Multipart upload (field `file`) from inside the page; the answer body is parsed as JSON when possible. */
+export async function apiUpload(page: Page, path: string, name: string, bytes: Buffer, type = 'application/octet-stream'): Promise<Api> {
+	return page.evaluate(
+		async ({ path, name, base64, type }) => {
+			const session = await (await fetch('/api/v1/auth/session', { credentials: 'include' })).json();
+			const raw = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+			const form = new FormData();
+			form.append('file', new Blob([raw], { type }), name);
+			const res = await fetch(path, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'X-CSRF-Token': session.csrfToken }, body: form });
+			const text = await res.text();
+			let parsed: unknown = null;
+			try {
+				parsed = text ? JSON.parse(text) : null;
+			} catch {
+				parsed = text;
+			}
+			return { status: res.status, body: parsed };
+		},
+		{ path, name, base64: bytes.toString('base64'), type }
+	);
+}
+
+/** GET a binary resource from inside the page (session cookie); returns status, headers and the raw bytes. */
+export async function apiDownload(page: Page, path: string): Promise<ApiBinary> {
+	const res = await page.evaluate(async (path) => {
+		const r = await fetch(path, { credentials: 'include' });
+		const buf = new Uint8Array(await r.arrayBuffer());
+		let binary = '';
+		for (let i = 0; i < buf.length; i += 0x8000) binary += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+		return { status: r.status, headers: Object.fromEntries(r.headers.entries()), base64: btoa(binary) };
+	}, path);
+	return { status: res.status, headers: res.headers, body: Buffer.from(res.base64, 'base64') };
+}

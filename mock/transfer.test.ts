@@ -99,13 +99,13 @@ describe('import mock', () => {
 
 	it('refuses to commit before a mapping exists and refuses error rows unless explicitly ignored', async () => {
 		const job = await api.uploadImport(csvFile('Datum;Beginn;Ende\n07.03.2031;8:00;12:00\nkaputt;8:00;12:00\n'));
-		await expect(api.commitImport(job.id)).rejects.toMatchObject({ status: 409, code: 'import_not_mapped' });
+		await expect(api.commitImport(job.id)).rejects.toMatchObject({ status: 409, code: 'import_not_ready' });
 		const preview = await api.putImportMapping(job.id, mapping());
 		expect(preview.errors).toEqual([{ row: 3, code: 'date_invalid' }]);
 		await expect(api.commitImport(job.id)).rejects.toMatchObject({ status: 409, code: 'import_has_errors' });
 		expect(await dayWork('2031-03-07')).toBe(0);
 		expect(await api.commitImport(job.id, true)).toMatchObject({ created: 1, skipped: 1 });
-		await expect(api.commitImport(job.id, true)).rejects.toMatchObject({ code: 'import_already_committed' });
+		await expect(api.commitImport(job.id, true)).rejects.toMatchObject({ code: 'import_not_ready' });
 	});
 
 	it('is idempotent: importing the same file again finds only duplicates and creates nothing', async () => {
@@ -137,7 +137,7 @@ describe('import mock', () => {
 		await api.rollbackImport(clean.id);
 		expect(await dayWork('2031-03-12')).toBe(0);
 		expect((await api.getImport(clean.id)).status).toBe('rolled_back');
-		await expect(api.rollbackImport(clean.id)).rejects.toMatchObject({ code: 'import_not_committed' });
+		await expect(api.rollbackImport(clean.id)).rejects.toMatchObject({ code: 'import_not_ready' });
 	});
 
 	it('discards uncommitted jobs only and validates uploads (413, 415, empty)', async () => {
