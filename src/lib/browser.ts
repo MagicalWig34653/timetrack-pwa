@@ -20,3 +20,8 @@ export function formatDateTime(iso: string | null | undefined): string {
 	if (!iso) return '';
 	return new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
 }
+
+/** Leaves the app for an external page (OIDC provider). Separate function so tests can replace it. */
+export function navigateTo(url: string): void {
+	window.location.assign(url);
+}

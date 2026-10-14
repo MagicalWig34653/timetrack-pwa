@@ -39,6 +39,7 @@ export function createMockFetch(options?: MockOptions) {
 			authorization: headers.get('Authorization') ?? undefined
 		});
 		if (result.sessionCookie !== undefined) sessionCookie = result.sessionCookie;
+		if (result.redirect) return new Response(null, { status: result.status, headers: { Location: result.redirect } });
 		if (result.binary) {
 			return new Response(result.binary.bytes as BodyInit, { status: result.status, headers: { 'Content-Type': result.binary.contentType, ...result.binary.headers } });
 		}

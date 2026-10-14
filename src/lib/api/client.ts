@@ -42,6 +42,10 @@ import type {
 	WorkModel,
 	WorkModelInput,
 	Invitation,
+	ExternalIdentity,
+	OidcConfig,
+	OidcPurpose,
+	OidcRegisterInput,
 	InvitationCreated,
 	Passkey,
 	RecoveryMethod,
@@ -202,6 +206,14 @@ export const api = {
 	loginOptions: () => request<RequestOptions>('POST', '/auth/login/options'),
 	loginVerify: (challengeId: string, credential: unknown) =>
 		sessionRequest('POST', '/auth/login/verify', { challengeId, credential }),
+
+	// optional OpenID Connect (contract v0.5.0)
+	oidcConfig: () => request<OidcConfig>('GET', '/auth/oidc/config'),
+	oidcStart: (purpose: OidcPurpose, inviteToken?: string) =>
+		request<{ authorizationUrl: string }>('POST', '/auth/oidc/start', { purpose, inviteToken }),
+	oidcRegister: (input: OidcRegisterInput) => sessionRequest('POST', '/auth/oidc/register', input),
+	listIdentities: () => request<ExternalIdentity[]>('GET', '/me/identities'),
+	unlinkIdentity: (id: string) => request<void>('DELETE', `/me/identities/${id}`),
 
 	// passkeys
 	listPasskeys: () => request<Passkey[]>('GET', '/me/passkeys'),

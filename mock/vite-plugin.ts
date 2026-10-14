@@ -3,7 +3,8 @@ import { createMockApi } from './api.ts';
 
 /** Vite dev middleware serving the mock API under /api (enabled by `npm run dev:mock`). */
 export function mockApiPlugin(): Plugin {
-	const api = createMockApi();
+	// OIDC is on by default in mock mode; MOCK_OIDC=0 mimics a server without it, MOCK_OIDC_NAME renames the provider.
+	const api = createMockApi({ oidc: process.env.MOCK_OIDC === '0' ? false : { name: process.env.MOCK_OIDC_NAME || 'Mock-IdP' } });
 	return {
 		name: 'timetrack-mock-api',
 		apply: 'serve',
@@ -45,7 +46,10 @@ export function mockApiPlugin(): Plugin {
 							: `tt_session=${result.sessionCookie}; Path=/; HttpOnly; SameSite=Lax`
 					);
 				}
-				if (result.binary) {
+				if (result.redirect) {
+					res.setHeader('Location', result.redirect);
+					res.end();
+				} else if (result.binary) {
 					res.setHeader('Content-Type', result.binary.contentType);
 					for (const [name, value] of Object.entries(result.binary.headers)) res.setHeader(name, value);
 					res.end(Buffer.from(result.binary.bytes));

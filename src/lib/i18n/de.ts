@@ -1,9 +1,11 @@
+import { deOidc } from './de-oidc';
 import { dePlanning } from './de-planning';
 import { deTransfer } from './de-transfer';
 
 // German UI texts. Keys are English; values are the only user-visible strings.
 // Technical API error codes are mapped via `error.<code>` and `error.status_<http status>`.
 export const de = {
+	...deOidc,
 	...dePlanning,
 	...deTransfer,
 	'app.name': 'Timetrack',

@@ -28,6 +28,8 @@ export interface MockResponse {
 	binary?: { bytes: Uint8Array; contentType: string; headers: Record<string, string> };
 	/** Value for the tt_session cookie; null clears it; undefined leaves it untouched. */
 	sessionCookie?: string | null;
+	/** 302 target (OIDC callback); replaces the body */
+	redirect?: string;
 }
 
 interface MockAccount {
@@ -45,6 +47,19 @@ interface MockSession {
 	accountId: string;
 	csrfToken: string;
 	recovery: boolean;
+	/** simulates a session too old for linking/unlinking (403 reauth_required) */
+	stale?: boolean;
+}
+
+interface MockIdentity {
+	id: string;
+	accountId: string;
+	/** subject at the mock provider; (issuer, sub) identifies the identity in the real contract */
+	sub: string;
+	providerName: string;
+	emailHint: string | null;
+	linkedAt: string;
+	lastUsedAt: string | null;
 }
 
 interface MockPasskey {
@@ -76,7 +91,15 @@ export interface MockOptions {
 	seedPlanning?: boolean;
 	/** false mimics a server without STORAGE_SECRET_KEY: S3 storage settings are refused with 501 */
 	storageSecretKey?: boolean;
+	/** optional OIDC (ADR-0007): false/undefined = disabled like a default server; true or {name} enables the in-app mock IdP */
+	oidc?: boolean | { name?: string };
 }
+
+/** Subjects the in-app mock IdP page (/mock-idp) can sign in as. `mock-user-2` is pre-linked to the demo account `lena`. */
+export const MOCK_OIDC_SUBJECTS = {
+	user1: { sub: 'mock-user-1', email: 'demo@mock-idp.example' },
+	user2: { sub: 'mock-user-2', email: 'lena@mock-idp.example' }
+} as const;
 
 const uuid = () => crypto.randomUUID();
 const randomToken = () => uuid().replace(/-/g, '');
@@ -109,6 +132,13 @@ export function createMockApi(options: MockOptions = {}) {
 		absenceExists: (accountId, absenceId) => !!planning.states.get(accountId)?.absences.some((a) => a.id === absenceId),
 		storageSecretKey: options.storageSecretKey ?? true
 	});
+	const oidc = {
+		enabled: !!options.oidc,
+		name: typeof options.oidc === 'object' ? (options.oidc.name ?? 'Mock-IdP') : 'Mock-IdP'
+	};
+	const identities: MockIdentity[] = [];
+	const oidcFlows = new Map<string, { purpose: string; inviteToken?: string }>();
+	const oidcPending = new Map<string, { sub: string; email: string; inviteToken: string }>();
 	const passkeys: MockPasskey[] = [];
 	const sessions = new Map<string, MockSession>();
 	const invitations: MockInvitation[] = [];
@@ -149,6 +179,15 @@ export function createMockApi(options: MockOptions = {}) {
 		planning.seedDemo(admin.id);
 		planning.seedDemo(lena.id);
 		planning.seedShare(lena.id, admin.id, 'admin', { plan: true, actual: false, vacation: true });
+		identities.push({
+			id: uuid(),
+			accountId: lena.id,
+			sub: MOCK_OIDC_SUBJECTS.user2.sub,
+			providerName: oidc.name,
+			emailHint: MOCK_OIDC_SUBJECTS.user2.email,
+			linkedAt: new Date().toISOString(),
+			lastUsedAt: null
+		});
 	}
 	invitations.push({
 		id: uuid(),
@@ -300,6 +339,108 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 200, body: sessionBody(opened), sessionCookie: id };
 		}
 
+
+		// --- optional OIDC (ADR-0007, contract v0.5.0); the provider is the in-app page /mock-idp ---
+		if (path === '/api/v1/mock/oidc' && method === 'POST') {
+			// test hook, not part of the contract: toggles the config and ages all existing sessions
+			if (typeof body.enabled === 'boolean') oidc.enabled = body.enabled;
+			if (typeof body.name === 'string') oidc.name = body.name;
+			if (body.staleSessions === true) for (const other of sessions.values()) other.stale = true;
+			return { status: 200, body: { enabled: oidc.enabled, name: oidc.name } };
+		}
+		if (path === '/api/v1/auth/oidc/config' && method === 'GET') {
+			return { status: 200, body: oidc.enabled ? { enabled: true, name: oidc.name } : { enabled: false } };
+		}
+		if (path === '/api/v1/auth/oidc/start' && method === 'POST') {
+			if (!oidc.enabled) return error(404, 'not_found');
+			if (!['login', 'link', 'register'].includes(body.purpose)) return error(400, 'bad_request');
+			if (body.purpose === 'link') {
+				if (!session || !account) return error(401, 'unauthorized');
+				if (req.csrfToken !== session.csrfToken) return error(403, 'csrf_invalid');
+				if (session.stale) return error(403, 'reauth_required');
+			}
+			if (body.purpose === 'register') {
+				const invitation = invitations.find((i) => i.token === body.inviteToken);
+				if (!invitation || invitation.status !== 'open') return error(404, 'not_found');
+			}
+			const flowId = randomToken();
+			oidcFlows.set(flowId, { purpose: body.purpose, inviteToken: body.inviteToken });
+			return { status: 200, body: { authorizationUrl: `/mock-idp?flow=${flowId}&purpose=${body.purpose}&name=${encodeURIComponent(oidc.name)}` } };
+		}
+		if (path === '/api/v1/auth/oidc/callback' && method === 'GET') {
+			// `outcome` is a mock-only parameter chosen on /mock-idp: user1, user2 or error:<code>
+			const query = new URLSearchParams(req.path.split('?')[1] ?? '');
+			const fail = (code: string): MockResponse => ({ status: 302, redirect: `/login?oidc_error=${code}` });
+			const flow = oidcFlows.get(query.get('flow') ?? '');
+			if (!oidc.enabled || !flow) return fail('oidc_state_invalid');
+			oidcFlows.delete(query.get('flow')!);
+			const outcome = query.get('outcome') ?? '';
+			if (outcome.startsWith('error:')) return fail(outcome.slice('error:'.length));
+			const subject = outcome === 'user2' ? MOCK_OIDC_SUBJECTS.user2 : outcome === 'user1' ? MOCK_OIDC_SUBJECTS.user1 : null;
+			if (!subject) return fail('oidc_failed');
+			const known = identities.find((i) => i.sub === subject.sub);
+			if (flow.purpose === 'login') {
+				if (!known) return fail('oidc_not_linked');
+				known.lastUsedAt = new Date().toISOString();
+				const { id } = openSession(known.accountId);
+				return { status: 302, redirect: '/', sessionCookie: id };
+			}
+			if (flow.purpose === 'link') {
+				if (!session || !account || session.stale) return fail('oidc_reauth_required');
+				if (known && known.accountId !== account.id) return fail('oidc_identity_taken');
+				if (!known) {
+					identities.push({
+						id: uuid(),
+						accountId: account.id,
+						sub: subject.sub,
+						providerName: oidc.name,
+						emailHint: subject.email,
+						linkedAt: new Date().toISOString(),
+						lastUsedAt: null
+					});
+				}
+				return { status: 302, redirect: '/settings/identities?linked=1' };
+			}
+			const invitation = invitations.find((i) => i.token === flow.inviteToken);
+			if (!invitation || invitation.status !== 'open') return fail('oidc_invite_invalid');
+			if (known) return fail('oidc_identity_taken');
+			const pendingId = randomToken();
+			oidcPending.set(pendingId, { sub: subject.sub, email: subject.email, inviteToken: invitation.token });
+			return { status: 302, redirect: `/invite/${encodeURIComponent(invitation.token)}?oidc=${pendingId}` };
+		}
+		if (path === '/api/v1/auth/oidc/register' && method === 'POST') {
+			const pending = oidcPending.get(body.pendingId);
+			if (!oidc.enabled || !pending) return error(404, 'not_found');
+			const invitation = invitations.find((i) => i.token === pending.inviteToken);
+			if (!invitation || invitation.status !== 'open') return error(404, 'not_found');
+			if (!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(body.handle ?? '') || !body.displayName) return error(400, 'bad_request');
+			if ([...accounts.values()].some((a) => a.handle === body.handle)) return error(409, 'handle_taken');
+			if (identities.some((i) => i.sub === pending.sub)) return error(409, 'conflict');
+			oidcPending.delete(body.pendingId);
+			invitation.status = 'used';
+			const created: MockAccount = {
+				id: uuid(),
+				handle: body.handle,
+				displayName: body.displayName,
+				role: 'member',
+				recoveryCodes: null,
+				fallbackPassword: null,
+				emailRecovery: { active: false, verified: false }
+			};
+			accounts.set(created.id, created);
+			identities.push({
+				id: uuid(),
+				accountId: created.id,
+				sub: pending.sub,
+				providerName: oidc.name,
+				emailHint: pending.email,
+				linkedAt: new Date().toISOString(),
+				lastUsedAt: new Date().toISOString()
+			});
+			const { id, session: opened } = openSession(created.id);
+			return { status: 201, body: sessionBody(opened), sessionCookie: id };
+		}
+
 		// Shortcuts: device token instead of cookie/CSRF.
 		if (path === '/api/v1/automation/events' && method === 'POST') {
 			return time.automationEvent(req.authorization, body);
@@ -323,6 +464,7 @@ export function createMockApi(options: MockOptions = {}) {
 
 		// A recovery session may only set up passkeys and revoke sessions.
 		const ownPasskeys = () => passkeys.filter((p) => p.accountId === account.id);
+		const ownIdentities = () => identities.filter((i) => i.accountId === account.id);
 		const recoveryAllowed = path.startsWith('/api/v1/me/passkeys') && (method === 'POST' || method === 'GET');
 		if (session.recovery && !recoveryAllowed) return error(403, 'recovery_session_restricted');
 
@@ -348,10 +490,26 @@ export function createMockApi(options: MockOptions = {}) {
 			if (method === 'DELETE') {
 				const hasRecovery =
 					!!account.recoveryCodes?.length || !!account.fallbackPassword || account.emailRecovery.active;
-				if (ownPasskeys().length === 1 && !hasRecovery) return error(409, 'last_passkey');
+				if (ownPasskeys().length === 1 && !hasRecovery && ownIdentities().length === 0) return error(409, 'last_passkey');
 				passkeys.splice(passkeys.indexOf(passkey), 1);
 				return { status: 204 };
 			}
+		}
+
+
+		if (path === '/api/v1/me/identities' && method === 'GET') {
+			return {
+				status: 200,
+				body: ownIdentities().map(({ sub: _s, accountId: _a, ...publicIdentity }) => publicIdentity)
+			};
+		}
+		if ((m = path.match(/^\/api\/v1\/me\/identities\/([^/]+)$/)) && method === 'DELETE') {
+			const identity = ownIdentities().find((i) => i.id === m![1]);
+			if (!identity) return error(404, 'not_found');
+			if (session.stale) return error(403, 'reauth_required');
+			if (ownPasskeys().length === 0 && ownIdentities().length === 1) return error(409, 'last_login_method');
+			identities.splice(identities.indexOf(identity), 1);
+			return { status: 204 };
 		}
 
 		if (path === '/api/v1/me/recovery' && method === 'GET') {
@@ -464,5 +622,5 @@ export function createMockApi(options: MockOptions = {}) {
 		return error(404, 'not_found');
 	}
 
-	return { handle, state: { accounts, passkeys, sessions, invitations } };
+	return { handle, state: { accounts, passkeys, sessions, invitations, identities } };
 }

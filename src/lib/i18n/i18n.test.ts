@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { ApiError } from '../api/errors.js';
 import { WebAuthnError } from '../webauthn.js';
 import { de } from './de.js';
-import { errorMessage, t } from './index.js';
+import { OIDC_ERROR_CODES } from '../api/types.js';
+import { errorMessage, oidcErrorMessage, t } from './index.js';
 
 function sourceFiles(dir: string): string[] {
 	return readdirSync(dir).flatMap((name) => {
@@ -51,5 +52,20 @@ describe('localization resource', () => {
 
 	it('fills placeholders', () => {
 		expect(t('home.title', { name: 'Mia' })).toBe('Hallo, Mia');
+	});
+
+	it('has a German message for every OIDC callback error code and falls back to oidc_failed', () => {
+		for (const code of OIDC_ERROR_CODES) {
+			expect(`oidc.error.${code}` in de, code).toBe(true);
+			expect(oidcErrorMessage(code), code).not.toContain('oidc_');
+		}
+		expect(oidcErrorMessage('oidc_not_linked')).toContain('per Einladung');
+		expect(oidcErrorMessage('oidc_not_linked')).toContain('Einstellungen');
+		expect(oidcErrorMessage('something_new')).toBe(de['oidc.error.oidc_failed']);
+	});
+
+	it('maps last_login_method and reauth_required to German', () => {
+		expect(errorMessage(new ApiError(409, 'last_login_method'))).toBe(de['error.last_login_method']);
+		expect(errorMessage(new ApiError(403, 'reauth_required'))).toContain('erneut an');
 	});
 });
