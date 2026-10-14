@@ -98,3 +98,9 @@ Angemeldete Nutzer, die per Fehler-Redirect auf `/login?oidc_error=…` landen (
 Mock: Config (standardmäßig an in `dev:mock`, `MOCK_OIDC=0` schaltet aus, `MOCK_OIDC_NAME`), In-App-Anbieter `/mock-idp` (nur mit `VITE_MOCK=1`; Demo-Nutzer 1/2, Fehlercodes), Callback als 302, Identitäten mit Regeln (`last_login_method`, `identity_taken`, frische Sitzung), Test-Hook `POST /api/v1/mock/oidc` (nicht im Vertrag).
 Geprüft: `npm run check` 0/0, `npm test` 297 grün, `npm run build`, `npm run test:e2e` (echtes Backend, unverändert) 49 grün, `npm run test:e2e:mock` 29 grün (+4 Screenshot-Specs übersprungen ohne SCREENSHOT_DIR), Screenshots 390 px hell/dunkel (Login, Einladung, Identitäten, Mock-IdP).
 Nicht geprüft: echtes Backend/Dex (E2E folgt mit C14), Firefox/WebKit. Details und offene Fragen: `docs/handoffs/L11.md`.
+
+## Stand 15.10.2026 – Paket L12 (Branch l12-stage3b-e2e)
+
+Export, Import-Assistent, Dateispeicher-Admin und Abwesenheitsanhänge laufen gegen das echte Swift-Backend (C1–C13, Vertrag v0.5.1): neue Spec `e2e/stage3b.spec.ts` (25 Tests, vierte Instanz auf `E2E_PORT`+3 mit `STORAGE_SECRET_KEY` und temporärem lokalem Speicherverzeichnis), inkl. S3-Variante gegen Adobe S3Mock (wird ohne S3Mock übersprungen).
+UI behoben: Fehlercodes an das Backend angepasst (`import_not_ready`, `rollback_conflict`, `unsupported_type`) plus Texte für `too_many_rows`, `storage_unavailable`, `storage_corrupt`; Mock angeglichen.
+Geprüft: `npm run check` 0/0, `npm test` 297, `npm run build`, `npm run test:e2e` 74 grün, `npm run test:e2e:mock` 29 grün. Keine Backend-Fehler (Beobachtungen in `docs/handoffs/L12.md`).
