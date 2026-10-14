@@ -72,6 +72,9 @@
 			places = placeList;
 			mark = evaluation.mark ?? 'none';
 			skipFixedBreaks = !!evaluation.skipFixedBreaks;
+			// Pre-fill from the stored values (contract v0.2.1) unless the user is typing right now.
+			if (!noteTouched) note = evaluation.note ?? '';
+			if (!creditText.trim()) creditText = evaluation.markCreditSeconds != null ? formatDuration(evaluation.markCreditSeconds) : '';
 			load = { status: 'ready' };
 		} catch (error) {
 			load = toLoadState(error);
