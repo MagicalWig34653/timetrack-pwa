@@ -15,6 +15,9 @@
 		{ href: '/settings/sharing', label: 'nav.sharing' },
 		{ href: '/settings/passkeys', label: 'nav.passkeys' },
 		{ href: '/settings/identities', label: 'nav.identities' },
+		{ href: '/settings/connections', label: 'nav.connections' },
+		{ href: '/settings/api-tokens', label: 'nav.api_tokens' },
+		{ href: '/settings/mcp-help', label: 'nav.mcp_help' },
 		{ href: '/settings/recovery', label: 'nav.recovery' },
 		{ href: '/settings/sessions', label: 'nav.sessions' }
 	] as const;

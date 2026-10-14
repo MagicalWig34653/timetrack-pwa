@@ -51,6 +51,12 @@ import type {
 	WorkModelInput,
 	Invitation,
 	ExternalIdentity,
+	ApiToken,
+	ApiTokenCreated,
+	ApiTokenInput,
+	McpScope,
+	OAuthGrant,
+	OAuthRequest,
 	OidcConfig,
 	OidcPurpose,
 	OidcRegisterInput,
@@ -234,6 +240,15 @@ export const api = {
 	oidcRegister: (input: OidcRegisterInput) => sessionRequest('POST', '/auth/oidc/register', input),
 	listIdentities: () => request<ExternalIdentity[]>('GET', '/me/identities'),
 	unlinkIdentity: (id: string) => request<void>('DELETE', `/me/identities/${id}`),
+	// MCP/OAuth (contract v0.7.0, ADR-0009)
+	getOAuthRequest: (id: string) => request<OAuthRequest>('GET', `/oauth/requests/${encodeURIComponent(id)}`),
+	decideOAuthRequest: (id: string, approve: boolean, scopes?: McpScope[]) =>
+		request<{ redirectUrl: string }>('POST', `/oauth/requests/${encodeURIComponent(id)}/decision`, approve ? { approve, scopes } : { approve }),
+	listOAuthGrants: () => request<OAuthGrant[]>('GET', '/me/oauth-grants'),
+	revokeOAuthGrant: (id: string) => request<void>('DELETE', `/me/oauth-grants/${id}`),
+	listApiTokens: () => request<ApiToken[]>('GET', '/me/api-tokens'),
+	createApiToken: (input: ApiTokenInput) => request<ApiTokenCreated>('POST', '/me/api-tokens', input),
+	revokeApiToken: (id: string) => request<void>('DELETE', `/me/api-tokens/${id}`),
 
 	// passkeys
 	listPasskeys: () => request<Passkey[]>('GET', '/me/passkeys'),

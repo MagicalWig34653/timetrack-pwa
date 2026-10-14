@@ -1,5 +1,6 @@
 import { ApiError } from '#lib/api/errors.js';
 import { WebAuthnError } from '#lib/webauthn.js';
+import type { McpScope } from '#lib/api/types.js';
 import { de, type MessageKey } from './de';
 
 export type { MessageKey } from './de';
@@ -29,4 +30,10 @@ export function errorMessage(error: unknown): string {
 export function oidcErrorMessage(code: string): string {
 	const key = `oidc.error.${code}`;
 	return t(hasKey(key) ? key : 'oidc.error.oidc_failed');
+}
+
+/** German label and plain-language description for an MCP scope. */
+export function scopeText(scope: McpScope): { label: string; description: string } {
+	const id = scope.replace(':', '_');
+	return { label: t(`scope.${id}.label` as MessageKey), description: t(`scope.${id}.desc` as MessageKey) };
 }
