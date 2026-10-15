@@ -400,12 +400,19 @@ export interface WorktimeRemarkRule {
 	action: WorktimeAction;
 }
 
+export type HolidayTimes = 'discard' | 'keep';
+export type PartialCredit = 'work' | 'absence';
+
 export interface WorktimeOptions {
 	pauseMode?: 'split' | 'none';
 	/** null = value from the table (H1) */
 	pauseMinutes?: number | null;
 	pauseStart?: string;
 	roundToMinutes?: boolean;
+	/** contract v0.10.2: rows with times on public/custom holidays; discard (default) = no segments, keep = work/school (overtime) */
+	holidayTimes?: HolidayTimes;
+	/** contract v0.10.2: vacation/sick/excused rows whose net time differs > 5 min from the day target; work (default) = work with note */
+	partialCredit?: PartialCredit;
 	/** empty/missing = default rules */
 	rules?: WorktimeRemarkRule[];
 }
@@ -421,6 +428,12 @@ export interface WorktimePreview {
 	dateSystem?: '1900' | '1904';
 	/** sum of the cached differences of the table (hint only) */
 	sheetBalanceSeconds?: number | null;
+	/** contract v0.10.2: only rows up to and including today (comparable with the app's time account) */
+	sheetBalanceUpToTodaySeconds?: number | null;
+	/** contract v0.10.2: share of the rows after today */
+	sheetBalanceFutureSeconds?: number | null;
+	/** contract v0.10.2: first day with times or a remark; suggestion for the start of the work model */
+	firstContentDate?: string | null;
 	unmappedRemarks?: { text: string; count: number }[];
 	byAction?: Record<string, number>;
 }
@@ -456,6 +469,15 @@ export type ImportErrorCode =
 	| 'pause_exceeds_day'
 	| 'planning_disabled';
 
+/** Warnings never block the commit (contract v0.10.2). */
+export type ImportWarningCode = 'pause_exceeds_day' | 'holiday_times_discarded' | 'credit_partial_as_work' | 'school_on_holiday';
+export interface ImportWarning {
+	code: ImportWarningCode | ImportErrorCode;
+	row?: number | null;
+	/** aggregated warnings: number of affected days */
+	count?: number;
+}
+
 export interface ImportPreview {
 	profile?: ImportProfile;
 	worktime?: WorktimePreview;
@@ -465,7 +487,7 @@ export interface ImportPreview {
 	duplicates: number;
 	errors: { row: number; code: ImportErrorCode }[];
 	/** contract v0.10.1: hints without commit obstacle (pause_exceeds_day); older mocks report the same code in `errors` */
-	warnings?: { code: ImportErrorCode; row?: number }[];
+	warnings?: ImportWarning[];
 	sample: { date?: string; startedAt?: string; endedAt?: string; kind?: SegmentKind }[];
 }
 
@@ -480,6 +502,8 @@ export interface ImportResult {
 	conflicts?: (string | { id: string; type?: string })[];
 	/** contract v0.10.1: typed conflict list next to `conflicts` (UUIDs) */
 	conflictItems?: { type: 'segment' | 'absence' | 'custom_day'; id: string }[];
+	/** C23 (not yet in the contract): aggregated warnings of the commit, same shape as in the preview */
+	warnings?: ImportWarning[];
 }
 
 export interface ImportTemplate {

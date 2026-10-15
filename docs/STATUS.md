@@ -1,4 +1,4 @@
-# Stand der PWA – 15.10.2026 (Paket L21)
+# Stand der PWA – 16.10.2026 (Paket L22)
 
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L19, X1).
@@ -33,7 +33,12 @@ Ein Test (`src/lib/modules/modules.test.ts`) schlägt fehl, wenn eine Seite wede
 - Export: Format `worktime-xlsx` mit Optionen (bewertet/tatsächlich, Pause, Standard-Beginn, Datumssystem).
 - Seit L19 gegen das echte Backend (C21/C22) geprüft: `e2e/worktime.spec.ts` (Import-Assistent, Export mit unabhängigem Leser `exceljs`, Round-trip in ein zweites Konto, Rollback und Konflikte, Modul planning aus). Der Mock-Export bleibt eine Näherung.
 - Rollback-Konflikte zeigen die typisierte Liste `conflictItems` (v0.10.1); Vorschau-`warnings` (pause_exceeds_day) erscheinen in der Problemtabelle als Hinweis.
-- Offener Backend-Befund (`test.fixme`): Schul-/Arbeitszeile mit Standardzeiten auf eingebautem Feiertag erzeugt Überschuss im Zeitkonto (Details `docs/handoffs/L19.md`).
+- Der frühere Backend-Befund (Schulzeile auf Feiertag) ist seit C23 behoben; der `fixme`-Test ist ein normaler Test.
+
+## Arbeitszeit-Import nach C23 (L22, Vertrag v0.10.2, ADR-0013 Ergänzung)
+- Profil-Schritt: `holidayTimes` (Verwerfen, Standard / Behalten mit Mehrarbeit-Hinweis) und `partialCredit` (Als Arbeit mit Notiz, Standard / Als Abwesenheit); beides in Vorlagen gespeichert, ältere Vorlagen erhalten die Standardwerte.
+- Vorschau: Hinweisliste mit Tageanzahl und „Was bedeutet das?“ (`holiday_times_discarded`, `school_on_holiday`, `credit_partial_as_work`), Saldo-Panel „Tabellensaldo bis heute“ / „nach heute“ (Gesamt sekundär), Hinweis „Beginn des Arbeitsmodells“ aus `firstContentDate` mit Link nach `/settings/work-model?validFrom=…` (die Arbeitsmodell-Seite öffnet dann das Formular für eine neue Version mit diesem Datum). Dieselben Hinweise in der Bestätigung und im Ergebnis (`ImportResult.warnings`, im Vertrag noch nicht erfasst, siehe Handoff).
+- Mock bildet die C23-Regeln nach (Feiertagszeiten, Teil-Gutschrift mit Soll aus dem Modell oder B1/5 und 5 Minuten Toleranz, Saldo nach heute, `firstContentDate`); `pause_exceeds_day` steht jetzt in `warnings` wie beim Backend. Details: `docs/handoffs/L22.md`.
 
 ## PWA / Service Worker
 Manifest, Icons (`npm run icons`), `src/service-worker.ts` (Precache, Navigation netzwerk-first mit `/offline`, API/OAuth/MCP nie gecacht, Update nur nach Bestätigung, Push-Handler), Offline-Banner, Web-Push-Einstellungen. Registrierung nur im Produktionsbuild (https/localhost) oder mit `VITE_SW=1`. Details: `docs/handoffs/L16.md`.
@@ -42,9 +47,9 @@ Manifest, Icons (`npm run icons`), `src/service-worker.ts` (Precache, Navigation
 | Befehl | Inhalt |
 | --- | --- |
 | `npm run check` | svelte-check + tsc des Service Workers (0 Fehler/Warnungen) |
-| `npm test` | vitest, 488 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung) |
+| `npm test` | vitest, 522 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung) |
 | `npm run build` | statisches Build nach `build/` |
-| `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 157 Specs (inkl. 10 Modul- und 19 Arbeitszeit-Specs, davon 1 `fixme`) |
+| `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 158 Specs (inkl. 10 Modul- und 20 Arbeitszeit-Specs) |
 | `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), inkl. `modules.spec.ts` und `worktime.spec.ts` |
 | `npm run test:e2e:pwa` | Produktionsbuild mit Mock-API: Manifest, Service Worker, Offline, Push |
 

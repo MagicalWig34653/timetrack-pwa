@@ -210,6 +210,10 @@ export interface ParsedWorktimeWorkbook {
 	rows: WorktimeDayRow[];
 	tablePauseMinutes: number;
 	sheetBalanceSeconds: number | null;
+	/** cached E differences per date (first occurrence of a date wins) */
+	sheetBalances: { date: string; seconds: number }[];
+	/** B1/5 in seconds (weekly target of the sheet spread over five days) */
+	sheetDailyTargetSeconds: number;
 	sheets: string[];
 }
 
@@ -227,10 +231,14 @@ export function parseWorktimeWorkbook(bytes: Uint8Array): ParsedWorktimeWorkbook
 	const rows: WorktimeDayRow[] = [];
 	let pause = 0;
 	let balance: number | null = null;
+	let weekly: number | null = null;
+	const balances: { date: string; seconds: number }[] = [];
 	const balanceDates = new Set<string>();
 	for (const sheet of book.sheets.filter(isWorktimeSheet)) {
 		const h1 = num(sheet.rows.get(1)?.get('H'));
 		if (pause === 0 && h1 !== null) pause = Math.round(h1 * 1440);
+		const b1 = num(sheet.rows.get(1)?.get('B'));
+		if (weekly === null && b1 !== null) weekly = b1;
 		for (const [row, cells] of [...sheet.rows].sort((a, b) => a[0] - b[0])) {
 			if (row < 3) continue;
 			const serial = num(cells.get('A'));
@@ -251,10 +259,11 @@ export function parseWorktimeWorkbook(bytes: Uint8Array): ParsedWorktimeWorkbook
 			if (e !== null && !balanceDates.has(date)) {
 				balanceDates.add(date);
 				balance = (balance ?? 0) + Math.round(e * 86_400);
+				balances.push({ date, seconds: Math.round(e * 86_400) });
 			}
 		}
 	}
-	return { dateSystem: book.date1904 ? '1904' : '1900', rows, tablePauseMinutes: pause, sheetBalanceSeconds: balance, sheets: book.sheets.map((s) => s.name) };
+	return { dateSystem: book.date1904 ? '1904' : '1900', rows, tablePauseMinutes: pause, sheetBalanceSeconds: balance, sheetBalances: balances, sheetDailyTargetSeconds: Math.round(((weekly ?? 0) * 86_400) / 5), sheets: book.sheets.map((s) => s.name) };
 }
 
 /** Raw rows (all cells as text) of one sheet for the wizard's preview table. */

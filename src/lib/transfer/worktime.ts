@@ -1,7 +1,7 @@
 // TypeScript port of the worktime workbook import rules of ADR-0013 (remark rules, pause split, absence merging, holidays).
 // The real backend (C21) evaluates on the server; this port backs the mock API and the client-side rule helpers of the
 // profile step. Nothing here writes data. Reading the workbook itself lives in mock/worktime-xlsx.ts.
-import type { ImportErrorCode, ImportPreview, SegmentKind, WorktimeAction, WorktimeOptions, WorktimePreview, WorktimeRemarkRule } from '../api/types.ts';
+import type { ImportErrorCode, ImportPreview, ImportWarning, SegmentKind, WorktimeAction, WorktimeOptions, WorktimePreview, WorktimeRemarkRule } from '../api/types.ts';
 import { DEFAULT_TIMEZONE, addDays, isoWeekday, zonedTimeToInstant } from '../time/dates.ts';
 
 export const WORKTIME_ACTIONS: WorktimeAction[] = ['work', 'school', 'vacation', 'sick', 'excused', 'holiday', 'skip'];
@@ -23,11 +23,15 @@ export const DEFAULT_WORKTIME_OPTIONS = {
 	pauseMode: 'split',
 	pauseMinutes: null,
 	pauseStart: '12:00',
-	roundToMinutes: true
+	roundToMinutes: true,
+	holidayTimes: 'discard',
+	partialCredit: 'work'
 } as const satisfies WorktimeOptions;
 
 /** Errors that only warn: the day is imported (as one segment) and the commit is not blocked. */
-export const WARNING_CODES: ImportErrorCode[] = ['pause_exceeds_day'];
+export const WARNING_CODES: string[] = ['pause_exceeds_day', 'holiday_times_discarded', 'credit_partial_as_work', 'school_on_holiday'];
+/** Partial credit: net time deviating more than this from the day target is work (C23). */
+export const PARTIAL_CREDIT_TOLERANCE_SECONDS = 300;
 export const isWarning = (code: string) => (WARNING_CODES as string[]).includes(code);
 
 // ---------------------------------------------------------------------------------------------------- rules
@@ -114,6 +118,12 @@ export interface WorktimeContext {
 	/** false when module `planning` is off: absences and custom holidays cannot be written */
 	planningEnabled: boolean;
 	sheetBalanceSeconds?: number | null;
+	/** cached sheet differences (E) per date, for the split by today */
+	sheetBalances?: { date: string; seconds: number }[];
+	/** day target in seconds of the work model valid on the date; null = no model (fallback `sheetDailyTargetSeconds`) */
+	targetFor?: (date: string) => number | null;
+	/** B1/5 of the sheet, used when no work model is valid on the date */
+	sheetDailyTargetSeconds?: number;
 	dateSystem: '1900' | '1904';
 }
 
@@ -161,6 +171,8 @@ export function resolveOptions(options: WorktimeOptions | undefined): Required<O
 		pauseMinutes: options?.pauseMinutes ?? null,
 		pauseStart: options?.pauseStart ?? '12:00',
 		roundToMinutes: options?.roundToMinutes ?? true,
+		holidayTimes: options?.holidayTimes ?? 'discard',
+		partialCredit: options?.partialCredit ?? 'work',
 		rules: options?.rules && options.rules.length > 0 ? options.rules : DEFAULT_WORKTIME_RULES
 	};
 }
@@ -221,6 +233,12 @@ export function evaluateWorktime(inputRows: WorktimeDayRow[], optionsInput: Work
 	let firstDate: string | null = null;
 	let lastDate: string | null = null;
 
+	const warnings: ImportWarning[] = [];
+	const counted: Record<string, number> = {};
+	const countWarning = (code: string) => (counted[code] = (counted[code] ?? 0) + 1);
+	const sheetHolidays = new Set(rows.filter((r) => resolveRemark(options.rules, r.remark).action === 'holiday').map((r) => r.date));
+	const isHoliday = (date: string) => ctx.holidays.has(date) || ctx.customHolidays.has(date) || sheetHolidays.has(date);
+
 	const takenIntervals = ctx.existingSegments.filter((s) => s.endedAt).map((s) => ({ start: Date.parse(s.startedAt), end: Date.parse(s.endedAt as string) }));
 	const knownKeys = new Set(ctx.existingSegments.map((s) => `${Date.parse(s.startedAt)}|${s.endedAt ? Date.parse(s.endedAt) : ''}|${s.kind}`));
 	const pauseSeconds = (options.pauseMinutes ?? ctx.tablePauseMinutes) * 60;
@@ -233,7 +251,19 @@ export function evaluateWorktime(inputRows: WorktimeDayRow[], optionsInput: Work
 		if (firstDate === null || r.date < firstDate) firstDate = r.date;
 		if (lastDate === null || r.date > lastDate) lastDate = r.date;
 
-		const { action, rule } = resolveRemark(options.rules, r.remark);
+		const resolved = resolveRemark(options.rules, r.remark);
+		const rule = resolved.rule;
+		let action = resolved.action;
+		const bothTimes = r.start !== null && r.end !== null;
+		const pausePart = options.pauseMode === 'split' && pauseSeconds > 0 && bothTimes && r.end! - r.start! > pauseSeconds ? pauseSeconds : 0;
+		// partial credit: an absence row with times whose net time differs from the day target is real work
+		if (ABSENCE_ACTIONS.includes(action) && bothTimes && options.partialCredit === 'work' && r.end! > r.start!) {
+			const target = ctx.targetFor?.(r.date) ?? ctx.sheetDailyTargetSeconds ?? 0;
+			if (Math.abs(r.end! - r.start! - pausePart - target) > PARTIAL_CREDIT_TOLERANCE_SECONDS) {
+				action = 'work';
+				countWarning('credit_partial_as_work');
+			}
+		}
 		byAction[action] = (byAction[action] ?? 0) + 1;
 		if (!rule && r.remark !== '') {
 			const key = r.remark.toLowerCase();
@@ -267,10 +297,14 @@ export function evaluateWorktime(inputRows: WorktimeDayRow[], optionsInput: Work
 			fail(r.row, 'end_before_start');
 			continue;
 		}
+		if (options.holidayTimes === 'discard' && isHoliday(r.date)) {
+			countWarning(action === 'school' ? 'school_on_holiday' : 'holiday_times_discarded');
+			continue;
+		}
 		const kind: SegmentKind = action === 'school' ? 'school' : 'work';
 		let parts: [number, number][] = [[r.start, r.end]];
 		if (options.pauseMode === 'split' && pauseSeconds > 0) {
-			if (r.end - r.start <= pauseSeconds) fail(r.row, 'pause_exceeds_day');
+			if (r.end - r.start <= pauseSeconds) warnings.push({ code: 'pause_exceeds_day', row: r.row });
 			else parts = splitAroundPause(r.start, r.end, pauseSeconds, pauseStart);
 		}
 		const built = parts.map(([s, e]) => ({
@@ -327,6 +361,20 @@ export function evaluateWorktime(inputRows: WorktimeDayRow[], optionsInput: Work
 	}
 	flush();
 
+	for (const code of ['holiday_times_discarded', 'school_on_holiday', 'credit_partial_as_work'] as const) {
+		if (counted[code]) warnings.push({ code, count: counted[code] });
+	}
+	const balances = ctx.sheetBalances ?? [];
+	const split = balances.length > 0 || ctx.sheetBalanceSeconds != null;
+	const upToToday = balances.filter((b) => b.date <= ctx.today).reduce((sum, b) => sum + b.seconds, 0);
+	const future = balances.filter((b) => b.date > ctx.today).reduce((sum, b) => sum + b.seconds, 0);
+
+	// first day with times or a remark, also when the row has a validation error
+	let firstContentDate: string | null = null;
+	for (const r of rows) {
+		if ((r.start !== null || r.end !== null || r.remark !== '') && (firstContentDate === null || r.date < firstContentDate)) firstContentDate = r.date;
+	}
+
 	const worktime: WorktimePreview = {
 		days,
 		segments: segments.length,
@@ -337,6 +385,9 @@ export function evaluateWorktime(inputRows: WorktimeDayRow[], optionsInput: Work
 		lastDate,
 		dateSystem: ctx.dateSystem,
 		sheetBalanceSeconds: ctx.sheetBalanceSeconds ?? null,
+		sheetBalanceUpToTodaySeconds: split ? upToToday : null,
+		sheetBalanceFutureSeconds: split ? future : null,
+		firstContentDate,
 		unmappedRemarks: [...unmapped.values()].sort((a, b) => b.count - a.count || a.text.localeCompare(b.text)),
 		byAction
 	};
@@ -348,6 +399,7 @@ export function evaluateWorktime(inputRows: WorktimeDayRow[], optionsInput: Work
 			duplicates,
 			errorCount: errors.length,
 			errors,
+			warnings,
 			sample: segments.slice(0, 10).map((s) => ({ date: s.date, startedAt: s.startedAt, endedAt: s.endedAt, kind: s.kind })),
 			worktime
 		},

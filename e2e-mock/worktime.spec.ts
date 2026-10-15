@@ -28,7 +28,11 @@ const WEEK = book({
 	]
 });
 
-async function toProfileStep(page: Page, file = WEEK) {
+/**
+ * Opens the profile step. The legacy specs import full-day credits and expect absences; other specs of the shared mock server may
+ * create work models with another day target, so they pin partialCredit to "absence" (C23 default is covered by the C23 specs).
+ */
+async function toProfileStep(page: Page, file = WEEK, pinAbsence = true) {
 	await page.goto('/import');
 	await page.getByTestId('import-file').setInputFiles(file);
 	await page.getByRole('button', { name: 'Weiter' }).click();
@@ -36,6 +40,7 @@ async function toProfileStep(page: Page, file = WEEK) {
 	await expect(page.getByTestId('profile-banner')).toContainText('Arbeitszeit-Tabelle erkannt');
 	await page.getByRole('button', { name: 'Weiter' }).click();
 	await expect(page.getByTestId('step-heading')).toHaveText('Arbeitszeit-Tabelle');
+	if (pinAbsence) await page.getByTestId('wt-credit-absence').check();
 }
 
 test('worktime import: profile step, preview with unmapped remark rule, commit with absences, excused shows in calendar and day', async ({ browser }) => {
@@ -168,6 +173,69 @@ test('export: worktime workbook option downloads an xlsx with the server filenam
 	await context.close();
 });
 
+// C23: holiday times, partial credit, balance split, model start hint. The 2020 rows lie in the past (balance up to today),
+// the 2036 rows in the future; 2020-03-05 and 2036-12-25 are Thursdays (first content day in the middle of the week).
+const C23 = book({
+	sheets: [
+		{ year: 2020, days: [day('2020-03-05', '8:00', '16:12'), day('2020-03-06', '8:00', '11:00', 'Freigestellt')] },
+		{ year: 2036, days: [day('2036-12-25', '8:00', '16:12'), day('2036-12-26', '8:00', '12:00', 'BS')] }
+	]
+});
+
+test('worktime import: holiday and partial-credit options, warning list, balance split, model start hint', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
+	await toProfileStep(page, C23, false);
+	await expect(page.getByTestId('wt-holiday-discard')).toBeChecked();
+	await expect(page.getByTestId('wt-credit-work')).toBeChecked();
+	await expect(page.getByTestId('wt-day-options')).toContainText('Mehrarbeit');
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('worktime-preview')).toBeVisible();
+
+	const warnings = page.getByTestId('wt-warnings');
+	await expect(warnings.locator('[data-code="holiday_times_discarded"]')).toContainText('1 Tag');
+	await expect(warnings.locator('[data-code="school_on_holiday"]')).toContainText('Schulzeiten an Feiertagen');
+	await expect(warnings.locator('[data-code="credit_partial_as_work"]')).toContainText('Teil-Gutschriften als Arbeit');
+	await warnings.locator('[data-code="credit_partial_as_work"] summary').click();
+	await expect(warnings.locator('[data-code="credit_partial_as_work"]')).toContainText('mehr als 5 Minuten');
+	await expect(page.getByTestId('wt-balance-value')).toHaveText('-5:12');
+	await expect(page.getByTestId('wt-balance-future')).toHaveText('-4:12');
+	await expect(page.getByTestId('wt-balance-total')).toContainText('-9:24');
+	await expect(page.getByTestId('wt-balance')).toContainText('rundet nicht');
+	// the demo work model starts after the first row (2020), so the hint says the first rows have no target
+	await expect(page.getByTestId('wt-model-start')).toHaveAttribute('data-kind', 'late');
+	await expect(page.getByTestId('wt-model-start')).toContainText('05.03.2020');
+
+	// both options switched: no warnings at all
+	await page.getByRole('button', { name: 'Zurück' }).click();
+	await page.getByTestId('wt-holiday-keep').check();
+	await page.getByTestId('wt-credit-absence').check();
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('worktime-preview')).toBeVisible();
+	await expect(page.getByTestId('wt-warnings')).toHaveCount(0);
+	await context.close();
+});
+
+test('worktime import: the model start link opens the work model form with the date prefilled; result shows the warnings', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
+	const thursday = book({ sheets: [{ year: 2036, days: [day('2036-09-04', '8:00', '16:12'), day('2036-09-05', '8:00', '16:12'), day('2036-12-25', '8:00', '16:12')] }] });
+	await toProfileStep(page, thursday, false);
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('wt-model-start')).toHaveAttribute('data-kind', 'earlier');
+	await expect(page.getByTestId('wt-model-start')).toContainText('04.09.2036');
+	await expect(page.getByTestId('wt-model-start')).toContainText('Fehlzeit');
+	const [popup] = await Promise.all([context.waitForEvent('page'), page.getByTestId('wt-model-start-link').click()]);
+	await expect(popup.getByTestId('work-model-prefilled')).toContainText('04.09.2036');
+	await expect(popup.getByLabel('Gültig ab')).toHaveValue('2036-09-04');
+	await popup.close();
+
+	await page.getByRole('button', { name: 'Weiter zur Bestätigung' }).click();
+	await expect(page.getByTestId('confirm-warnings')).toContainText('Arbeitszeiten an Feiertagen');
+	await page.getByLabel(/Ich habe die Vorschau geprüft/).check();
+	await page.getByTestId('commit').click();
+	await expect(page.getByTestId('result-warnings').locator('[data-code="holiday_times_discarded"]')).toHaveAttribute('data-count', '1');
+	await context.close();
+});
+
 // Layout review (390 px phone and desktop, light and dark); only with SCREENSHOT_DIR set.
 const dir = process.env.SCREENSHOT_DIR;
 test.describe('worktime screenshots', () => {
@@ -176,8 +244,8 @@ test.describe('worktime screenshots', () => {
 	for (const [name, viewport] of [['phone', { width: 390, height: 844 }], ['desktop', { width: 1280, height: 900 }]] as const) {
 		for (const scheme of ['light', 'dark'] as const) {
 			test(`${name} ${scheme}`, async ({ browser }) => {
-				const year = 2040 + variant++;
-				const file = book({ sheets: [{ year, days: [day(`${year}-03-0${(variant % 2) + 1}`, '8:00', '16:12'), day(`${year}-03-03`, '8:00', '16:12', 'Urlaub (Freigestellt)'), day(`${year}-03-04`, '9:00', '13:00', 'Arzttermin')] }] });
+				const file = C23; // warnings, balance split and model start hint in the preview
+				variant++;
 				const { page, context } = await loginAsAdmin(browser, { viewport, colorScheme: scheme });
 				const shot = (label: string) => page.screenshot({ path: `${dir}/worktime-${name}-${scheme}-${label}.png`, fullPage: true });
 				await page.goto('/import');
@@ -191,6 +259,9 @@ test.describe('worktime screenshots', () => {
 				await page.getByTestId('wt-validate').click();
 				await page.getByTestId('worktime-preview').waitFor();
 				await shot('preview');
+				await page.getByRole('button', { name: 'Zurück' }).click();
+				await page.getByTestId('wt-day-options').scrollIntoViewIfNeeded();
+				await shot('profile-day-options');
 				await page.goto('/export');
 				await page.getByRole('radio', { name: /Arbeitszeit-Tabelle/ }).check();
 				await shot('export');

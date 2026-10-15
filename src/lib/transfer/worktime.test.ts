@@ -24,6 +24,8 @@ const ctx = (extra: Partial<WorktimeContext> = {}): WorktimeContext => ({
 	tablePauseMinutes: 30,
 	planningEnabled: true,
 	dateSystem: '1900',
+	// B1/5 of a 38.5 h sheet: the net time of the 8:00-16:12 rows (with 30 min pause) is exactly the target
+	sheetDailyTargetSeconds: 27_720,
 	...extra
 });
 const h = (hours: number, minutes = 0, seconds = 0) => hours * 3600 + minutes * 60 + seconds;
@@ -97,7 +99,7 @@ describe('evaluateWorktime', () => {
 			['vacation', '2026-03-11', '2026-03-11'],
 			['sick', '2026-03-12', '2026-03-12']
 		]);
-		const bridged = evaluateWorktime([row('2026-03-09', h(8), h(16), 'Urlaub'), row('2026-03-11', h(8), h(16), 'Urlaub')], {}, ctx({ holidays: new Set(['2026-03-10']) }));
+		const bridged = evaluateWorktime([row('2026-03-09', h(8), h(16, 12), 'Urlaub'), row('2026-03-11', h(8), h(16, 12), 'Urlaub')], {}, ctx({ holidays: new Set(['2026-03-10']) }));
 		expect(bridged.absences).toHaveLength(1);
 		expect(out.segments).toHaveLength(0);
 	});
@@ -139,7 +141,8 @@ describe('evaluateWorktime', () => {
 		];
 		const existing = [{ startedAt: '2026-03-05T08:30:00Z', endedAt: '2026-03-05T09:30:00Z', kind: 'work' as const }];
 		const out = evaluateWorktime(rows, {}, ctx({ existingSegments: existing, planningEnabled: false }));
-		expect(out.preview.errors.map((e) => `${e.row}:${e.code}`)).toEqual(['1:end_before_start', '2:missing_value', '3:pause_exceeds_day', '4:overlap', '5:planning_disabled']);
+		expect(out.preview.errors.map((e) => `${e.row}:${e.code}`)).toEqual(['1:end_before_start', '2:missing_value', '4:overlap', '5:planning_disabled']);
+		expect(out.preview.warnings).toEqual([{ code: 'pause_exceeds_day', row: 3 }]);
 		expect(isWarning('pause_exceeds_day')).toBe(true);
 		expect(isWarning('overlap')).toBe(false);
 		expect(out.segments).toHaveLength(1);
@@ -154,5 +157,77 @@ describe('evaluateWorktime', () => {
 		]);
 		const ruled = evaluateWorktime(rows, { pauseMode: 'none', rules: [exactRuleFor('Arzttermin', 'work'), ...DEFAULT_WORKTIME_RULES] }, ctx());
 		expect(ruled.preview.worktime!.unmappedRemarks).toEqual([{ text: 'Messe', count: 1 }]);
+	});
+});
+
+describe('evaluateWorktime: C23 situations (holiday times, partial credit, balance split, first content)', () => {
+	const holiday = '2026-04-03';
+	const holidays = ctx({ holidays: new Set([holiday]) });
+
+	it('discards a school row on a public holiday with an aggregated school_on_holiday warning; keep imports it', () => {
+		const rows = [row(holiday, h(8), h(12), 'BS', 1), row('2026-04-02', h(8), h(12), 'BS', 2)];
+		const discard = evaluateWorktime(rows, { pauseMode: 'none' }, holidays);
+		expect(discard.segments.map((s) => s.date)).toEqual(['2026-04-02']);
+		expect(discard.preview.warnings).toEqual([{ code: 'school_on_holiday', count: 1 }]);
+		const keep = evaluateWorktime(rows, { pauseMode: 'none', holidayTimes: 'keep' }, holidays);
+		expect(keep.segments).toHaveLength(2);
+		expect(keep.preview.warnings).toEqual([]);
+	});
+
+	it('discards a work row on a holiday (public, custom or marked in the sheet) with holiday_times_discarded and the day count', () => {
+		const rows = [row(holiday, h(8), h(16, 12), '', 1), row('2026-05-04', h(8), h(16, 12), '', 2)];
+		const custom = evaluateWorktime(rows.slice(0, 2), {}, ctx({ holidays: new Set([holiday]), customHolidays: new Set(['2026-05-04']) }));
+		expect(custom.segments).toHaveLength(0);
+		expect(custom.preview.warnings).toEqual([{ code: 'holiday_times_discarded', count: 2 }]);
+		const fromSheet = evaluateWorktime([row('2026-05-05', null, null, 'Feiertag', 1, 'a'), row('2026-05-05', null, null, 'Feiertag', 5, 'b')], {}, ctx());
+		expect(fromSheet.customDays).toHaveLength(1);
+		const keep = evaluateWorktime(rows.slice(0, 1), { holidayTimes: 'keep' }, holidays);
+		expect(keep.segments.length).toBeGreaterThan(0);
+	});
+
+	it('does not touch rows whose own action is holiday, absence or skip', () => {
+		const out = evaluateWorktime([row(holiday, h(8), h(16, 12), 'Feiertag', 1), row('2026-04-06', null, null, 'Urlaub', 2)], {}, holidays);
+		expect(out.preview.warnings).toEqual([]);
+		expect(out.preview.worktime?.skippedHolidays).toBe(1);
+	});
+
+	it('turns a partial Freigestellt row (net time far below the target) into work with the remark as note', () => {
+		const out = evaluateWorktime([row('2026-03-03', h(8), h(11), 'Freigestellt', 1)], {}, ctx());
+		expect(out.absences).toHaveLength(0);
+		expect(new Set(out.segments.map((s) => s.note))).toEqual(new Set(['Freigestellt']));
+		expect(out.preview.warnings).toEqual([{ code: 'credit_partial_as_work', count: 1 }]);
+		expect(out.preview.worktime?.byAction).toMatchObject({ work: 1 });
+		const asAbsence = evaluateWorktime([row('2026-03-03', h(8), h(11), 'Freigestellt', 1)], { partialCredit: 'absence' }, ctx());
+		expect(asAbsence.absences).toHaveLength(1);
+		expect(asAbsence.segments).toHaveLength(0);
+		expect(asAbsence.preview.warnings).toEqual([]);
+	});
+
+	it('keeps a full Freigestellt row as absence; exactly 5 minutes of deviation is still absence, 5:01 is work', () => {
+		const full = evaluateWorktime([row('2026-03-03', h(8), h(16, 12), 'Freigestellt', 1)], {}, ctx());
+		expect(full.absences).toHaveLength(1);
+		expect(full.preview.warnings).toEqual([]);
+		const edge = evaluateWorktime([row('2026-03-03', h(8), h(16, 17), 'Urlaub', 1)], {}, ctx());
+		expect(edge.absences).toHaveLength(1);
+		const over = evaluateWorktime([row('2026-03-03', h(8), h(16, 18), 'Urlaub', 1)], { roundToMinutes: false }, ctx());
+		expect(over.segments.length).toBeGreaterThan(0);
+	});
+
+	it('compares against the work model target when one exists, else B1/5; pauseMode none subtracts nothing', () => {
+		const model = ctx({ targetFor: () => h(4) });
+		expect(evaluateWorktime([row('2026-03-03', h(8), h(12, 30), 'Urlaub', 1)], {}, model).absences).toHaveLength(1);
+		expect(evaluateWorktime([row('2026-03-03', h(8), h(12), 'Urlaub', 1)], { pauseMode: 'none' }, model).absences).toHaveLength(1);
+		expect(evaluateWorktime([row('2026-03-03', h(8), h(16, 12), 'Urlaub', 1)], { pauseMode: 'none' }, ctx()).segments.length).toBeGreaterThan(0);
+	});
+
+	it('splits the sheet balance by today and reports the first content day', () => {
+		const out = evaluateWorktime(
+			[row('2026-03-04', null, null, '', 1), row('2026-03-05', null, null, 'Urlaub', 2), row('2026-03-06', h(9), h(8), '', 3)],
+			{},
+			ctx({ today: '2026-03-05', sheetBalanceSeconds: 600, sheetBalances: [{ date: '2026-03-04', seconds: 100 }, { date: '2026-03-05', seconds: 200 }, { date: '2026-03-06', seconds: 300 }] })
+		);
+		expect(out.preview.worktime).toMatchObject({ sheetBalanceSeconds: 600, sheetBalanceUpToTodaySeconds: 300, sheetBalanceFutureSeconds: 300, firstContentDate: '2026-03-05' });
+		const none = evaluateWorktime([], {}, ctx());
+		expect(none.preview.worktime).toMatchObject({ sheetBalanceUpToTodaySeconds: null, firstContentDate: null });
 	});
 });

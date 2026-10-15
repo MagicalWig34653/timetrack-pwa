@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/svelte';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockFetch } from '../../mock/fetch.ts';
@@ -208,6 +208,24 @@ describe('work model settings', () => {
 		expect(list).toHaveTextContent('Ab 01.11.2026');
 		expect(list).toHaveTextContent('40:00');
 		expect((await api.listWorkModels()).find((m) => m.validFrom === '2026-11-01')).toBeDefined();
+	});
+
+	it('opens the form for a new version at ?validFrom=YYYY-MM-DD (worktime import hint) and ignores invalid values', async () => {
+		window.history.pushState({}, '', '/settings/work-model?validFrom=2026-09-17');
+		try {
+			render(WorkModelPage);
+			expect(await screen.findByTestId('work-model-prefilled')).toHaveTextContent('17.09.2026');
+			expect(screen.getByLabelText('Gültig ab')).toHaveValue('2026-09-17');
+			expect(screen.getByLabelText('Wochen-Soll')).toHaveValue('38:30');
+			cleanup();
+			window.history.pushState({}, '', '/settings/work-model?validFrom=2026-13-45');
+			render(WorkModelPage);
+			await screen.findByTestId('history-note');
+			expect(screen.queryByTestId('work-model-prefilled')).toBeNull();
+			expect(screen.queryByLabelText('Gültig ab')).toBeNull();
+		} finally {
+			window.history.pushState({}, '', '/');
+		}
 	});
 
 	it('shows German validation errors instead of calling the API', async () => {

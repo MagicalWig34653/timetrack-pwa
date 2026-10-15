@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { api, ApiError } from '#lib/api/client.js';
-	import type { ImportJob, ImportPreview, ImportProfile, ImportResult, ImportTemplate, RawPreview, WorktimeAction, WorktimeRemarkRule } from '#lib/api/types.js';
+	import type { ImportJob, WorkModel, ImportPreview, ImportProfile, ImportResult, ImportTemplate, RawPreview, WorktimeAction, WorktimeRemarkRule } from '#lib/api/types.js';
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent } from '#lib/components/ui/card/index.js';
@@ -37,6 +37,7 @@
 	import { tick, untrack } from 'svelte';
 	import MappingStep from './MappingStep.svelte';
 	import RawTable from './RawTable.svelte';
+	import ImportWarnings from './ImportWarnings.svelte';
 	import WorktimePreviewPanel from './WorktimePreviewPanel.svelte';
 	import WorktimeStep from './WorktimeStep.svelte';
 	import Stepper from './Stepper.svelte';
@@ -75,7 +76,10 @@
 	/** warnings (pause_exceeds_day) never block the commit */
 	const errorCount = $derived(preview?.errors.filter((e) => !isWarning(e.code)).length ?? 0);
 	/** error rows and warnings (separate `warnings` list since contract v0.10.1) in one table */
-	const issues = $derived([...(preview?.errors ?? []), ...(preview?.warnings ?? []).map((w) => ({ row: w.row ?? 0, code: w.code }))]);
+	const issues = $derived([...(preview?.errors ?? []), ...(preview?.warnings ?? []).filter((w) => w.count === undefined).map((w) => ({ row: w.row ?? 0, code: w.code }))]);
+	/** aggregated warnings (code + number of days, contract v0.10.2) are listed separately, not per row */
+	const aggregated = $derived((preview?.warnings ?? []).filter((w) => w.count !== undefined));
+	let models = $state<WorkModel[] | null>(null);
 	const visibleTemplates = $derived(templates.filter((x) => isWorktimeTemplate(x.mapping) === isWorktime));
 
 	// Move focus to the step heading after every step change (not on first render) so keyboard and screen reader users follow along.
@@ -280,6 +284,7 @@
 			preview = await api.putImportMapping(job.id, isWorktime ? worktimeMapping(job.sheets[0] ?? '', wtForm) : mappingFromForm(form));
 			confirmChecked = false;
 			ignoreErrors = false;
+			if (isWorktime) models = await api.listWorkModels().catch(() => null);
 			go('preview');
 		} catch (e) {
 			error = errorMessage(e);
@@ -509,7 +514,8 @@
 		</dl>
 		{#if preview.duplicates > 0}<p class="text-sm text-muted-foreground">{t('import.duplicates_note')}</p>{/if}
 		{#if isWorktime && preview.worktime}
-			<WorktimePreviewPanel worktime={preview.worktime} {busy} oncreaterule={createRule} />
+			<WorktimePreviewPanel worktime={preview.worktime} {busy} oncreaterule={createRule} {models} />
+			<ImportWarnings warnings={aggregated} />
 		{/if}
 		{#if issues.length > 0}
 			<section aria-labelledby="errors-heading">
@@ -587,6 +593,7 @@
 					<p class="text-sm text-muted-foreground">{t('import.confirm_errors', { errors: errorCount })}</p>
 					<label class="flex items-start gap-2 text-sm"><Checkbox id="ignore-errors" class="mt-0.5" bind:checked={ignoreErrors} />{t('import.confirm_ignore_errors')}</label>
 				{/if}
+				{#if aggregated.length > 0}<ImportWarnings warnings={aggregated} testid="confirm-warnings" />{/if}
 				<label class="flex items-start gap-2 text-sm"><Checkbox id="confirm-check" class="mt-0.5" bind:checked={confirmChecked} />{t('import.confirm_check', { created })}</label>
 				<p class="text-xs text-muted-foreground">{t('import.rollback_hint')}</p>
 			</CardContent>
@@ -606,6 +613,7 @@
 					<p class="text-sm text-muted-foreground" data-testid="result-skipped">{t('import.result_skipped', { count: result.skipped })}</p>
 					{#if (result.absencesCreated ?? 0) > 0}<p class="text-sm" data-testid="result-absences">{t('import.result_absences', { count: result.absencesCreated ?? 0 })}</p>{/if}
 					{#if (result.customDaysCreated ?? 0) > 0}<p class="text-sm" data-testid="result-custom-days">{t('import.result_custom_days', { count: result.customDaysCreated ?? 0 })}</p>{/if}
+					{#if (result.warnings ?? []).length > 0}<ImportWarnings warnings={result.warnings ?? []} testid="result-warnings" />{/if}
 					{#if resultTotal === 0}<p class="text-sm">{t('import.result_none_created')}</p>{/if}
 				</CardContent>
 			</Card>

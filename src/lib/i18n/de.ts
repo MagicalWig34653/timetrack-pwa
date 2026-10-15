@@ -440,6 +440,7 @@ export const de = {
 	'work_model.break_start': 'Pause von',
 	'work_model.break_end': 'Pause bis',
 	'work_model.add_break': 'Feste Pause hinzufügen',
+	'work_model.prefilled': 'Vorbelegt aus dem Tabellenimport: Die neue Version beginnt am {date}. Prüfe Soll, Arbeitstage, Rundung und Pause, bevor du speicherst.',
 	'work_model.past_warning': 'Das Startdatum liegt in der Vergangenheit. Der Server entscheidet, ob das erlaubt ist; bestehende Versionen und bereits erfasste Zeiten werden nicht verändert.',
 	'work_model.create': 'Version anlegen',
 	'work_model.created': 'Neue Version angelegt.',

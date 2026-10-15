@@ -1,6 +1,8 @@
 <script lang="ts">
-	import type { WorktimeAction, WorktimePreview } from '#lib/api/types.js';
-	import { Alert } from '#lib/components/ui/alert/index.js';
+	import type { WorkModel, WorktimeAction, WorktimePreview } from '#lib/api/types.js';
+	import Banner from '#lib/components/app/Banner.svelte';
+	import KpiCard from '#lib/components/app/KpiCard.svelte';
+	import Panel from '#lib/components/app/Panel.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent } from '#lib/components/ui/card/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
@@ -8,8 +10,9 @@
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { formatDuration } from '#lib/time/format.js';
 	import { WORKTIME_ACTIONS } from '#lib/transfer/worktime.js';
+	import { modelStartHint } from '#lib/transfer/worktime-flow.js';
 
-	let { worktime, busy, oncreaterule }: { worktime: WorktimePreview; busy: boolean; oncreaterule: (text: string, action: WorktimeAction) => void } = $props();
+	let { worktime, busy, oncreaterule, models = null }: { worktime: WorktimePreview; busy: boolean; oncreaterule: (text: string, action: WorktimeAction) => void; models?: WorkModel[] | null } = $props();
 
 	const picks = $state<Record<string, WorktimeAction>>({});
 	const unmapped = $derived(worktime.unmappedRemarks ?? []);
@@ -22,7 +25,14 @@
 		{ id: 'skipped-holidays', label: t('worktime.count_skipped_holidays'), value: worktime.skippedHolidays ?? 0 }
 	]);
 	const actionLabel = (action: string) => t(`worktime.action.${action}` as MessageKey);
-	const balance = $derived(worktime.sheetBalanceSeconds == null ? null : `${worktime.sheetBalanceSeconds < 0 ? '-' : '+'}${formatDuration(Math.abs(worktime.sheetBalanceSeconds))}`);
+	const signed = (seconds: number | null | undefined) => (seconds == null ? null : `${seconds < 0 ? '-' : '+'}${formatDuration(Math.abs(seconds))}`);
+	const total = $derived(signed(worktime.sheetBalanceSeconds));
+	// older servers report only the total: it is then shown as the main value
+	const split = $derived(worktime.sheetBalanceUpToTodaySeconds != null);
+	const upToToday = $derived(signed(split ? worktime.sheetBalanceUpToTodaySeconds : worktime.sheetBalanceSeconds));
+	const future = $derived(signed(worktime.sheetBalanceFutureSeconds));
+	const hint = $derived(models ? modelStartHint(worktime.firstContentDate, models) : null);
+	const firstDate = $derived(worktime.firstContentDate ?? '');
 </script>
 
 <section class="flex flex-col gap-4" aria-labelledby="wt-preview-heading" data-testid="worktime-preview">
@@ -49,11 +59,37 @@
 		{/if}
 	</dl>
 
-	<Alert data-testid="wt-balance">
-		<p class="font-medium">{t('worktime.balance_title')}</p>
-		{#if balance}<p class="mt-1" data-testid="wt-balance-value">{t('worktime.balance_text', { balance })}</p>{/if}
-		<p class="mt-1 text-xs">{t('worktime.balance_rounding')}</p>
-	</Alert>
+	<Panel title={t('worktime.balance_title')} description={t('worktime.balance_intro')} data-testid="wt-balance">
+		{#if upToToday}
+			<div class="grid gap-3 sm:grid-cols-2">
+				<KpiCard title={t('worktime.balance_upto')} value={upToToday} hint={t('worktime.balance_upto_hint')} testid="wt-balance-value" />
+				{#if split && future}<KpiCard title={t('worktime.balance_future')} value={future} hint={t('worktime.balance_future_hint')} testid="wt-balance-future" />{/if}
+			</div>
+			{#if split && total}<p class="mt-3 text-xs text-muted-foreground" data-testid="wt-balance-total">{t('worktime.balance_total', { balance: total })}</p>{/if}
+		{/if}
+		<p class="mt-3 text-xs text-muted-foreground">{t('worktime.balance_rounding')}</p>
+	</Panel>
+
+	{#if hint}
+		<div data-testid="wt-model-start" data-kind={hint.kind}>
+			<Banner tone={hint.kind === 'ok' ? 'success' : 'warning'}>
+				<p class="font-medium">{t('worktime.model_start_title')}</p>
+				<p class="mt-0.5">{t('worktime.model_start_first', { date: formatDateNumeric(firstDate) })}</p>
+				<p class="mt-0.5 text-xs">
+					{#if hint.kind === 'none'}{t('worktime.model_start_none', { date: formatDateNumeric(firstDate) })}
+					{:else if hint.kind === 'ok'}{t('worktime.model_start_ok', { modelFrom: formatDateNumeric(hint.modelFrom) })}
+					{:else if hint.kind === 'late'}{t('worktime.model_start_late', { modelFrom: formatDateNumeric(hint.modelFrom) })}
+					{:else if hint.beforeWeek}{t('worktime.model_start_text', { modelFrom: formatDateNumeric(hint.modelFrom), date: formatDateNumeric(firstDate) })}
+					{:else}{t('worktime.model_start_midweek', { days: hint.emptyDays, date: formatDateNumeric(firstDate) })}{/if}
+				</p>
+				
+					{#if hint && hint.kind !== 'ok'}
+						<a class="mt-2 inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-medium hover:bg-muted" href="/settings/work-model?validFrom={firstDate}" target="_blank" rel="noopener" data-testid="wt-model-start-link">{t('worktime.model_start_link', { date: formatDateNumeric(firstDate) })}</a>
+					{/if}
+				
+			</Banner>
+		</div>
+	{/if}
 
 	{#if unmapped.length > 0}
 		<section aria-labelledby="wt-unmapped-heading" data-testid="wt-unmapped">

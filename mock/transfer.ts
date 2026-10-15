@@ -1,11 +1,12 @@
 // In-memory mock of contract v0.4.0 (ADR-0006): export, import, import templates, file storage and absence attachments.
 // The backend implements these in C11-C13. Import parsing is the TS port in src/lib/transfer/import-parse.ts.
 import { createHash } from 'node:crypto';
-import type { DayEvaluation, FileMeta, ImportJob, ImportMapping, ImportPreview, ImportResult, ImportTemplate, StorageBackend, StorageSettings, StorageSettingsInput, WorktimeExportOptions } from '../src/lib/api/types.ts';
+import type { DayEvaluation, FileMeta, ImportJob, ImportMapping, ImportPreview, ImportResult, ImportTemplate, StorageBackend, StorageSettings, StorageSettingsInput, WorkModel, WorktimeExportOptions } from '../src/lib/api/types.ts';
 import { addDays, todayLocal } from '../src/lib/time/dates.ts';
 import { DEFAULT_WORKTIME_RULES, WORKTIME_ACTIONS, evaluateWorktime, isWarning, type WorktimeOutcome } from '../src/lib/transfer/worktime.ts';
 import { buildImportPreview, detectDelimiter, mappingIssues, parseCsv, type ParsedItem } from '../src/lib/transfer/import-parse.ts';
 import { buildCsv, buildPdfPlaceholder, buildXlsxPlaceholder, exportRows } from './export-files.ts';
+import { dailyTarget, modelForDate } from './evaluate.ts';
 import { buildWorktimeExport } from './worktime-export.ts';
 import { detectWorktimeWorkbook, parseWorktimeWorkbook, readWorkbook, sheetToRows, type ParsedWorktimeWorkbook } from './worktime-xlsx.ts';
 
@@ -207,6 +208,7 @@ export function createTransferMock(deps: TransferDeps) {
 			absences.push(...((deps.planning(accountId, 'GET', `/api/v1/absences?from=${from}&to=${to}`)?.body ?? []) as typeof absences));
 		}
 		const { existing } = context(accountId);
+		const models = (deps.call(accountId, 'GET', '/api/v1/work-models')?.body ?? []) as WorkModel[];
 		return evaluateWorktime(book.rows, mapping.worktime, {
 			today: todayLocal('Europe/Berlin', new Date(deps.clock())),
 			holidays,
@@ -216,6 +218,12 @@ export function createTransferMock(deps: TransferDeps) {
 			tablePauseMinutes: book.tablePauseMinutes,
 			planningEnabled: deps.planningEnabled(accountId),
 			sheetBalanceSeconds: book.sheetBalanceSeconds,
+			sheetBalances: book.sheetBalances,
+			sheetDailyTargetSeconds: book.sheetDailyTargetSeconds,
+			targetFor: (date) => {
+				const model = modelForDate(models, date);
+				return model ? dailyTarget(model, date) : null;
+			},
 			dateSystem: book.dateSystem
 		});
 	}
@@ -226,6 +234,8 @@ export function createTransferMock(deps: TransferDeps) {
 		if (typeof w !== 'object') return false;
 		if (w.pauseMode !== undefined && !['split', 'none'].includes(w.pauseMode)) return false;
 		if (w.pauseMinutes != null && (!Number.isInteger(w.pauseMinutes) || w.pauseMinutes < 0 || w.pauseMinutes > 240)) return false;
+		if (w.holidayTimes !== undefined && !['discard', 'keep'].includes(w.holidayTimes)) return false;
+		if (w.partialCredit !== undefined && !['work', 'absence'].includes(w.partialCredit)) return false;
 		if (w.pauseStart !== undefined && !/^[0-2]\d:[0-5]\d$/.test(w.pauseStart)) return false;
 		if (w.rules !== undefined) {
 			if (!Array.isArray(w.rules) || w.rules.length > MAX_RULES) return false;
@@ -403,7 +413,7 @@ export function createTransferMock(deps: TransferDeps) {
 		const batchId = uuid();
 		Object.assign(state, { segmentIds, absenceIds, customDayIds, batchId });
 		state.job.status = 'committed';
-		return ok({ batchId, created, skipped, absencesCreated: absenceIds.length, customDaysCreated: customDayIds.length } satisfies ImportResult);
+		return ok({ batchId, created, skipped, absencesCreated: absenceIds.length, customDaysCreated: customDayIds.length, warnings: (outcome.preview.warnings ?? []).filter((w) => w.count !== undefined) } satisfies ImportResult);
 	}
 
 	function rollbackWorktime(accountId: string, state: ImportState): TransferResponse {
