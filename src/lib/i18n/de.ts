@@ -5,6 +5,7 @@ import { dePlanning } from './de-planning';
 import { dePwa } from './de-pwa';
 import { deReports } from './de-reports';
 import { deTransfer } from './de-transfer';
+import { deWorktime } from './de-worktime';
 
 // German UI texts. Keys are English; values are the only user-visible strings.
 // Technical API error codes are mapped via `error.<code>` and `error.status_<http status>`.
@@ -16,6 +17,7 @@ export const de = {
 	...dePwa,
 	...deReports,
 	...deTransfer,
+	...deWorktime,
 	'app.name': 'Timetrack',
 
 	'common.loading': 'Wird geladen …',
