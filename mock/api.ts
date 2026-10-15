@@ -1,4 +1,5 @@
 import { createMcpMock } from './mcp.ts';
+import { createNotificationsMock } from './notifications.ts';
 import { createPlanningMock } from './planning.ts';
 import { createReportsMock } from './reports.ts';
 import { createTimeMock } from './time.ts';
@@ -143,6 +144,7 @@ export function createMockApi(options: MockOptions = {}) {
 		}
 	});
 	const mcp = createMcpMock({ clock: options.now ?? Date.now });
+	const notifications = createNotificationsMock({ clock: options.now ?? Date.now });
 	const oidc = {
 		enabled: !!options.oidc,
 		name: typeof options.oidc === 'object' ? (options.oidc.name ?? 'Mock-IdP') : 'Mock-IdP'
@@ -586,6 +588,9 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 204 };
 		}
 
+		const notificationsResponse = notifications.handle(account.id, { method, path: req.path, body: req.body });
+		if (notificationsResponse) return notificationsResponse;
+
 		const mcpResponse = mcp.handle(account.id, session, { method, path: req.path, body: req.body });
 		if (mcpResponse) return mcpResponse;
 
@@ -644,5 +649,5 @@ export function createMockApi(options: MockOptions = {}) {
 		return error(404, 'not_found');
 	}
 
-	return { handle, state: { accounts, passkeys, sessions, invitations, identities, mcp: mcp.state } };
+	return { handle, state: { accounts, passkeys, sessions, invitations, identities, mcp: mcp.state, notifications: notifications.state } };
 }

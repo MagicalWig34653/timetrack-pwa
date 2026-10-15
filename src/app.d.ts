@@ -12,6 +12,8 @@ declare global {
 	interface ImportMetaEnv {
 		/** '1' when started via `npm run dev:mock`: in-repo mock API and fake authenticator */
 		readonly VITE_MOCK?: string;
+		/** '1' registers the service worker in dev (E2E only); production builds always register it on https/localhost */
+		readonly VITE_SW?: string;
 	}
 }
 

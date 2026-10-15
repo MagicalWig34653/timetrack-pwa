@@ -3,5 +3,15 @@
 	"compilerOptions": {
 		"strict": true
 	},
-	"include": ["src", "mock", "vite.config.ts", "vitest-setup.ts"]
+	"include": [
+		"src",
+		"mock",
+		"vite.config.ts",
+		"vitest-setup.ts"
+	],
+	"exclude": [
+		"src/service-worker",
+		"src/service-worker.ts",
+		"src/service-worker.js"
+	]
 }

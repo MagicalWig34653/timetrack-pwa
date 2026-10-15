@@ -1,6 +1,7 @@
 import { deMcp } from './de-mcp';
 import { deOidc } from './de-oidc';
 import { dePlanning } from './de-planning';
+import { dePwa } from './de-pwa';
 import { deReports } from './de-reports';
 import { deTransfer } from './de-transfer';
 
@@ -10,6 +11,7 @@ export const de = {
 	...deMcp,
 	...deOidc,
 	...dePlanning,
+	...dePwa,
 	...deReports,
 	...deTransfer,
 	'app.name': 'Timetrack',

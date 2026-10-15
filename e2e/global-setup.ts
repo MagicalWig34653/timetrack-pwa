@@ -1,5 +1,5 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -98,6 +98,7 @@ export default async function globalSetup() {
 	const transferPort = Number(process.env.E2E_TRANSFER_PORT ?? port + 3);
 	const reportsPort = Number(process.env.E2E_REPORTS_PORT ?? port + 4);
 	const mcpPort = Number(process.env.E2E_MCP_PORT ?? port + 5);
+	const notificationsPort = Number(process.env.E2E_NOTIFICATIONS_PORT ?? port + 6);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -184,7 +185,30 @@ export default async function globalSetup() {
 	process.env.E2E_MCP_BASE_URL = `http://localhost:${mcpPort}`;
 	process.env.E2E_MCP_BOOTSTRAP_LINK = stage6.link;
 
+	// Package L16 (notifications + Web Push) gets a seventh instance: background runner off (no timing dependence), generated
+	// VAPID key (valid P-256 private scalar, base64url) so GET /push/config is available. The key lives only in the child env.
+	const vapid = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey.export({ format: 'jwk' }).d as string;
+	let stage7: Instance;
+	try {
+		stage7 = await startInstance(binary, notificationsPort, {
+			NOTIFICATIONS_ENABLED: 'false',
+			VAPID_PRIVATE_KEY: vapid,
+			VAPID_SUBJECT: 'mailto:e2e@example.com'
+		});
+	} catch (e) {
+		await stage6.stop();
+		await stage5.stop();
+		await stage4.stop();
+		await stage3.stop();
+		await stage2.stop();
+		await stage1.stop();
+		throw e;
+	}
+	process.env.E2E_NOTIFICATIONS_BASE_URL = `http://localhost:${notificationsPort}`;
+	process.env.E2E_NOTIFICATIONS_BOOTSTRAP_LINK = stage7.link;
+
 	return async () => {
+		await stage7.stop();
 		await stage6.stop();
 		await stage5.stop();
 		await stage4.stop();

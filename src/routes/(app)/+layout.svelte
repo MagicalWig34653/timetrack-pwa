@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import Bell from '@lucide/svelte/icons/bell';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
+	import { unread } from '#lib/notifications/unread.svelte.js';
 	import { sessionStore } from '#lib/session.svelte.js';
 	import type { LayoutProps } from './$types';
 
@@ -23,6 +25,13 @@
 		{ href: '/settings/work-model', label: t('nav.settings'), prefix: false, section: '/settings' },
 		...(session?.account.role === 'admin' ? [{ href: '/admin/invitations', label: t('nav.invitations'), prefix: true }] : [])
 	]);
+
+	// The bell polls while a regular (non-recovery) session is open; polling pauses when the tab is hidden.
+	const polling = $derived(!!session && !session.recovery);
+	$effect(() => {
+		if (!polling) return;
+		return unread.start();
+	});
 
 	function isActive(link: { href: string; prefix: boolean; section?: string }): boolean {
 		const path = page.url.pathname;
@@ -46,6 +55,20 @@
 			<div class="flex items-center gap-3">
 				{#if session}
 					<span class="hidden text-sm text-muted-foreground sm:inline">{session.account.displayName}</span>
+				{/if}
+				{#if polling}
+					<a
+						href="/notifications"
+						class="relative inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+						aria-label={unread.count > 0 ? t('nav.notifications_unread', { count: unread.count }) : t('nav.notifications')}
+						aria-current={page.url.pathname === '/notifications' ? 'page' : undefined}
+						data-testid="bell"
+					>
+						<Bell class="size-5" aria-hidden="true" />
+						{#if unread.count > 0}
+							<span class="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 font-semibold text-primary-foreground" data-testid="bell-badge">{unread.count > 99 ? '99+' : unread.count}</span>
+						{/if}
+					</a>
 				{/if}
 				<Button variant="outline" size="sm" onclick={signOut}>{t('nav.sign_out')}</Button>
 			</div>

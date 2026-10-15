@@ -18,7 +18,9 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			// SPA fallback: the backend serves build/index.html for unknown paths so deep links work.
-			adapter: adapter({ fallback: 'index.html' })
+			adapter: adapter({ fallback: 'index.html' }),
+			// The service worker is registered by src/lib/pwa (production on https/localhost only, never in dev).
+			serviceWorker: { register: false }
 		}),
 		...(useMock ? [mockApiPlugin()] : [])
 	],
