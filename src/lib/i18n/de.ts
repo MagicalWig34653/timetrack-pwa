@@ -1,3 +1,4 @@
+import { deDesign } from './de-design';
 import { deMcp } from './de-mcp';
 import { deModules } from './de-modules';
 import { deOidc } from './de-oidc';
@@ -10,6 +11,7 @@ import { deWorktime } from './de-worktime';
 // German UI texts. Keys are English; values are the only user-visible strings.
 // Technical API error codes are mapped via `error.<code>` and `error.status_<http status>`.
 export const de = {
+	...deDesign,
 	...deMcp,
 	...deModules,
 	...deOidc,
