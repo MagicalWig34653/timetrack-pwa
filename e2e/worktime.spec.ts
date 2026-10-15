@@ -381,6 +381,25 @@ test('duplicate dates with conflicting data in two sheets give duplicate_date_co
 	await expect(page.getByTestId('commit')).toBeDisabled();
 });
 
+test('note_too_long (holiday name over 80 characters) is an error row, pause_exceeds_day is only a warning', async () => {
+	const { page } = alice;
+	const long = book({
+		sheets: [
+			{
+				year: 2026,
+				days: [row('2026-10-05', '8:00', '8:20'), row('2026-10-06', '8:00', '16:12', `Feiertag ${'x'.repeat(90)}`), row('2026-10-07', '8:00', '16:12', 'Urlaub')]
+			}
+		]
+	});
+	await toProfileStep(page, long);
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('count-errors')).toHaveText('1');
+	await expect(page.getByTestId('error-table')).toContainText('Die Notiz ist zu lang.');
+	await expect(page.getByTestId('error-table').locator('[data-warning="true"]')).toContainText('Der Tag ist nicht länger als die Pause. Er wird als ein Abschnitt übernommen.');
+	// nothing was committed
+	expect(await segmentsOf(page, 'from=2026-10-04T00:00:00Z&to=2026-10-11T00:00:00Z')).toHaveLength(0);
+});
+
 test('generic wizard switch still works', async () => {
 	const { page } = alice;
 	await page.goto('/import');

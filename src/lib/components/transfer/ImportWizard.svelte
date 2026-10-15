@@ -74,6 +74,8 @@
 	const created = $derived(preview?.valid ?? 0);
 	/** warnings (pause_exceeds_day) never block the commit */
 	const errorCount = $derived(preview?.errors.filter((e) => !isWarning(e.code)).length ?? 0);
+	/** error rows and warnings (separate `warnings` list since contract v0.10.1) in one table */
+	const issues = $derived([...(preview?.errors ?? []), ...(preview?.warnings ?? []).map((w) => ({ row: w.row ?? 0, code: w.code }))]);
 	const visibleTemplates = $derived(templates.filter((x) => isWorktimeTemplate(x.mapping) === isWorktime));
 
 	// Move focus to the step heading after every step change (not on first render) so keyboard and screen reader users follow along.
@@ -509,7 +511,7 @@
 		{#if isWorktime && preview.worktime}
 			<WorktimePreviewPanel worktime={preview.worktime} {busy} oncreaterule={createRule} />
 		{/if}
-		{#if preview.errors.length > 0}
+		{#if issues.length > 0}
 			<section aria-labelledby="errors-heading">
 				<h3 id="errors-heading" class="mb-2 font-medium">{t('import.errors_title')}</h3>
 				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -517,9 +519,9 @@
 					<table class="w-full text-sm" data-testid="error-table">
 						<thead class="bg-muted text-left"><tr><th scope="col" class="px-3 py-1.5">{t('import.errors_col_row')}</th><th scope="col" class="px-3 py-1.5">{t('import.errors_col_problem')}</th></tr></thead>
 						<tbody>
-							{#each preview.errors as err, i (i)}
+							{#each issues as err, i (i)}
 								<tr class="border-t" data-code={err.code} data-warning={isWarningCode(err.code) ? 'true' : undefined}>
-									<td class="px-3 py-1.5 tabular-nums">{err.row}</td>
+									<td class="px-3 py-1.5 tabular-nums">{err.row || '–'}</td>
 									<td class="px-3 py-1.5">{#if isWarningCode(err.code)}<span class="mr-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs font-medium">{t('import.warning_label')}</span>{/if}{errorText(err.code)}</td>
 								</tr>
 							{/each}

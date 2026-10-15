@@ -464,6 +464,8 @@ export interface ImportPreview {
 	valid: number;
 	duplicates: number;
 	errors: { row: number; code: ImportErrorCode }[];
+	/** contract v0.10.1: hints without commit obstacle (pause_exceeds_day); older mocks report the same code in `errors` */
+	warnings?: { code: ImportErrorCode; row?: number }[];
 	sample: { date?: string; startedAt?: string; endedAt?: string; kind?: SegmentKind }[];
 }
 
