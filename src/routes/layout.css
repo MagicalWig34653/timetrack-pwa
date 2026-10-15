@@ -89,6 +89,8 @@
 }
 
 @theme inline {
+	--breakpoint-menu: 760px;
+	--breakpoint-wide: 1100px;
 	--font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);

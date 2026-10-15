@@ -97,7 +97,7 @@
 			</Banner>
 		{/if}
 
-		<div class="grid gap-4 sm:grid-cols-2 min-[1100px]:grid-cols-4" data-testid="kpi-row">
+		<div class="grid gap-4 sm:grid-cols-2 wide:grid-cols-4" data-testid="kpi-row">
 			{#if day}
 				<KpiCard title={t('kpi.target')} value={formatDuration(day.targetSeconds)} hint={t('kpi.target_hint')} icon={Target} testid="day-target" />
 				<KpiCard title={t('kpi.actual')} value={formatDuration(day.evaluatedWorkSeconds)} hint={t('kpi.actual_hint')} icon={Gauge} testid="day-evaluated" />

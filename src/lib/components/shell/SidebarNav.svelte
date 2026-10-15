@@ -42,11 +42,11 @@
 	const accountActive = $derived(['/settings/passkeys', '/settings/identities', '/settings/recovery', '/settings/sessions'].includes(page.url.pathname));
 
 	const itemClass =
-		'flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground aria-[current=page]:bg-ui-accent-soft aria-[current=page]:text-ui-accent-ink';
+		'flex h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground aria-[current=page]:bg-ui-accent-soft aria-[current=page]:text-ui-accent-ink';
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
-	<a href="/" class="flex items-center gap-3 px-5 pt-5 pb-4" onclick={onnavigate} aria-label={t('app.name')}>
+	<a href="/" class="flex items-center gap-3 px-5 pt-4 pb-3" onclick={onnavigate} aria-label={t('app.name')}>
 		<span class="inline-flex size-[34px] items-center justify-center rounded-lg border bg-background text-ui-accent-ink" data-testid="brand-mark">
 			<Clock class="size-[18px]" aria-hidden="true" />
 		</span>
@@ -88,7 +88,7 @@
 
 		<nav aria-label={t('nav.main')} class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
 			{#each groups as group (group.id)}
-				<div class="mt-3 first:mt-1" data-testid="nav-group-{group.id}">
+				<div class="mt-2 first:mt-0" data-testid="nav-group-{group.id}">
 					<p class="px-3 pb-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{t(group.label)}</p>
 					<ul class="flex flex-col gap-0.5">
 						{#each group.items as item (item.href)}
@@ -107,7 +107,7 @@
 			{/each}
 		</nav>
 
-		<div class="flex flex-col gap-0.5 border-t px-3 py-3" data-testid="sidebar-bottom">
+		<div class="flex flex-col gap-0.5 border-t px-3 py-2" data-testid="sidebar-bottom">
 			<a href="/notifications" class={itemClass} aria-current={page.url.pathname === '/notifications' ? 'page' : undefined} onclick={onnavigate} data-testid="nav-notifications">
 				<Bell class="size-[18px] shrink-0" aria-hidden="true" />
 				<span class="min-w-0 flex-1">{t('nav.notifications')}</span>
@@ -132,7 +132,7 @@
 		<div class="flex-1"></div>
 	{/if}
 
-	<div class="flex items-center gap-2 border-t px-5 py-3 text-[13px] text-muted-foreground" data-testid="status-line" role="status">
+	<div class="flex items-center gap-2 border-t px-5 py-2.5 text-[13px] text-muted-foreground" data-testid="status-line" role="status">
 		<span class="size-2 rounded-full {pwa.offline ? 'bg-amber-500' : 'bg-emerald-500'}" aria-hidden="true"></span>
 		<span>{pwa.offline ? t('status.offline') : t('status.online')}</span>
 	</div>

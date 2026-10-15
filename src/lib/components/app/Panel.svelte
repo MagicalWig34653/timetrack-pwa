@@ -21,7 +21,7 @@
 	} = $props();
 </script>
 
-<section class="rounded-[10px] border bg-card p-[17px] text-card-foreground shadow-[var(--shadow-card)] sm:p-[22px] min-[1100px]:p-7 {className}" {...rest}>
+<section class="rounded-[10px] border bg-card p-[17px] text-card-foreground shadow-[var(--shadow-card)] sm:p-[22px] wide:p-7 {className}" {...rest}>
 	{#if title || action}
 		<div class="mb-4 flex flex-wrap items-start justify-between gap-3">
 			<div class="min-w-0">

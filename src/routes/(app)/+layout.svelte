@@ -63,12 +63,12 @@
 <svelte:window onresize={onWindowResize} />
 
 <div class="min-h-screen">
-	<aside class="glass-sidebar fixed inset-y-0 left-0 z-40 hidden w-64 border-r min-[760px]:block" data-testid="sidebar">
+	<aside class="glass-sidebar fixed inset-y-0 left-0 z-40 hidden w-64 border-r menu:block" data-testid="sidebar">
 		<SidebarNav onhelp={() => (helpOpen = true)} />
 	</aside>
 
 	{#if menuOpen}
-		<div class="fixed inset-0 z-50 min-[760px]:hidden" data-testid="mobile-menu">
+		<div class="fixed inset-0 z-50 menu:hidden" data-testid="mobile-menu">
 			<button type="button" class="absolute inset-0 bg-black/10 backdrop-blur-xs" aria-label={t('nav.menu_close')} tabindex="-1" onclick={() => (menuOpen = false)}></button>
 			<div
 				role="dialog"
@@ -96,9 +96,9 @@
 		</div>
 	{/if}
 
-	<div class="min-[760px]:pl-64">
+	<div class="menu:pl-64">
 		<TopBar {polling} {menuOpen} onmenu={() => (menuOpen = true)} onsignout={signOut} />
-		<main class="mx-auto w-full max-w-[1240px] px-4 py-[22px] min-[760px]:px-6 min-[760px]:py-6 min-[1100px]:px-10 min-[1100px]:py-9">
+		<main class="mx-auto w-full max-w-[1240px] px-4 py-[22px] menu:px-6 menu:py-6 wide:px-10 wide:py-9">
 			{#if blockedBy}
 				<ModuleDisabled module={blockedBy} />
 			{:else}
