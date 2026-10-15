@@ -123,6 +123,7 @@
 			<li class="rounded px-1.5 py-0.5 {SCHOOL_HOLIDAY_CLASS}">{t('calendar.school_holiday')}</li>
 			<li class="rounded px-1.5 py-0.5 {ABSENCE_CLASSES.vacation}">{absenceKindLabel('vacation')}</li>
 			<li class="rounded px-1.5 py-0.5 {ABSENCE_CLASSES.sick}">{absenceKindLabel('sick')}</li>
+			<li class="rounded px-1.5 py-0.5 {ABSENCE_CLASSES.excused}">{absenceKindLabel('excused')}</li>
 			<li class="rounded px-1.5 py-0.5 {ABSENCE_CLASSES.other}">{absenceKindLabel('other')}</li>
 			<li class="rounded px-1.5 py-0.5 {PLAN_CLASSES.office}">{t('calendar.plan')}</li>
 		</ul>

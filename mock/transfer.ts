@@ -1,10 +1,13 @@
 // In-memory mock of contract v0.4.0 (ADR-0006): export, import, import templates, file storage and absence attachments.
 // The backend implements these in C11-C13. Import parsing is the TS port in src/lib/transfer/import-parse.ts.
 import { createHash } from 'node:crypto';
-import type { DayEvaluation, FileMeta, ImportJob, ImportMapping, ImportPreview, ImportResult, ImportTemplate, StorageBackend, StorageSettings, StorageSettingsInput } from '../src/lib/api/types.ts';
-import { addDays } from '../src/lib/time/dates.ts';
+import type { DayEvaluation, FileMeta, ImportJob, ImportMapping, ImportPreview, ImportResult, ImportTemplate, StorageBackend, StorageSettings, StorageSettingsInput, WorktimeExportOptions } from '../src/lib/api/types.ts';
+import { addDays, todayLocal } from '../src/lib/time/dates.ts';
+import { DEFAULT_WORKTIME_RULES, WORKTIME_ACTIONS, evaluateWorktime, isWarning, type WorktimeOutcome } from '../src/lib/transfer/worktime.ts';
 import { buildImportPreview, detectDelimiter, mappingIssues, parseCsv, type ParsedItem } from '../src/lib/transfer/import-parse.ts';
 import { buildCsv, buildPdfPlaceholder, buildXlsxPlaceholder, exportRows } from './export-files.ts';
+import { buildWorktimeExport } from './worktime-export.ts';
+import { detectWorktimeWorkbook, parseWorktimeWorkbook, readWorkbook, sheetToRows, type ParsedWorktimeWorkbook } from './worktime-xlsx.ts';
 
 export interface UploadedFile {
 	name: string;
@@ -35,6 +38,10 @@ export interface TransferDeps {
 	absenceExists: (accountId: string, absenceId: string) => boolean;
 	/** false mimics a server without STORAGE_SECRET_KEY (S3 configuration is refused with 501) */
 	storageSecretKey: boolean;
+	/** internal call into the planning mock (absences, calendar) */
+	planning: (accountId: string, method: string, path: string, body?: unknown) => { status: number; body?: any } | null;
+	/** module `planning` effective for the account (ADR-0012) */
+	planningEnabled: (accountId: string) => boolean;
 }
 
 const uuid = () => crypto.randomUUID();
@@ -44,13 +51,19 @@ const ok = (body: unknown, status = 200): TransferResponse => ({ status, body })
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 const MAX_EXPORT_DAYS = 366;
 const MAX_NAME = 80;
+const MAX_RULES = 100;
 
 interface ImportState {
 	job: ImportJob;
 	text: string;
 	rows: string[][];
+	/** rows per sheet (xlsx); csv uses `rows` */
+	sheetRows: Map<string, (string | null)[][]>;
+	workbook: ParsedWorktimeWorkbook | null;
 	mapping: ImportMapping | null;
 	segmentIds: string[];
+	absenceIds: string[];
+	customDayIds: string[];
 	batchId: string | null;
 }
 
@@ -113,11 +126,22 @@ export function createTransferMock(deps: TransferDeps) {
 	}
 
 	// ------------------------------------------------------------------------------------------ export
+	function worktimeExportOptions(query: URLSearchParams): Required<Pick<WorktimeExportOptions, 'times' | 'standardStart' | 'dateSystem'>> & { pauseMinutes: number | null } | null {
+		const times = query.get('times') ?? 'evaluated';
+		const standardStart = query.get('standardStart') ?? '08:00';
+		const dateSystem = query.get('dateSystem') ?? '1900';
+		const pauseRaw = query.get('pauseMinutes');
+		const pause = pauseRaw === null ? null : Number(pauseRaw);
+		if (!['evaluated', 'actual'].includes(times) || !/^[0-2]\d:[0-5]\d$/.test(standardStart) || !['1900', '1904'].includes(dateSystem)) return null;
+		if (pause !== null && (!Number.isInteger(pause) || pause < 0 || pause > 240)) return null;
+		return { times: times as 'evaluated' | 'actual', standardStart, dateSystem: dateSystem as '1900' | '1904', pauseMinutes: pause };
+	}
+
 	function exportTime(accountId: string, query: URLSearchParams): TransferResponse {
 		const from = query.get('from');
 		const to = query.get('to');
 		const format = query.get('format');
-		if (!isDate(from) || !isDate(to) || to < from || !['xlsx', 'pdf', 'csv'].includes(format ?? '')) return fail(400, 'bad_request');
+		if (!isDate(from) || !isDate(to) || to < from || !['xlsx', 'pdf', 'csv', 'worktime-xlsx'].includes(format ?? '')) return fail(400, 'bad_request');
 		const days: DayEvaluation[] = [];
 		let count = 0;
 		for (let cursor = from; cursor <= to; cursor = addDays(cursor, 1)) count++;
@@ -127,6 +151,19 @@ export function createTransferMock(deps: TransferDeps) {
 			const response = deps.call(accountId, 'GET', `/api/v1/time/days?from=${start}&to=${end}`);
 			if (!response || response.status !== 200) return fail(501, 'not_implemented');
 			days.push(...(response.body as DayEvaluation[]));
+		}
+		if (format === 'worktime-xlsx') {
+			const options = worktimeExportOptions(query);
+			if (!options) return fail(400, 'bad_request');
+			const filename = `Arbeitszeit-Tabelle_${from}_${to}.xlsx`;
+			return {
+				status: 200,
+				binary: {
+					bytes: buildWorktimeExport(days, from, to, options),
+					contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+					headers: { 'Content-Disposition': `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`, 'X-Content-Type-Options': 'nosniff' }
+				}
+			};
 		}
 		const csv = buildCsv(deps.displayNameOf(accountId), from, to, exportRows(days), new Date(deps.clock()));
 		const filename = `Arbeitszeit_${from}_${to}.${format}`;
@@ -147,10 +184,60 @@ export function createTransferMock(deps: TransferDeps) {
 	}
 
 	function preview(accountId: string, state: ImportState, mapping: ImportMapping): { preview: ImportPreview; items: ParsedItem[] } {
-		return buildImportPreview(state.rows, mapping, context(accountId));
+		return buildImportPreview(state.sheetRows.get(mapping.sheet) ?? state.rows, mapping, context(accountId));
+	}
+
+	/** Profile worktime_workbook (ADR-0013): the pure rules engine plus the account's existing data. */
+	function worktimeOutcome(accountId: string, state: ImportState, mapping: ImportMapping): WorktimeOutcome {
+		const book = state.workbook as ParsedWorktimeWorkbook;
+		const dates = book.rows.map((r) => r.date).sort();
+		const first = dates[0] ?? todayLocal();
+		const last = dates[dates.length - 1] ?? first;
+		const holidays = new Set<string>();
+		const customHolidays = new Set<string>();
+		for (let year = Number(first.slice(0, 4)); year <= Number(last.slice(0, 4)); year++) {
+			const list = (deps.planning(accountId, 'GET', `/api/v1/calendar/holidays?year=${year}`)?.body ?? []) as { kind: string; source: string; startDate: string; endDate: string }[];
+			for (const h of list.filter((x) => x.kind === 'holiday')) {
+				for (let d = h.startDate; d <= h.endDate; d = addDays(d, 1)) (h.source === 'custom' ? customHolidays : holidays).add(d);
+			}
+		}
+		const absences: { kind: string; startDate: string; endDate: string; status: string }[] = [];
+		for (let from = first; from <= last; from = addDays(from, 366)) {
+			const to = addDays(from, 365) < last ? addDays(from, 365) : last;
+			absences.push(...((deps.planning(accountId, 'GET', `/api/v1/absences?from=${from}&to=${to}`)?.body ?? []) as typeof absences));
+		}
+		const { existing } = context(accountId);
+		return evaluateWorktime(book.rows, mapping.worktime, {
+			today: todayLocal('Europe/Berlin', new Date(deps.clock())),
+			holidays,
+			customHolidays,
+			existingSegments: existing,
+			existingAbsences: absences,
+			tablePauseMinutes: book.tablePauseMinutes,
+			planningEnabled: deps.planningEnabled(accountId),
+			sheetBalanceSeconds: book.sheetBalanceSeconds,
+			dateSystem: book.dateSystem
+		});
+	}
+
+	function validWorktimeMapping(state: ImportState, m: any): boolean {
+		if (!state.workbook) return false;
+		const w = m.worktime ?? {};
+		if (typeof w !== 'object') return false;
+		if (w.pauseMode !== undefined && !['split', 'none'].includes(w.pauseMode)) return false;
+		if (w.pauseMinutes != null && (!Number.isInteger(w.pauseMinutes) || w.pauseMinutes < 0 || w.pauseMinutes > 240)) return false;
+		if (w.pauseStart !== undefined && !/^[0-2]\d:[0-5]\d$/.test(w.pauseStart)) return false;
+		if (w.rules !== undefined) {
+			if (!Array.isArray(w.rules) || w.rules.length > MAX_RULES) return false;
+			for (const rule of w.rules) {
+				if (typeof rule?.pattern !== 'string' || rule.pattern.trim() === '' || rule.pattern.length > 80 || !WORKTIME_ACTIONS.includes(rule.action)) return false;
+			}
+		}
+		return true;
 	}
 
 	function validMapping(state: ImportState, m: any): m is ImportMapping {
+		if (m && m.profile === 'worktime_workbook') return validWorktimeMapping(state, m);
 		if (!m || typeof m !== 'object' || !m.columns || typeof m.columns !== 'object') return false;
 		if (!state.job.sheets.includes(m.sheet)) return false;
 		if (!Number.isInteger(m.headerRow) || m.headerRow < 0 || m.headerRow > state.rows.length) return false;
@@ -168,28 +255,46 @@ export function createTransferMock(deps: TransferDeps) {
 			if (req.file.bytes.length > MAX_IMPORT_BYTES) return fail(413, 'file_too_large');
 			const kind = /\.csv$/i.test(req.file.name) ? 'csv' : /\.xlsx$/i.test(req.file.name) ? 'xlsx' : null;
 			if (!kind) return fail(415, 'unsupported_type');
-			// the mock only reads CSV; a workbook would need a ZIP/XML reader
-			if (kind === 'xlsx') return fail(415, 'unsupported_type');
-			const text = decodeText(req.file.bytes);
-			const rows = parseCsv(text, detectDelimiter(text));
-			if (rows.length === 0) return fail(415, 'unsupported_type');
+			let text = '';
+			let rows: string[][] = [];
+			const sheetRows = new Map<string, (string | null)[][]>();
+			let sheets = ['Tabelle1'];
+			let workbook: ParsedWorktimeWorkbook | null = null;
+			if (kind === 'xlsx') {
+				try {
+					const book = readWorkbook(req.file.bytes);
+					if (book.sheets.length === 0) return fail(415, 'unsupported_type');
+					sheets = book.sheets.map((sh) => sh.name);
+					for (const sh of book.sheets) sheetRows.set(sh.name, sheetToRows(sh) as string[][]);
+					rows = (sheetRows.get(sheets[0]) ?? []) as string[][];
+					if (detectWorktimeWorkbook(req.file.bytes)) workbook = parseWorktimeWorkbook(req.file.bytes);
+				} catch {
+					return fail(415, 'unsupported_type');
+				}
+			} else {
+				text = decodeText(req.file.bytes);
+				rows = parseCsv(text, detectDelimiter(text));
+				if (rows.length === 0) return fail(415, 'unsupported_type');
+			}
 			const job: ImportJob = {
 				id: uuid(),
 				filename: sanitizeFilename(req.file.name),
 				kind,
 				status: 'uploaded',
-				sheets: ['Tabelle1'],
+				sheets,
+				detectedProfile: workbook ? 'worktime_workbook' : 'generic',
 				sha256: createHash('sha256').update(req.file.bytes).digest('hex'),
 				createdAt: new Date(deps.clock()).toISOString()
 			};
-			s.imports.set(job.id, { job, text, rows, mapping: null, segmentIds: [], batchId: null });
+			s.imports.set(job.id, { job, text, rows, sheetRows, workbook, mapping: null, segmentIds: [], absenceIds: [], customDayIds: [], batchId: null });
 			return ok(job, 201);
 		}
+		if (route === 'import-profiles/worktime/default-rules' && method === 'GET') return ok(DEFAULT_WORKTIME_RULES);
 		if (route === 'import-templates') {
 			if (method === 'GET') return ok(s.templates);
 			if (method === 'POST') {
 				const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
-				if (!name || name.length > MAX_NAME || !req.body?.mapping?.columns) return fail(400, 'bad_request');
+				if (!name || name.length > MAX_NAME || !(req.body?.mapping?.columns || req.body?.mapping?.profile === 'worktime_workbook')) return fail(400, 'bad_request');
 				const template: ImportTemplate = { id: uuid(), name, mapping: req.body.mapping };
 				s.templates.push(template);
 				return ok(template, 201);
@@ -217,18 +322,21 @@ export function createTransferMock(deps: TransferDeps) {
 		if (action === 'preview' && method === 'GET') {
 			const sheet = query.get('sheet');
 			if (sheet && !state.job.sheets.includes(sheet)) return fail(404, 'not_found');
-			return ok({ sheet: sheet ?? state.job.sheets[0], rows: state.rows.slice(0, 50) });
+			const name = sheet ?? state.job.sheets[0];
+			return ok({ sheet: name, rows: (state.sheetRows.get(name) ?? state.rows).slice(0, 50) });
 		}
 		if (action === 'mapping' && method === 'PUT') {
 			if (state.job.status === 'committed') return fail(409, 'import_not_ready');
 			if (!validMapping(state, req.body)) return fail(400, 'bad_request');
 			state.mapping = req.body;
 			state.job.status = 'mapped';
+			if (req.body.profile === 'worktime_workbook') return ok(worktimeOutcome(accountId, state, req.body).preview);
 			return ok(preview(accountId, state, req.body).preview);
 		}
 		if (action === 'commit' && method === 'POST') {
 			if (state.job.status === 'committed') return fail(409, 'import_not_ready');
 			if (state.job.status !== 'mapped' || !state.mapping) return fail(409, 'import_not_ready');
+			if (state.mapping.profile === 'worktime_workbook') return commitWorktime(accountId, state, req.body?.ignoreErrors === true);
 			// validated again against the current data: a second import of the same file finds every row as duplicate
 			const { preview: p, items } = preview(accountId, state, state.mapping);
 			const ignoreErrors = req.body?.ignoreErrors === true;
@@ -251,6 +359,7 @@ export function createTransferMock(deps: TransferDeps) {
 		}
 		if (action === 'rollback' && method === 'POST') {
 			if (state.job.status !== 'committed' || !state.batchId) return fail(409, 'import_not_ready');
+			if (state.mapping?.profile === 'worktime_workbook') return rollbackWorktime(accountId, state);
 			const all = (deps.call(accountId, 'GET', '/api/v1/time/segments?from=1970-01-01T00:00:00Z&to=2100-01-01T00:00:00Z&includeVoided=true')?.body ?? []) as { id: string; version: number; voided: boolean }[];
 			const mine = all.filter((x) => state.segmentIds.includes(x.id) && !x.voided);
 			const conflicts = mine.filter((x) => x.version !== 1).map((x) => x.id);
@@ -263,6 +372,52 @@ export function createTransferMock(deps: TransferDeps) {
 			return ok(result);
 		}
 		return null;
+	}
+
+	function commitWorktime(accountId: string, state: ImportState, ignoreErrors: boolean): TransferResponse {
+		const outcome = worktimeOutcome(accountId, state, state.mapping as ImportMapping);
+		const blocking = outcome.preview.errors.filter((e) => !isWarning(e.code));
+		if (blocking.length > 0 && !ignoreErrors) return fail(409, 'import_has_errors');
+		let created = 0;
+		let skipped = outcome.preview.duplicates + blocking.length;
+		const segmentIds: string[] = [];
+		for (const item of outcome.segments) {
+			const response = deps.call(accountId, 'POST', '/api/v1/time/segments', { kind: item.kind, startedAt: item.startedAt, endedAt: item.endedAt, note: item.note });
+			if (response?.status === 201) {
+				created++;
+				segmentIds.push(response.body.id);
+			} else skipped++;
+		}
+		const absenceIds: string[] = [];
+		for (const item of outcome.absences) {
+			const response = deps.planning(accountId, 'POST', '/api/v1/absences', { kind: item.kind, startDate: item.startDate, endDate: item.endDate, status: item.status, note: item.note });
+			if (response?.status === 201) absenceIds.push(response.body.id);
+			else skipped++;
+		}
+		const customDayIds: string[] = [];
+		for (const item of outcome.customDays) {
+			const response = deps.planning(accountId, 'POST', '/api/v1/calendar/custom-days', { kind: 'holiday', startDate: item.date, endDate: item.date, name: item.name });
+			if (response?.status === 201) customDayIds.push(response.body.id);
+			else skipped++;
+		}
+		const batchId = uuid();
+		Object.assign(state, { segmentIds, absenceIds, customDayIds, batchId });
+		state.job.status = 'committed';
+		return ok({ batchId, created, skipped, absencesCreated: absenceIds.length, customDaysCreated: customDayIds.length } satisfies ImportResult);
+	}
+
+	function rollbackWorktime(accountId: string, state: ImportState): TransferResponse {
+		const all = (deps.call(accountId, 'GET', '/api/v1/time/segments?from=1970-01-01T00:00:00Z&to=2100-01-01T00:00:00Z&includeVoided=true')?.body ?? []) as { id: string; version: number; voided: boolean }[];
+		const segments = all.filter((x) => state.segmentIds.includes(x.id) && !x.voided);
+		const conflicts: { id: string; type: string }[] = segments.filter((x) => x.version !== 1).map((x) => ({ id: x.id, type: 'segment' }));
+		const absences = state.absenceIds.map((id) => deps.planning(accountId, 'GET', `/api/v1/absences/${id}`)).filter((r) => r?.status === 200).map((r) => r!.body as { id: string; version: number });
+		for (const a of absences) if (a.version !== 1) conflicts.push({ id: a.id, type: 'absence' });
+		if (conflicts.length > 0) return { status: 409, body: { error: { code: 'rollback_conflict', message: 'rollback_conflict' }, conflicts } };
+		for (const segment of segments) deps.call(accountId, 'DELETE', `/api/v1/time/segments/${segment.id}?reason=${encodeURIComponent('Import zurückgenommen')}`);
+		for (const a of absences) deps.planning(accountId, 'DELETE', `/api/v1/absences/${a.id}`);
+		for (const id of state.customDayIds) deps.planning(accountId, 'DELETE', `/api/v1/calendar/custom-days/${id}`);
+		state.job.status = 'rolled_back';
+		return ok({ batchId: state.batchId as string, created: 0, skipped: 0, rolledBack: segments.length, conflicts: [] } satisfies ImportResult);
 	}
 
 	// ------------------------------------------------------------------------------------------ storage and files

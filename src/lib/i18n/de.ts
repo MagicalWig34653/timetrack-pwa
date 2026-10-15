@@ -236,6 +236,7 @@ export const de = {
 	'mark.holiday': 'Feiertag',
 	'mark.vacation': 'Urlaub',
 	'mark.sick': 'Krank',
+	'mark.excused': 'Freigestellt',
 	'mark.school_credit': 'Schultag (Gutschrift)',
 	'place_kind.office': 'Büro',
 	'place_kind.home': 'Zuhause',

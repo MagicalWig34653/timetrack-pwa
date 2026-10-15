@@ -55,7 +55,7 @@ const fail = (status: number, code: string, message = code): TimeResponse => ({ 
 const ok = (body: unknown, status = 200): TimeResponse => ({ status, body });
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isInstant = (v: unknown): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v));
-const DAY_MARKS: DayMarkKind[] = ['none', 'holiday', 'vacation', 'sick', 'school_credit'];
+const DAY_MARKS: DayMarkKind[] = ['none', 'holiday', 'vacation', 'sick', 'excused', 'school_credit'];
 const SEGMENT_KINDS = ['work', 'travel', 'school'];
 
 export function createTimeMock(clock: () => number) {

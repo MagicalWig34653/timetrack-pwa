@@ -14,7 +14,7 @@ export interface EvalSegment {
 
 /** Effect of absences/holidays on a day (ADR-0005, derived by the planning mock). An explicit mark always wins. */
 export interface DerivedDayContext {
-	mark: 'holiday' | 'vacation' | 'sick';
+	mark: 'holiday' | 'vacation' | 'sick' | 'excused';
 	/** half vacation day: the target is halved */
 	halfTarget?: boolean;
 }
@@ -103,7 +103,7 @@ export function evaluateDay(input: {
 
 	let target = baseTarget;
 	let credit = 0;
-	if (mark === 'holiday' || mark === 'vacation' || mark === 'sick') {
+	if (mark === 'holiday' || mark === 'vacation' || mark === 'sick' || mark === 'excused') {
 		const halved = derived?.halfTarget ? Math.round(baseTarget / 2) : 0;
 		target = prefs.targetOverrideSeconds ?? halved;
 		credit = prefs.creditSeconds ?? 0;
@@ -159,7 +159,7 @@ export function evaluateDay(input: {
 		modelId: model?.id ?? null,
 		mark,
 		markSource: explicit ? 'explicit' : derived ? (derived.mark === 'holiday' ? 'holiday' : 'absence') : 'none',
-		targetOverrideSeconds: mark === 'holiday' || mark === 'vacation' || mark === 'sick' ? (prefs.targetOverrideSeconds ?? (derived?.halfTarget ? target : null)) : null,
+		targetOverrideSeconds: mark === 'holiday' || mark === 'vacation' || mark === 'sick' || mark === 'excused' ? (prefs.targetOverrideSeconds ?? (derived?.halfTarget ? target : null)) : null,
 		skipFixedBreaks: !!prefs.skipFixedBreaks,
 		targetSeconds: target,
 		rawWorkSeconds,

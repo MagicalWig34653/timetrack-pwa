@@ -321,7 +321,7 @@ describe('shared view', () => {
 		await waitFor(() => expect(within(view).getByTestId('shared-plan')).toBeInTheDocument());
 		expect(within(view).getByTestId('shared-vacation')).toBeInTheDocument();
 		expect(within(view).queryByTestId('shared-actual')).toBeNull();
-		expect(screen.getByTestId('never-shared')).toHaveTextContent('Krankheitstage');
+		expect(screen.getByTestId('never-shared')).toHaveTextContent('Krankheits- und Freistellungstage');
 	});
 
 	it('shows the gone notice when the share was revoked meanwhile', async () => {

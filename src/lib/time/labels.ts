@@ -2,7 +2,7 @@ import { t } from '#lib/i18n/index.js';
 import type { AutomationMode, BreakHintCode, DayMarkKind, PlaceKind, Segment, SegmentKind, SegmentSource } from '#lib/api/types.js';
 
 export const SEGMENT_KINDS: SegmentKind[] = ['work', 'travel', 'school'];
-export const DAY_MARKS: DayMarkKind[] = ['none', 'holiday', 'vacation', 'sick', 'school_credit'];
+export const DAY_MARKS: DayMarkKind[] = ['none', 'holiday', 'vacation', 'sick', 'excused', 'school_credit'];
 export const PLACE_KINDS: PlaceKind[] = ['office', 'home', 'customer', 'school', 'other'];
 export const AUTOMATION_MODES: AutomationMode[] = ['direct', 'suggest', 'off'];
 

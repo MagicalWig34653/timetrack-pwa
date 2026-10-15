@@ -9,6 +9,8 @@ import type {
 	PushSubscriptionInput,
 	DownloadedFile,
 	ExportFormat,
+	WorktimeExportOptions,
+	WorktimeRemarkRule,
 	FileMeta,
 	ImportJob,
 	ImportMapping,
@@ -406,8 +408,17 @@ export const api = {
 	},
 
 	// export, contract v0.4.0: the file comes as an attachment (blob); at most 366 days (else 400 range_too_large)
-	exportTime: (from: string, to: string, format: ExportFormat) =>
-		download(`/export/time?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&format=${format}`),
+	exportTime: (from: string, to: string, format: ExportFormat, options: WorktimeExportOptions = {}) => {
+		const query = new URLSearchParams({ from, to, format });
+		if (format === 'worktime-xlsx') {
+			if (options.times) query.set('times', options.times);
+			if (options.pauseMinutes !== undefined) query.set('pauseMinutes', String(options.pauseMinutes));
+			if (options.standardStart) query.set('standardStart', options.standardStart);
+			if (options.dateSystem) query.set('dateSystem', options.dateSystem);
+		}
+		return download(`/export/time?${query.toString()}`);
+	},
+	worktimeDefaultRules: () => request<WorktimeRemarkRule[]>('GET', '/import-profiles/worktime/default-rules'),
 
 	// import (CSV/XLSX -> segments); nothing is written before commitImport
 	uploadImport: (file: File) => upload<ImportJob>('/imports', file),

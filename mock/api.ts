@@ -137,6 +137,8 @@ export function createMockApi(options: MockOptions = {}) {
 		clock: options.now ?? Date.now,
 		displayNameOf: (id) => accounts.get(id)?.displayName ?? '',
 		call: (accountId, method, path, body) => time.handle(accountId, { method, path, body }),
+		planning: (accountId, method, path, body) => planning.handle(accountId, { method, path, body }),
+		planningEnabled: (accountId) => modules.effective(accountId, 'planning'),
 		absenceExists: (accountId, absenceId) => !!planning.states.get(accountId)?.absences.some((a) => a.id === absenceId),
 		storageSecretKey: options.storageSecretKey ?? true
 	});

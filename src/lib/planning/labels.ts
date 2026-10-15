@@ -1,7 +1,7 @@
 import { t } from '#lib/i18n/index.js';
 import type { AbsenceKind, AbsenceStatus, DocumentStatus, PlanMode, ShareScopes } from '#lib/api/types.js';
 
-export const ABSENCE_KINDS: AbsenceKind[] = ['vacation', 'sick', 'other'];
+export const ABSENCE_KINDS: AbsenceKind[] = ['vacation', 'sick', 'excused', 'other'];
 export const ABSENCE_STATUSES: AbsenceStatus[] = ['planned', 'requested', 'approved', 'taken', 'rejected', 'cancelled'];
 export const DOCUMENT_STATUSES: DocumentStatus[] = ['not_needed', 'pending', 'submitted'];
 export const PLAN_MODES: PlanMode[] = ['office', 'home', 'customer', 'school', 'off'];
@@ -21,6 +21,7 @@ export const PLANNED_STATUSES: AbsenceStatus[] = ['planned', 'requested'];
 export const ABSENCE_CLASSES: Record<AbsenceKind, string> = {
 	vacation: 'bg-sky-500/15 text-sky-900 dark:text-sky-200',
 	sick: 'bg-rose-500/15 text-rose-900 dark:text-rose-200',
+	excused: 'bg-teal-500/15 text-teal-900 dark:text-teal-200',
 	other: 'bg-violet-500/15 text-violet-900 dark:text-violet-200'
 };
 

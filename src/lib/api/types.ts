@@ -67,7 +67,7 @@ export interface RegisterInput {
 
 export type SegmentKind = 'work' | 'travel' | 'school';
 export type SegmentSource = 'timer' | 'manual' | 'automation' | 'suggestion' | 'import';
-export type DayMarkKind = 'none' | 'holiday' | 'vacation' | 'sick' | 'school_credit';
+export type DayMarkKind = 'none' | 'holiday' | 'vacation' | 'sick' | 'excused' | 'school_credit';
 export type PlaceKind = 'office' | 'home' | 'customer' | 'school' | 'other';
 export type AutomationMode = 'direct' | 'suggest' | 'off';
 export type BreakHintCode = 'break_missing_30' | 'break_missing_45' | 'break_part_too_short' | 'work_over_6h_without_break';
@@ -273,7 +273,7 @@ export interface VacationEntries {
 	adjustments: VacationAdjustmentEntry[];
 }
 
-export type AbsenceKind = 'vacation' | 'sick' | 'other';
+export type AbsenceKind = 'vacation' | 'sick' | 'excused' | 'other';
 export type AbsenceStatus = 'planned' | 'requested' | 'approved' | 'rejected' | 'cancelled' | 'taken';
 export type DocumentStatus = 'not_needed' | 'pending' | 'submitted';
 
@@ -354,7 +354,15 @@ export interface SharedView {
 
 // --- Export, import, file storage (contract v0.4.0, ADR-0006) ---
 
-export type ExportFormat = 'xlsx' | 'pdf' | 'csv';
+export type ExportFormat = 'xlsx' | 'pdf' | 'csv' | 'worktime-xlsx';
+
+/** Options of the worktime workbook export (contract v0.10.0, ADR-0013); all optional, the server has defaults. */
+export interface WorktimeExportOptions {
+	times?: 'evaluated' | 'actual';
+	pauseMinutes?: number;
+	standardStart?: string;
+	dateSystem?: '1900' | '1904';
+}
 
 export type ImportKind = 'csv' | 'xlsx';
 export type ImportStatus = 'uploaded' | 'mapped' | 'committed' | 'rolled_back';
@@ -367,6 +375,8 @@ export interface ImportJob {
 	kind: ImportKind;
 	status: ImportStatus;
 	sheets: string[];
+	/** worktime_workbook when the upload looks like the yearly-sheet workbook of ADR-0013 */
+	detectedProfile?: ImportProfile;
 	sha256?: string;
 	createdAt: string;
 }
@@ -381,7 +391,44 @@ export interface ImportColumns {
 	note?: number | null;
 }
 
+export type ImportProfile = 'generic' | 'worktime_workbook';
+export type WorktimeAction = 'work' | 'school' | 'vacation' | 'sick' | 'excused' | 'holiday' | 'skip';
+
+export interface WorktimeRemarkRule {
+	/** substring (case-insensitive); with ^ and $ an exact text */
+	pattern: string;
+	action: WorktimeAction;
+}
+
+export interface WorktimeOptions {
+	pauseMode?: 'split' | 'none';
+	/** null = value from the table (H1) */
+	pauseMinutes?: number | null;
+	pauseStart?: string;
+	roundToMinutes?: boolean;
+	/** empty/missing = default rules */
+	rules?: WorktimeRemarkRule[];
+}
+
+export interface WorktimePreview {
+	days?: number;
+	segments?: number;
+	absences?: number;
+	customDays?: number;
+	skippedHolidays?: number;
+	firstDate?: string | null;
+	lastDate?: string | null;
+	dateSystem?: '1900' | '1904';
+	/** sum of the cached differences of the table (hint only) */
+	sheetBalanceSeconds?: number | null;
+	unmappedRemarks?: { text: string; count: number }[];
+	byAction?: Record<string, number>;
+}
+
 export interface ImportMapping {
+	/** worktime_workbook: sheet/headerRow/columns/formats are placeholders and `worktime` is evaluated */
+	profile?: ImportProfile;
+	worktime?: WorktimeOptions;
 	sheet: string;
 	/** 1-based row number of the header row; 0 = no header row */
 	headerRow: number;
@@ -401,9 +448,18 @@ export type ImportErrorCode =
 	| 'overlap'
 	| 'formula_without_value'
 	| 'summary_row'
-	| 'unknown_place';
+	| 'unknown_place'
+	| 'unknown_kind'
+	| 'note_too_long'
+	| 'too_many_rows'
+	| 'duplicate_date_conflict'
+	| 'pause_exceeds_day'
+	| 'planning_disabled';
 
 export interface ImportPreview {
+	profile?: ImportProfile;
+	worktime?: WorktimePreview;
+	errorCount?: number;
 	rows: number;
 	valid: number;
 	duplicates: number;
@@ -415,7 +471,11 @@ export interface ImportResult {
 	batchId: string;
 	created: number;
 	skipped: number;
-	conflicts?: string[];
+	rolledBack?: number;
+	absencesCreated?: number;
+	customDaysCreated?: number;
+	/** rollback_conflict: plain ids (older contract) or typed entries (ADR-0013) */
+	conflicts?: (string | { id: string; type?: string })[];
 }
 
 export interface ImportTemplate {
