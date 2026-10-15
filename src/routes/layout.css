@@ -140,13 +140,13 @@
 	}
 	html {
 		@apply font-sans;
-		font-size: 15px;
-		line-height: 1.6;
 		-webkit-text-size-adjust: 100%;
 	}
 	body {
 		@apply bg-background text-foreground;
-		font-variant-numeric: normal;
+		/* base text 15/1.6; rem stays 16 px so Tailwind spacing and the 256 px sidebar keep their size */
+		font-size: 15px;
+		line-height: 1.6;
 	}
 	h1, h2, h3 {
 		text-wrap: balance;

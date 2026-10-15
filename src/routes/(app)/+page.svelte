@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { api } from '#lib/api/client.js';
 	import type { DayEvaluation, Place, Segment, Suggestion, TimeAccount } from '#lib/api/types.js';
+	import Banner from '#lib/components/app/Banner.svelte';
+	import KpiCard from '#lib/components/app/KpiCard.svelte';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
+	import Gauge from '@lucide/svelte/icons/gauge';
+	import Scale from '@lucide/svelte/icons/scale';
+	import Target from '@lucide/svelte/icons/target';
+	import Wallet from '@lucide/svelte/icons/wallet';
 	import DaySummary from '#lib/components/time/DaySummary.svelte';
 	import DayTimeline from '#lib/components/time/DayTimeline.svelte';
 	import ReportsTeaser from '#lib/components/reports/ReportsTeaser.svelte';
@@ -15,7 +21,7 @@
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { sessionStore } from '#lib/session.svelte.js';
 	import { dayBounds, formatDateLong, todayLocal } from '#lib/time/dates.js';
-	import { formatDelta } from '#lib/time/format.js';
+	import { formatDelta, formatDuration } from '#lib/time/format.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { onMount } from 'svelte';
@@ -85,13 +91,29 @@
 {:else}
 	<div class="flex flex-col gap-4">
 		{#if suggestions.length > 0 && moduleStore.enabled('automation')}
-			<Alert data-testid="suggestions-notice">
-				<div class="flex flex-wrap items-center justify-between gap-2">
-					<span>{t('home.suggestions_open', { count: suggestions.length })}</span>
-					<Button variant="outline" size="sm" href="/suggestions">{t('home.suggestions_review')}</Button>
-				</div>
-			</Alert>
+			<Banner testid="suggestions-notice">
+				<span>{t('home.suggestions_open', { count: suggestions.length })}</span>
+				{#snippet action()}<Button variant="outline" size="sm" href="/suggestions">{t('home.suggestions_review')}</Button>{/snippet}
+			</Banner>
 		{/if}
+
+		<div class="grid gap-4 sm:grid-cols-2 min-[1100px]:grid-cols-4" data-testid="kpi-row">
+			{#if day}
+				<KpiCard title={t('kpi.target')} value={formatDuration(day.targetSeconds)} hint={t('kpi.target_hint')} icon={Target} testid="day-target" />
+				<KpiCard title={t('kpi.actual')} value={formatDuration(day.evaluatedWorkSeconds)} hint={t('kpi.actual_hint')} icon={Gauge} testid="day-evaluated" />
+				<KpiCard title={t('kpi.balance')} value={formatDelta(day.deltaSeconds)} hint={t('kpi.balance_hint')} icon={Scale} tone={day.deltaSeconds < 0 ? 'negative' : 'default'} testid="day-delta" />
+			{/if}
+			{#if account}
+				<KpiCard
+					title={t('kpi.account')}
+					value={formatDelta(account.balanceSeconds)}
+					hint={account.provisional ? t('home.balance_provisional') : account.accountStart ? t('home.balance_since', { date: account.accountStart.split('-').reverse().join('.') }) : t('home.balance_no_start')}
+					icon={Wallet}
+					tone={account.balanceSeconds < 0 ? 'negative' : 'default'}
+					testid="balance"
+				/>
+			{/if}
+		</div>
 
 		<TimerCard {running} {places} {now} {timeZone} onchange={onTimerChange} />
 
@@ -101,7 +123,7 @@
 				<CardDescription>{formatDateLong(today)}</CardDescription>
 			</CardHeader>
 			<CardContent class="flex flex-col gap-5">
-				{#if day}<DaySummary evaluation={day} />{/if}
+				{#if day}<DaySummary evaluation={day} kpis={false} />{/if}
 				<DayTimeline date={today} {timeZone} {segments} evaluation={day} {now} />
 				{#if segments.length > 0}<SegmentList {segments} {places} {timeZone} {now} />{/if}
 				<div><Button variant="outline" size="sm" href="/time/{today}">{t('home.open_day')}</Button></div>
@@ -109,19 +131,7 @@
 		</Card>
 
 		{#if account}
-			<Card>
-				<CardHeader>
-					<CardTitle>{t('home.balance')}</CardTitle>
-					<CardDescription>
-						{account.accountStart ? t('home.balance_since', { date: account.accountStart.split('-').reverse().join('.') }) : t('home.balance_no_start')}
-					</CardDescription>
-				</CardHeader>
-				<CardContent class="flex flex-wrap items-baseline gap-3">
-					<span class="text-3xl font-semibold tabular-nums {account.balanceSeconds < 0 ? 'text-destructive' : ''}" data-testid="balance">{formatDelta(account.balanceSeconds)}</span>
-					{#if account.provisional}<span class="text-sm text-muted-foreground">{t('home.balance_provisional')}</span>{/if}
-					<Button variant="ghost" size="sm" href="/settings/account-time">{t('home.balance_manage')}</Button>
-				</CardContent>
-			</Card>
+			<div><Button variant="ghost" size="sm" href="/settings/account-time">{t('home.balance_manage')}</Button></div>
 		{/if}
 
 		{#if moduleStore.enabled('reports')}<ReportsTeaser />{/if}
