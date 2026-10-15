@@ -666,3 +666,24 @@ export interface PushSubscriptionInput {
 	keys: { p256dh: string; auth: string };
 	userAgent?: string;
 }
+
+// --- Module switches (contract v0.9.0, ADR-0012) ---
+
+export const MODULE_KEYS = ['reports', 'planning', 'transfer', 'automation', 'mcp'] as const;
+export type ModuleKey = (typeof MODULE_KEYS)[number];
+
+export interface ModuleStatus {
+	key: ModuleKey;
+	serverEnabled: boolean;
+	accountEnabled: boolean;
+	/** serverEnabled && accountEnabled: the only flag that decides whether the module is visible */
+	effective: boolean;
+	/** switched off by the operator via environment; cannot be changed in the UI */
+	lockedByOperator: boolean;
+}
+
+export interface ServerModule {
+	key: ModuleKey;
+	enabled: boolean;
+	lockedByOperator: boolean;
+}

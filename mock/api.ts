@@ -1,4 +1,5 @@
 import { createMcpMock } from './mcp.ts';
+import { createModulesMock, type ModuleKey } from './modules.ts';
 import { createNotificationsMock } from './notifications.ts';
 import { createPlanningMock } from './planning.ts';
 import { createReportsMock } from './reports.ts';
@@ -94,6 +95,8 @@ export interface MockOptions {
 	seedPlanning?: boolean;
 	/** false mimics a server without STORAGE_SECRET_KEY: S3 storage settings are refused with 501 */
 	storageSecretKey?: boolean;
+	/** operator lock like MODULES_DISABLED (ADR-0012): these modules are off server-wide and cannot be switched on */
+	modulesDisabled?: ModuleKey[];
 	/** optional OIDC (ADR-0007): false/undefined = disabled like a default server; true or {name} enables the in-app mock IdP */
 	oidc?: boolean | { name?: string };
 }
@@ -127,7 +130,9 @@ export function createMockApi(options: MockOptions = {}) {
 		findByHandle: (handle) => [...accounts.values()].find((a) => a.handle === handle),
 		displayNameOf: (id) => accounts.get(id)?.displayName ?? ''
 	});
-	time.setDayContext(planning.dayContext);
+	const modules = createModulesMock({ disabledByOperator: options.modulesDisabled });
+	// With planning switched off, absences and holidays do not act on the day evaluation (ADR-0012).
+	time.setDayContext((accountId, date) => (modules.effective(accountId, 'planning') ? planning.dayContext(accountId, date) : null));
 	const transfer = createTransferMock({
 		clock: options.now ?? Date.now,
 		displayNameOf: (id) => accounts.get(id)?.displayName ?? '',
@@ -457,12 +462,20 @@ export function createMockApi(options: MockOptions = {}) {
 
 		// Shortcuts: device token instead of cookie/CSRF.
 		if (path === '/api/v1/automation/events' && method === 'POST') {
+			// the token's account is not known here; the server-wide switch is enough for the mock
+			if (!modules.serverEnabled('automation')) return error(404, 'module_disabled');
 			return time.automationEvent(req.authorization, body);
 		}
 
 		// --- MCP/OAuth entry points of the authorization server (public, ADR-0009) ---
-		if (path === '/oauth/register' && method === 'POST') return mcp.register(req.body);
-		if (path === '/oauth/authorize' && method === 'GET') return mcp.authorize(req.path);
+		if (path === '/oauth/register' && method === 'POST') {
+			if (!modules.serverEnabled('mcp')) return error(404, 'module_disabled');
+			return mcp.register(req.body);
+		}
+		if (path === '/oauth/authorize' && method === 'GET') {
+			if (!modules.serverEnabled('mcp')) return error(404, 'module_disabled');
+			return mcp.authorize(req.path);
+		}
 
 		// --- authenticated endpoints ---
 		if (!session || !account) return error(401, 'unauthorized');
@@ -588,6 +601,11 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 204 };
 		}
 
+		const modulesResponse = modules.handle(account.id, account.role, { method, path, body: req.body });
+		if (modulesResponse) return modulesResponse;
+		const disabled = modules.guard(account.id, path);
+		if (disabled) return disabled;
+
 		const notificationsResponse = notifications.handle(account.id, { method, path: req.path, body: req.body });
 		if (notificationsResponse) return notificationsResponse;
 
@@ -649,5 +667,5 @@ export function createMockApi(options: MockOptions = {}) {
 		return error(404, 'not_found');
 	}
 
-	return { handle, state: { accounts, passkeys, sessions, invitations, identities, mcp: mcp.state, notifications: notifications.state } };
+	return { handle, state: { modules: modules.state, accounts, passkeys, sessions, invitations, identities, mcp: mcp.state, notifications: notifications.state } };
 }

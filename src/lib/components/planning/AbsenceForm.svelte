@@ -10,6 +10,7 @@
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import { ABSENCE_KINDS, ABSENCE_STATUSES, absenceKindLabel, absenceStatusLabel, DOCUMENT_STATUSES, documentStatusLabel } from '#lib/planning/labels.js';
 	import { isValidDate } from '#lib/time/dates.js';
+	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import AbsenceAttachments from '../transfer/AbsenceAttachments.svelte';
 	import { untrack } from 'svelte';
 
@@ -156,7 +157,9 @@
 			<p class="text-xs text-muted-foreground">{t('absence.documents_hint')}</p>
 		</fieldset>
 	{/if}
-	{#if initial}
+	{#if !moduleStore.enabled('transfer')}
+		<!-- attachments belong to the transfer module -->
+	{:else if initial}
 		<AbsenceAttachments absenceId={initial.id} />
 	{:else}
 		<p class="text-xs text-muted-foreground" data-testid="attachments-save-first">{t('attachments.save_first')}</p>

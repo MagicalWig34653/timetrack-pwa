@@ -4,6 +4,10 @@
 	import Bell from '@lucide/svelte/icons/bell';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
+	import ModuleDisabled from '#lib/components/app/ModuleDisabled.svelte';
+	import { moduleOfPath } from '#lib/modules/map.js';
+	import { moduleStore } from '#lib/modules/store.svelte.js';
+	import { ADMIN_LINKS, MAIN_LINKS } from '#lib/nav.js';
 	import { unread } from '#lib/notifications/unread.svelte.js';
 	import { sessionStore } from '#lib/session.svelte.js';
 	import type { LayoutProps } from './$types';
@@ -11,20 +15,19 @@
 	let { children }: LayoutProps = $props();
 
 	const session = $derived(sessionStore.current);
-	const links = $derived([
-		{ href: '/', label: t('nav.home'), prefix: false },
-		{ href: '/time', label: t('nav.time'), prefix: true },
-		{ href: '/suggestions', label: t('nav.suggestions'), prefix: true },
-		{ href: '/reports', label: t('nav.reports'), prefix: true },
-		{ href: '/calendar', label: t('nav.calendar'), prefix: true },
-		{ href: '/vacation', label: t('nav.vacation'), prefix: true },
-		{ href: '/absences', label: t('nav.absences'), prefix: true },
-		{ href: '/shared', label: t('nav.shared'), prefix: true },
-		{ href: '/export', label: t('nav.export'), prefix: true },
-		{ href: '/import', label: t('nav.import'), prefix: true },
-		{ href: '/settings/work-model', label: t('nav.settings'), prefix: false, section: '/settings' },
-		...(session?.account.role === 'admin' ? [{ href: '/admin/invitations', label: t('nav.invitations'), prefix: true }] : [])
-	]);
+	const links = $derived(
+		[...MAIN_LINKS, ...(session?.account.role === 'admin' ? ADMIN_LINKS : [])]
+			.filter((link) => {
+				const module = moduleOfPath(link.href);
+				return !module || moduleStore.enabled(module);
+			})
+			.map((link) => ({ ...link, label: t(link.label) }))
+	);
+	/** module of the current page when that module is switched off: the page shows the notice instead of its content */
+	const blockedBy = $derived.by(() => {
+		const module = moduleOfPath(page.url.pathname);
+		return module && !moduleStore.enabled(module) ? module : null;
+	});
 
 	// The bell polls while a regular (non-recovery) session is open; polling pauses when the tab is hidden.
 	const polling = $derived(!!session && !session.recovery);
@@ -92,6 +95,10 @@
 		{/if}
 	</header>
 	<main class="mx-auto max-w-4xl px-4 py-8">
-		{@render children()}
+		{#if blockedBy}
+			<ModuleDisabled module={blockedBy} />
+		{:else}
+			{@render children()}
+		{/if}
 	</main>
 </div>

@@ -1,4 +1,5 @@
 import { deMcp } from './de-mcp';
+import { deModules } from './de-modules';
 import { deOidc } from './de-oidc';
 import { dePlanning } from './de-planning';
 import { dePwa } from './de-pwa';
@@ -9,6 +10,7 @@ import { deTransfer } from './de-transfer';
 // Technical API error codes are mapped via `error.<code>` and `error.status_<http status>`.
 export const de = {
 	...deMcp,
+	...deModules,
 	...deOidc,
 	...dePlanning,
 	...dePwa,

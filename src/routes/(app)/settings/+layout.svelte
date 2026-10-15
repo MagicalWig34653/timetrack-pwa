@@ -1,28 +1,20 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { t } from '#lib/i18n/index.js';
+	import { moduleOfPath } from '#lib/modules/map.js';
+	import { moduleStore } from '#lib/modules/store.svelte.js';
+	import { SETTINGS_ADMIN_LINKS, SETTINGS_LINKS } from '#lib/nav.js';
 	import { sessionStore } from '#lib/session.svelte.js';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
 
-	const baseLinks = [
-		{ href: '/settings/work-model', label: 'nav.work_model' },
-		{ href: '/settings/places', label: 'nav.places' },
-		{ href: '/settings/account-time', label: 'nav.account_time' },
-		{ href: '/settings/learning-fields', label: 'nav.learning_fields' },
-		{ href: '/settings/notifications', label: 'nav.notification_settings' },
-		{ href: '/settings/devices', label: 'nav.devices' },
-		{ href: '/settings/sharing', label: 'nav.sharing' },
-		{ href: '/settings/passkeys', label: 'nav.passkeys' },
-		{ href: '/settings/identities', label: 'nav.identities' },
-		{ href: '/settings/connections', label: 'nav.connections' },
-		{ href: '/settings/api-tokens', label: 'nav.api_tokens' },
-		{ href: '/settings/mcp-help', label: 'nav.mcp_help' },
-		{ href: '/settings/recovery', label: 'nav.recovery' },
-		{ href: '/settings/sessions', label: 'nav.sessions' }
-	] as const;
-	const links = $derived([...baseLinks, ...(sessionStore.current?.account.role === 'admin' ? ([{ href: '/settings/storage', label: 'nav.storage' }] as const) : [])]);
+	const links = $derived(
+		[...SETTINGS_LINKS, ...(sessionStore.current?.account.role === 'admin' ? SETTINGS_ADMIN_LINKS : [])].filter((link) => {
+			const module = moduleOfPath(link.href);
+			return !module || moduleStore.enabled(module);
+		})
+	);
 </script>
 
 <nav aria-label={t('nav.settings')} class="-mt-4 mb-6 overflow-x-auto">
