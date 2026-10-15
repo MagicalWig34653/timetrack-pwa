@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '#lib/components/app/EmptyState.svelte';
 	import { api, ApiError } from '#lib/api/client.js';
 	import {
 		NOTIFICATION_CATEGORIES,
@@ -321,7 +322,7 @@
 				<div>
 					<h3 class="mb-2 text-sm font-medium">{t('push.subscriptions_title')}</h3>
 					{#if subscriptions.length === 0}
-						<p class="text-sm text-muted-foreground">{t('push.subscriptions_empty')}</p>
+						<EmptyState title={t('push.subscriptions_empty')} />
 					{:else}
 						<ul class="divide-y" data-testid="subscription-list">
 							{#each subscriptions as info (info.id)}

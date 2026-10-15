@@ -240,3 +240,22 @@
 		scroll-behavior: auto !important;
 	}
 }
+
+/* native dialogs: overlay black/10 with a light blur (DESIGN.md "Dialoge") */
+dialog::backdrop {
+	background: rgb(0 0 0 / 0.1);
+	-webkit-backdrop-filter: blur(4px);
+	backdrop-filter: blur(4px);
+}
+@media (prefers-reduced-transparency: reduce) {
+	dialog::backdrop {
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
+		background: rgb(0 0 0 / 0.4);
+	}
+}
+:root[data-transparency='reduced'] dialog::backdrop {
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	background: rgb(0 0 0 / 0.4);
+}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '#lib/components/app/EmptyState.svelte';
 	import { api } from '#lib/api/client.js';
 	import type { VacationEntries } from '#lib/api/types.js';
 	import { Alert } from '#lib/components/ui/alert/index.js';
@@ -53,7 +54,7 @@
 		{#if notice}<Alert variant="success">{notice}</Alert>{/if}
 		{#if error}<Alert variant="destructive">{error}</Alert>{/if}
 		{#if rows.length === 0}
-			<p class="text-sm text-muted-foreground" data-testid="entries-empty">{t('vacation.entries_empty')}</p>
+			<EmptyState title={t('vacation.entries_empty')} testid="entries-empty" />
 		{:else}
 			<ul class="divide-y rounded-lg border text-sm">
 				{#each rows as row (row.id)}
