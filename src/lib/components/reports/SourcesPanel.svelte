@@ -8,6 +8,7 @@
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import { formatDateLong, formatDateNumeric, localDateOf } from '#lib/time/dates.js';
+	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { ATTACHMENT_ACCEPT, isAllowedAttachment } from '#lib/transfer/attachments.js';
 	import { formatBytes } from '#lib/transfer/bytes.js';
 	import { saveBlob } from '#lib/transfer/export.js';
@@ -189,6 +190,7 @@
 			<div><Button type="submit" variant="outline" size="sm" disabled={busy} data-testid="source-note-add">{t('reports.sources.note_add')}</Button></div>
 		</form>
 
+		{#if moduleStore.enabled('transfer')}
 		<div class="flex flex-wrap items-center gap-2">
 			<input
 				bind:this={input}
@@ -206,6 +208,7 @@
 				<Button type="button" size="sm" disabled={busy} onclick={upload} data-testid="source-upload">{busy ? t('attachments.uploading') : t('attachments.upload')}</Button>
 			{/if}
 		</div>
+		{/if}
 		<p class="text-xs text-muted-foreground" data-testid="sources-never-shared">{t('reports.sources.never_shared')}</p>
 	{/if}
 </section>

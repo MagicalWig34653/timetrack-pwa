@@ -56,6 +56,9 @@ import type {
 	WorkModel,
 	WorkModelInput,
 	Invitation,
+	ModuleKey,
+	ModuleStatus,
+	ServerModule,
 	ExternalIdentity,
 	ApiToken,
 	ApiTokenCreated,
@@ -93,6 +96,13 @@ async function netFetch(input: string, init: RequestInit): Promise<Response> {
 	}
 }
 
+let moduleDisabledHandler: (() => void) | null = null;
+
+/** Registers the callback that runs when any call answers 404 module_disabled (the module store refreshes itself). */
+export function setModuleDisabledHandler(handler: (() => void) | null): void {
+	moduleDisabledHandler = handler;
+}
+
 export function setCsrfToken(token: string | null): void {
 	csrfToken = token;
 }
@@ -111,6 +121,7 @@ async function toApiError(response: Response): Promise<ApiError> {
 	} catch {
 		// non-JSON error body (e.g. proxy error page): keep the generic code
 	}
+	if (response.status === 404 && code === 'module_disabled') moduleDisabledHandler?.();
 	return new ApiError(response.status, code, message, body);
 }
 
@@ -455,5 +466,11 @@ export const api = {
 	listPushSubscriptions: () => request<PushSubscriptionInfo[]>('GET', '/me/push-subscriptions'),
 	createPushSubscription: (input: PushSubscriptionInput) => request<PushSubscriptionInfo>('POST', '/me/push-subscriptions', input),
 	deletePushSubscription: (id: string) => request<void>('DELETE', `/me/push-subscriptions/${id}`),
-	sendTestPush: (id: string) => request<void>('POST', `/me/push-subscriptions/${id}/test`)
+	sendTestPush: (id: string) => request<void>('POST', `/me/push-subscriptions/${id}/test`),
+
+	// module switches, contract v0.9.0 (ADR-0012); a PUT only needs the keys that change
+	listModules: () => request<ModuleStatus[]>('GET', '/modules'),
+	putMyModules: (modules: Partial<Record<ModuleKey, boolean>>) => request<ModuleStatus[]>('PUT', '/me/modules', { modules }),
+	getServerModules: () => request<ServerModule[]>('GET', '/admin/modules'),
+	putServerModules: (modules: Partial<Record<ModuleKey, boolean>>) => request<ServerModule[]>('PUT', '/admin/modules', { modules })
 };

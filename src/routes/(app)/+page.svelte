@@ -12,6 +12,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
 	import { t } from '#lib/i18n/index.js';
+	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { sessionStore } from '#lib/session.svelte.js';
 	import { dayBounds, formatDateLong, todayLocal } from '#lib/time/dates.js';
 	import { formatDelta } from '#lib/time/format.js';
@@ -43,7 +44,7 @@
 				api.listSegments(start.toISOString(), end.toISOString()),
 				api.listPlaces(),
 				api.getTimeAccount(),
-				api.listSuggestions()
+				moduleStore.enabled('automation') ? api.listSuggestions() : Promise.resolve([] as Suggestion[])
 			]);
 			running = timer;
 			day = evaluation;
@@ -83,7 +84,7 @@
 	<Alert variant="destructive">{load.message}</Alert>
 {:else}
 	<div class="flex flex-col gap-4">
-		{#if suggestions.length > 0}
+		{#if suggestions.length > 0 && moduleStore.enabled('automation')}
 			<Alert data-testid="suggestions-notice">
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<span>{t('home.suggestions_open', { count: suggestions.length })}</span>
@@ -123,6 +124,6 @@
 			</Card>
 		{/if}
 
-		<ReportsTeaser />
+		{#if moduleStore.enabled('reports')}<ReportsTeaser />{/if}
 	</div>
 {/if}

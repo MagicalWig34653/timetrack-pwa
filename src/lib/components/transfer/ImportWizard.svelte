@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { api, ApiError } from '#lib/api/client.js';
 	import type { ImportJob, ImportPreview, ImportResult, ImportTemplate, RawPreview } from '#lib/api/types.js';
 	import { Alert } from '#lib/components/ui/alert/index.js';
@@ -473,7 +474,7 @@
 			<div class="flex flex-wrap gap-2">
 				{#if firstDate}
 					<a class="text-sm underline underline-offset-4" href="/time/{firstDate}">{t('import.open_day')}</a>
-					<a class="text-sm underline underline-offset-4" href="/calendar?date={firstDate}">{t('import.open_calendar')}</a>
+					{#if moduleStore.enabled('planning')}<a class="text-sm underline underline-offset-4" href="/calendar?date={firstDate}">{t('import.open_calendar')}</a>{/if}
 				{:else}
 					<a class="text-sm underline underline-offset-4" href="/time">{t('import.open_time')}</a>
 				{/if}

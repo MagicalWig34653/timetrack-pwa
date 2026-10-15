@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { moduleStore } from '#lib/modules/store.svelte.js';
 import { sessionStore } from '#lib/session.svelte.js';
 import type { LayoutLoad } from './$types';
 
@@ -14,5 +15,7 @@ export const load: LayoutLoad = async ({ url }) => {
 	// A restricted recovery session may only set up a new passkey.
 	if (session.recovery && url.pathname !== RECOVERY_PATH) redirect(307, RECOVERY_PATH);
 	if (!session.recovery && url.pathname === RECOVERY_PATH) redirect(307, '/');
+	// module switches decide which pages exist for this account; a failing read never blocks navigation
+	if (!session.recovery) await moduleStore.ensure(session.account.id);
 	return { session };
 };

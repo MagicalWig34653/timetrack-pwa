@@ -1,5 +1,6 @@
 import { api, ApiError, setCsrfToken } from '#lib/api/client.js';
 import type { Session } from '#lib/api/types.js';
+import { moduleStore } from '#lib/modules/store.svelte.js';
 
 class SessionStore {
 	current = $state<Session | null>(null);
@@ -13,6 +14,7 @@ class SessionStore {
 			if (error instanceof ApiError && error.status === 401) {
 				this.current = null;
 				setCsrfToken(null);
+				moduleStore.reset();
 			} else throw error;
 		}
 		this.loaded = true;
@@ -31,6 +33,7 @@ class SessionStore {
 		} finally {
 			this.current = null;
 			setCsrfToken(null);
+			moduleStore.reset();
 		}
 	}
 }

@@ -16,6 +16,8 @@
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
+	import { CATEGORY_MODULES } from '#lib/modules/map.js';
+	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { errorMessage, t, type MessageKey } from '#lib/i18n/index.js';
 	import { DEFAULT_FORM, formFromSettings, settingsFromForm, validateForm, type FormErrors, type SettingsForm } from '#lib/notifications/settings.js';
 	import {
@@ -215,7 +217,7 @@
 				</CardHeader>
 				<CardContent>
 					<ul class="divide-y" data-testid="category-list">
-						{#each NOTIFICATION_CATEGORIES as kind (kind)}
+						{#each NOTIFICATION_CATEGORIES.filter((k) => !(k in CATEGORY_MODULES) || moduleStore.enabled(CATEGORY_MODULES[k as keyof typeof CATEGORY_MODULES])) as kind (kind)}
 							<li class="flex flex-col gap-3 py-4 first:pt-0 last:pb-0" data-kind={kind}>
 								<div>
 									<p class="font-medium">{labelOf(kind)}</p>

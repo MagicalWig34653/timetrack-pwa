@@ -56,9 +56,10 @@ describe('TimerCard', () => {
 		render(TimerCard, { running: null, places, now: NOW, timeZone: 'Europe/Berlin', onchange });
 		const button = screen.getByRole('button', { name: 'Start' });
 		const clicks = Promise.all([userEvent.click(button), userEvent.click(button), userEvent.click(button)]);
-		await new Promise((resolve) => setTimeout(resolve, 30));
+		// wait for the real condition instead of a fixed sleep: the first start call is pending (button busy)
+		await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
+		await clicks; // all three clicks are issued while the first call is still held
 		release();
-		await clicks;
 		await waitFor(() => expect(onchange).toHaveBeenCalled());
 		expect(timerCalls('/time/timer/start')).toHaveLength(1);
 		expect(onchange).toHaveBeenCalledTimes(1);

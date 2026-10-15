@@ -10,14 +10,16 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import { hasWriteScope } from '#lib/mcp/scopes.js';
+	import { moduleStore } from '#lib/modules/store.svelte.js';
+	import ModuleDisabled from '#lib/components/app/ModuleDisabled.svelte';
 	import { sessionStore } from '#lib/session.svelte.js';
 	import { onMount } from 'svelte';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 
-	type View = 'loading' | 'ready' | 'missing' | 'expired' | 'decided' | 'error' | 'redirecting';
+	type View = 'disabled' | 'loading' | 'ready' | 'missing' | 'expired' | 'decided' | 'error' | 'redirecting';
 
 	const requestId = page.url.searchParams.get('request') ?? '';
-	let view = $state<View>(requestId ? 'loading' : 'missing');
+	let view = $state<View>(!moduleStore.enabled('mcp') ? 'disabled' : requestId ? 'loading' : 'missing');
 	let request = $state<OAuthRequest | null>(null);
 	let selected = $state<McpScope[]>([]);
 	let busy = $state<'allow' | 'deny' | null>(null);
@@ -27,7 +29,7 @@
 	const writes = $derived(hasWriteScope(selected));
 
 	onMount(async () => {
-		if (!requestId) return;
+		if (!requestId || view === 'disabled') return;
 		try {
 			request = await api.getOAuthRequest(requestId);
 			// Everything the client asked for is preselected; the person removes what must not be allowed.
@@ -41,6 +43,7 @@
 
 	/** 404: expired, invalid or not for this account. 409: already decided. */
 	function classify(e: unknown): View {
+		if (e instanceof ApiError && e.code === 'module_disabled') return 'disabled';
 		if (e instanceof ApiError && e.status === 404) return 'expired';
 		if (e instanceof ApiError && e.status === 409) return 'decided';
 		return 'error';
@@ -79,7 +82,9 @@
 </script>
 
 <AuthShell title={view === 'expired' ? t('consent.expired_title') : view === 'decided' ? t('consent.decided_title') : t('consent.title')}>
-	{#if view === 'loading'}
+	{#if view === 'disabled'}
+		<ModuleDisabled module="mcp" />
+	{:else if view === 'loading'}
 		<p class="text-sm text-muted-foreground" role="status">{t('common.loading')}</p>
 	{:else if view === 'missing'}
 		<Alert variant="destructive">{t('consent.missing_request')}</Alert>
