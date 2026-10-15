@@ -55,9 +55,31 @@ const workbook = () =>
 		'Arbeitszeit.xlsx'
 	);
 
-async function openProfileStep() {
+/** C23 situations: partial Freigestellt (18.9.), holiday work (25.12.) and school (26.12.) rows; first content on a Thursday */
+const c23Workbook = () =>
+	new File(
+		[
+			buildWorktimeWorkbook({
+				sheets: [
+					{
+						year: 2026,
+						days: [
+							day('2026-09-17', '8:00', '16:12'),
+							day('2026-09-18', '8:00', '11:00', 'Freigestellt'),
+							day('2026-09-21', '8:00', '16:12', 'Urlaub'),
+							day('2026-12-25', '8:00', '16:12'),
+							day('2026-12-26', '8:00', '12:00', 'BS')
+						]
+					}
+				]
+			}) as BlobPart
+		],
+		'Arbeitszeit.xlsx'
+	);
+
+async function openProfileStep(file: File = workbook()) {
 	const u = user();
-	await u.upload(screen.getByTestId('import-file'), workbook());
+	await u.upload(screen.getByTestId('import-file'), file);
 	await u.click(screen.getByRole('button', { name: 'Weiter' }));
 	await screen.findByRole('heading', { name: 'Blatt und Kopfzeile' });
 	return u;
@@ -178,6 +200,75 @@ describe('worktime import wizard', () => {
 		await u.selectOptions(screen.getByLabelText('Gespeicherte Vorlage'), 'Meine Tabelle');
 		await u.click(screen.getByRole('button', { name: 'Anwenden' }));
 		expect((screen.getByTestId('wt-pause-none') as HTMLInputElement).checked).toBe(true);
+	});
+});
+
+describe('worktime import wizard: holiday times, partial credit, balance split and model start (C23)', () => {
+	async function toPreview(u: ReturnType<typeof user>) {
+		await u.click(screen.getByRole('button', { name: 'Weiter' }));
+		await screen.findByTestId('worktime-step');
+		await u.click(screen.getByTestId('wt-validate'));
+		await screen.findByTestId('worktime-preview');
+	}
+	const warning = (code: string) => screen.queryByTestId('wt-warnings')?.querySelector(`[data-code="${code}"]`) ?? null;
+
+	it('defaults to discarding holiday times and importing partial credits as work', async () => {
+		render(ImportWizard);
+		const u = await openProfileStep(c23Workbook());
+		await u.click(screen.getByRole('button', { name: 'Weiter' }));
+		await screen.findByTestId('worktime-step');
+		expect(screen.getByTestId('wt-holiday-discard')).toBeChecked();
+		expect(screen.getByTestId('wt-credit-work')).toBeChecked();
+		expect(screen.getByTestId('wt-day-options')).toHaveTextContent('Mehrarbeit');
+		expect(screen.getByTestId('wt-day-options')).toHaveTextContent('Freigestellt mit wenigen Stunden');
+	});
+
+	it('lists the warnings with day counts and a short explanation, splits the balance and points to the model start', async () => {
+		render(ImportWizard);
+		const u = await openProfileStep(c23Workbook());
+		await toPreview(u);
+		expect(warning('holiday_times_discarded')).toHaveTextContent('1 Tage');
+		expect(warning('school_on_holiday')).toHaveTextContent('Schulzeiten an Feiertagen nicht übernommen');
+		expect(warning('credit_partial_as_work')).toHaveAttribute('data-count', '1');
+		expect(warning('credit_partial_as_work')).toHaveTextContent('Was bedeutet das?');
+		expect(screen.getByTestId('wt-count-segments')).toHaveTextContent(/^[1-9]/);
+		expect(screen.getByTestId('wt-balance-value')).toHaveTextContent('-5:12');
+		expect(screen.getByTestId('wt-balance-future')).toHaveTextContent('-4:12');
+		expect(screen.getByTestId('wt-balance-total')).toHaveTextContent('-9:24');
+		const hint = screen.getByTestId('wt-model-start');
+		await waitFor(() => expect(hint).toBeInTheDocument());
+		expect(hint).toHaveAttribute('data-kind', 'earlier');
+		expect(hint).toHaveTextContent('17.09.2026');
+		expect(screen.getByTestId('wt-model-start-link')).toHaveAttribute('href', '/settings/work-model?validFrom=2026-09-17');
+	});
+
+	it('switching to "keep" and "as absence" removes the warnings and is stored in a template', async () => {
+		render(ImportWizard);
+		const u = await openProfileStep(c23Workbook());
+		await u.click(screen.getByRole('button', { name: 'Weiter' }));
+		await screen.findByTestId('worktime-step');
+		await u.click(screen.getByTestId('wt-holiday-keep'));
+		await u.click(screen.getByTestId('wt-credit-absence'));
+		await u.type(screen.getByLabelText('Name der neuen Vorlage'), 'C23');
+		await u.click(screen.getByRole('button', { name: 'Als Vorlage speichern' }));
+		await screen.findByTestId('import-notice');
+		expect((await api.listImportTemplates())[0].mapping.worktime).toMatchObject({ holidayTimes: 'keep', partialCredit: 'absence' });
+		await u.click(screen.getByTestId('wt-validate'));
+		await screen.findByTestId('worktime-preview');
+		expect(screen.queryByTestId('wt-warnings')).toBeNull();
+		expect(screen.getByTestId('wt-count-absences')).toHaveTextContent('2');
+	});
+
+	it('shows the aggregated warnings again in the confirmation and in the result', async () => {
+		render(ImportWizard);
+		const u = await openProfileStep(c23Workbook());
+		await toPreview(u);
+		await u.click(screen.getByRole('button', { name: 'Weiter zur Bestätigung' }));
+		expect(screen.getByTestId('confirm-warnings').querySelector('[data-code="school_on_holiday"]')).not.toBeNull();
+		await u.click(screen.getByLabelText(/Ich habe die Vorschau/));
+		await u.click(screen.getByTestId('commit'));
+		const result = await screen.findByTestId('result-warnings');
+		expect(result.querySelector('[data-code="holiday_times_discarded"]')).toHaveAttribute('data-count', '1');
 	});
 });
 

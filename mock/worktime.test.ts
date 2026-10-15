@@ -219,3 +219,77 @@ describe('worktime export profile (mock)', () => {
 		await expect(api.exportTime('2026-03-01', '2026-03-31', 'worktime-xlsx', { dateSystem: '1910' as '1900' })).rejects.toMatchObject({ status: 400 });
 	});
 });
+
+describe('worktime import profile: C23 semantics over the API', () => {
+	const C23: WorktimeWorkbookInput = {
+		sheets: [
+			{
+				year: 2026,
+				days: [
+					day('2026-09-17', '8:00', '16:12'),
+					day('2026-09-18', '8:00', '11:00', 'Freigestellt'),
+					day('2026-09-21', '8:00', '16:12', 'Freigestellt'),
+					day('2026-12-25', '8:00', '16:12'),
+					day('2026-12-26', '8:00', '12:00', 'BS')
+				]
+			}
+		]
+	};
+
+	it('discards holiday times by default (work and school separately) and keeps them on request', async () => {
+		const bytes = buildWorktimeWorkbook(C23);
+		const w = await preview(bytes);
+		expect(w.preview.warnings).toEqual(
+			expect.arrayContaining([
+				{ code: 'holiday_times_discarded', count: 1 },
+				{ code: 'school_on_holiday', count: 1 }
+			])
+		);
+		const days = (p: typeof w.preview) => p.sample.map((s) => s.date);
+		expect(days(w.preview)).not.toContain('2026-12-25');
+		const kept = (await preview(bytes, { holidayTimes: 'keep' })).preview;
+		expect(kept.warnings!.map((x) => x.code)).not.toContain('holiday_times_discarded');
+		expect(kept.worktime!.segments).toBeGreaterThan(w.preview.worktime!.segments!);
+	});
+
+	it('treats partial Freigestellt as work with note, a full one as absence, and honours partialCredit=absence', async () => {
+		const bytes = buildWorktimeWorkbook(C23);
+		const asWork = (await preview(bytes)).preview;
+		expect(asWork.warnings).toContainEqual({ code: 'credit_partial_as_work', count: 1 });
+		expect(asWork.worktime!.absences).toBe(1);
+		const asAbsence = (await preview(bytes, { partialCredit: 'absence' })).preview;
+		expect(asAbsence.warnings!.map((x) => x.code)).not.toContain('credit_partial_as_work');
+		// 18.9. (Fri) and 21.9. (Mon) are consecutive working days of the same kind: one merged absence
+		expect(asAbsence.worktime!.absences).toBe(1);
+		expect(asAbsence.worktime!.byAction).toMatchObject({ excused: 2 });
+		expect(asWork.worktime!.byAction).toMatchObject({ excused: 1, work: 3 });
+		const { job } = await preview(bytes);
+		const result = await api.commitImport(job.id);
+		expect(result.warnings).toContainEqual({ code: 'credit_partial_as_work', count: 1 });
+		const notes = (await api.listSegments('2026-09-18T00:00:00Z', '2026-09-19T00:00:00Z')).map((s) => s.note);
+		expect(new Set(notes)).toEqual(new Set(['Freigestellt']));
+	});
+
+	it('uses the work model target of the day: a 4 h model makes a 4 h Freigestellt row a plain absence', async () => {
+		await api.createWorkModel({ validFrom: '2026-09-01', weeklyTargetSeconds: 20 * 3600, workdays: [1, 2, 3, 4, 5], timezone: 'Europe/Berlin' } as never);
+		const four = buildWorktimeWorkbook({ sheets: [{ year: 2026, days: [day('2026-09-18', '8:00', '12:30', 'Freigestellt')] }] });
+		const p = (await preview(four)).preview;
+		expect(p.warnings!.map((x) => x.code)).not.toContain('credit_partial_as_work');
+		expect(p.worktime!.absences).toBe(1);
+	});
+
+	it('splits the sheet balance by today and reports the first content day', async () => {
+		const w = (await preview(buildWorktimeWorkbook(C23))).preview.worktime!;
+		expect(w.firstContentDate).toBe('2026-09-17');
+		// today is 14.10.2026: the rows in September are due, the December rows lie in the future
+		expect(w.sheetBalanceUpToTodaySeconds).toBe(-(5 * 3600 + 12 * 60));
+		expect(w.sheetBalanceFutureSeconds).toBe(-(4 * 3600 + 12 * 60));
+		expect(w.sheetBalanceSeconds).toBe(w.sheetBalanceUpToTodaySeconds! + w.sheetBalanceFutureSeconds!);
+	});
+
+	it('rejects unknown option values', async () => {
+		const job = await api.uploadImport(file(buildWorktimeWorkbook(C23)));
+		await expect(api.putImportMapping(job.id, profile({ holidayTimes: 'maybe' as never }))).rejects.toMatchObject({ status: 400 });
+		await expect(api.putImportMapping(job.id, profile({ partialCredit: 'x' as never }))).rejects.toMatchObject({ status: 400 });
+	});
+});
