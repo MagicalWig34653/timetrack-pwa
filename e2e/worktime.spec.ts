@@ -886,19 +886,97 @@ test('rounding model: "bewertet" exports the rounded start/end, "tatsächlich" t
 	}
 });
 
-// Backend finding from the local real-file check (L19): a school/work row with standard times on a BUILT-IN public holiday becomes a
-// segment, and the holiday has target 0, so the app shows a +7:42 surplus while the sheet's own E column says 0 (credited day).
-// Not fixed here (backend is read-only for L19); see docs/handoffs/L19.md. Remove .fixme once C21 treats such rows as credited.
+// C23 (diagnosis L20): a school row with standard times on a BUILT-IN public holiday used to create a +7:42 surplus. By default the times
+// are now discarded (warning school_on_holiday); "keep" restores the earlier overtime behaviour.
 const HOLIDAY_SCHOOL = book({ sheets: [{ year: 2027, days: [row('2027-03-26', '8:00', '16:12', 'Berufsschule')] }] }, 'feiertag-schule.xlsx'); // Good Friday 2027
 
-test.fixme('school row with standard times on a built-in holiday must not create a time-account surplus (sheet difference is 0)', async () => {
+test('C23: school row on a built-in holiday is discarded by default (warning, no surplus); "keep" imports it as before', async () => {
 	const { page } = bob;
 	await toProfileStep(page, HOLIDAY_SCHOOL);
 	await page.getByTestId('wt-validate').click();
-	await confirmAndCommit(page);
+	// the preview of the holiday fixture must carry the new warning: this also proves the backend binary includes C23
+	await expect(page.getByTestId('wt-warnings').locator('[data-code="school_on_holiday"]')).toHaveAttribute('data-count', '1');
+	await expect(page.getByTestId('wt-count-segments')).toHaveText('0');
+	// nothing is left to import, so the wizard offers no way to the confirmation
+	await expect(page.getByRole('button', { name: 'Weiter zur Bestätigung' })).toBeDisabled();
 	const day = (await api(page, 'GET', '/api/v1/time/days/2027-03-26')).body;
 	expect(day.targetSeconds).toBe(0);
-	expect(day.deltaSeconds).toBe(0); // currently 27720 (7:42 surplus)
+	expect(day.deltaSeconds).toBe(0);
+
+	// keep: same file, option switched, the earlier behaviour (a school segment on the holiday)
+	await toProfileStep(page, HOLIDAY_SCHOOL);
+	await page.getByTestId('wt-holiday-keep').check();
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('worktime-preview')).toBeVisible();
+	await expect(page.getByTestId('wt-warnings')).toHaveCount(0);
+	await expect(page.getByTestId('wt-count-segments')).not.toHaveText('0');
+});
+
+// C23 situations with synthetic rows: 2026-10-08 (Thu, first content day), 10-09 partial Freigestellt (3 h), 10-12 full Freigestellt,
+// 2036-12-25 work row and 2036-12-26 school row on built-in holidays (far in the future: "after today" for any run date).
+const C23_FILE = book(
+	{
+		sheets: [
+			{ year: 2026, days: [row('2026-10-08', '8:00', '16:12'), row('2026-10-09', '8:00', '11:00', 'Freigestellt'), row('2026-10-12', '8:00', '16:12', 'Freigestellt')] },
+			{ year: 2036, days: [row('2036-12-25', '8:00', '16:12'), row('2036-12-26', '8:00', '12:00', 'BS')] }
+		]
+	},
+	'c23.xlsx'
+);
+
+test('C23: defaults, warnings with counts, split sheet balance, model start hint with link, option switches', async ({ browser }) => {
+	const { page, context } = alice;
+	await toProfileStep(page, C23_FILE);
+	await expect(page.getByTestId('wt-holiday-discard')).toBeChecked();
+	await expect(page.getByTestId('wt-credit-work')).toBeChecked();
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('worktime-preview')).toBeVisible();
+
+	const warnings = page.getByTestId('wt-warnings');
+	await expect(warnings.locator('[data-code="holiday_times_discarded"]')).toHaveAttribute('data-count', '1');
+	await expect(warnings.locator('[data-code="school_on_holiday"]')).toHaveAttribute('data-count', '1');
+	await expect(warnings.locator('[data-code="credit_partial_as_work"]')).toHaveAttribute('data-count', '1');
+
+	// sheet balance split by today: 10-09 is -5:12 (3:00 - 0:30 - 7:42), the 2036 rows are in the future (0 and -4:12)
+	await expect(page.getByTestId('wt-balance-value')).toHaveText('-5:12');
+	await expect(page.getByTestId('wt-balance-future')).toHaveText('-4:12');
+	await expect(page.getByTestId('wt-balance-total')).toContainText('-9:24');
+
+	// the work model starts 2026-08-03, before the first content day (Thursday 8.10.2026)
+	const hint = page.getByTestId('wt-model-start');
+	await expect(hint).toHaveAttribute('data-kind', 'earlier');
+	await expect(hint).toContainText('08.10.2026');
+	await expect(page.getByTestId('wt-model-start-link')).toHaveAttribute('href', '/settings/work-model?validFrom=2026-10-08');
+	const [popup] = await Promise.all([context.waitForEvent('page'), page.getByTestId('wt-model-start-link').click()]);
+	await expect(popup.getByTestId('work-model-prefilled')).toContainText('08.10.2026', { timeout: 20_000 });
+	await expect(popup.getByLabel('Gültig ab')).toHaveValue('2026-10-08');
+	await popup.close();
+
+	// option switches: keep + absence leave no warnings and turn both Freigestellt rows into one absence range
+	await page.getByRole('button', { name: 'Zurück zur Zuordnung' }).click();
+	await page.getByTestId('wt-holiday-keep').check();
+	await page.getByTestId('wt-credit-absence').check();
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('worktime-preview')).toBeVisible();
+	await expect(page.getByTestId('wt-warnings')).toHaveCount(0);
+	await expect(page.getByTestId('wt-count-absences')).toHaveText('1');
+	await expect(page.getByTestId('wt-count-segments')).toHaveText('6'); // 8.10. + two 2036 days, each split by the 30 min pause
+
+	// defaults again, commit: partial day became work with the remark as note, holiday rows are gone
+	await page.getByRole('button', { name: 'Zurück zur Zuordnung' }).click();
+	await page.getByTestId('wt-holiday-discard').check();
+	await page.getByTestId('wt-credit-work').check();
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('worktime-preview')).toBeVisible();
+	await confirmAndCommit(page);
+	await expect(page.getByTestId('result-warnings').locator('[data-code="credit_partial_as_work"]')).toHaveAttribute('data-count', '1');
+	const week = canonical(await segmentsOf(page, 'from=2026-10-07T00:00:00Z&to=2026-10-14T00:00:00Z'));
+	expect(week.filter((x) => x.date === '2026-10-09').every((x) => x.note === 'Freigestellt')).toBe(true);
+	expect(week.some((x) => x.date === '2026-10-09')).toBe(true);
+	expect(await segmentsOf(page, 'from=2036-12-24T00:00:00Z&to=2036-12-28T00:00:00Z')).toHaveLength(0);
+	const absences = await absencesOf(page, '2026-10-01', '2026-10-31');
+	expect(absences.map((a) => [a.kind, a.startDate, a.endDate])).toEqual([['excused', '2026-10-12', '2026-10-12']]);
+	void browser;
 });
 
 void MAIN_2027;
