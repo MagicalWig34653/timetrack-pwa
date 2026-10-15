@@ -80,7 +80,7 @@
 			{#if form.pauseSource === 'override'}
 				<div class="flex flex-col gap-1.5">
 					<Label for="wt-pause-minutes">{t('worktime.pause_minutes')}</Label>
-					<Input id="wt-pause-minutes" type="number" min={0} max={240} inputmode="numeric" bind:value={form.pauseMinutes} />
+					<Input id="wt-pause-minutes" type="text" inputmode="numeric" bind:value={form.pauseMinutes} />
 					<p class="text-xs text-muted-foreground">{t('worktime.pause_minutes_hint')}</p>
 				</div>
 			{/if}

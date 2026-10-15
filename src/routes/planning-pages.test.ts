@@ -100,6 +100,17 @@ describe('AbsenceForm', () => {
 		expect(screen.queryByText('Unterlagen')).toBeNull(); // documents only for sick/other
 	});
 
+	it('offers "Freigestellt" with its hint, no document fields and no vacation count', async () => {
+		const onsaved = vi.fn();
+		render(AbsenceForm, { date: '2026-12-07', onsaved, oncancel: vi.fn() });
+		await userEvent.selectOptions(screen.getByLabelText('Art'), 'excused');
+		expect(screen.getByTestId('absence-excused-hint')).toHaveTextContent('Bezahlt frei, verbraucht keinen Urlaub.');
+		expect(screen.queryByText('Unterlagen')).toBeNull();
+		await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+		await waitFor(() => expect(onsaved).toHaveBeenCalled());
+		expect(onsaved.mock.calls[0][0]).toMatchObject({ kind: 'excused', countedHalfDays: 0, documentStatus: 'not_needed' });
+	});
+
 	it('shows document fields for sick leave', async () => {
 		render(AbsenceForm, { date: '2026-12-07', onsaved: vi.fn(), oncancel: vi.fn() });
 		await userEvent.selectOptions(screen.getByLabelText('Art'), 'sick');

@@ -149,7 +149,7 @@
 							<p class="text-xs text-muted-foreground">{t('export.worktime_pause_hint')}</p>
 						</div>
 						{#if wtPauseSource === 'override'}
-							<Field id="wt-pause-minutes" type="number" inputmode="numeric" label={t('export.worktime_pause_minutes')} bind:value={wtPauseMinutes} error={wtErrors.pause} />
+							<Field id="wt-pause-minutes" type="text" inputmode="numeric" label={t('export.worktime_pause_minutes')} bind:value={wtPauseMinutes} error={wtErrors.pause} />
 						{/if}
 						<Field id="wt-start" type="time" label={t('export.worktime_start')} hint={t('export.worktime_start_hint')} bind:value={wtStart} error={wtErrors.start} />
 						<div class="flex flex-col gap-1.5">
