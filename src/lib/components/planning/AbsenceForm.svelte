@@ -49,7 +49,7 @@
 	let pending = $state(false);
 
 	const editing = initial !== null;
-	const withDocuments = $derived(kind !== 'vacation');
+	const withDocuments = $derived(kind === 'sick' || kind === 'other');
 	const singleDay = $derived(startDate !== '' && startDate === endDate);
 
 	function validate(): AbsenceInput | null {
@@ -122,6 +122,7 @@
 			<Select id="abs-kind" bind:value={kind} disabled={pending}>
 				{#each ABSENCE_KINDS as option (option)}<option value={option}>{absenceKindLabel(option)}</option>{/each}
 			</Select>
+			{#if kind === 'excused'}<p class="text-xs text-muted-foreground" data-testid="absence-excused-hint">{t('absence.kind_excused_hint')}</p>{/if}
 		</div>
 		<div class="flex flex-col gap-1.5">
 			<Label for="abs-status">{t('absence.status')}</Label>

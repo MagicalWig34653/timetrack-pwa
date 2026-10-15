@@ -99,6 +99,8 @@ export default async function globalSetup() {
 	const reportsPort = Number(process.env.E2E_REPORTS_PORT ?? port + 4);
 	const mcpPort = Number(process.env.E2E_MCP_PORT ?? port + 5);
 	const notificationsPort = Number(process.env.E2E_NOTIFICATIONS_PORT ?? port + 6);
+	const modulesPort = Number(process.env.E2E_MODULES_PORT ?? port + 7);
+	const modulesOperatorPort = Number(process.env.E2E_MODULES_OPERATOR_PORT ?? port + 8);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -209,7 +211,9 @@ export default async function globalSetup() {
 	process.env.E2E_NOTIFICATIONS_BASE_URL = `http://localhost:${notificationsPort}`;
 	process.env.E2E_NOTIFICATIONS_BOOTSTRAP_LINK = stage7.link;
 
-	return async () => {
+	// Package L18 (module switches against the real backend): one instance for account/server switches, a second one with the
+	// operator lock MODULES_DISABLED (ADR-0012), each with its own database.
+	const stopBase = async () => {
 		await stage7.stop();
 		await stage6.stop();
 		await stage5.stop();
@@ -217,5 +221,30 @@ export default async function globalSetup() {
 		await stage3.stop();
 		await stage2.stop();
 		await stage1.stop();
+	};
+	let stage8: Instance;
+	try {
+		stage8 = await startInstance(binary, modulesPort);
+	} catch (e) {
+		await stopBase();
+		throw e;
+	}
+	process.env.E2E_MODULES_BASE_URL = `http://localhost:${modulesPort}`;
+	process.env.E2E_MODULES_BOOTSTRAP_LINK = stage8.link;
+	let stage9: Instance;
+	try {
+		stage9 = await startInstance(binary, modulesOperatorPort, { MODULES_DISABLED: 'reports,mcp' });
+	} catch (e) {
+		await stage8.stop();
+		await stopBase();
+		throw e;
+	}
+	process.env.E2E_MODULES_OPERATOR_BASE_URL = `http://localhost:${modulesOperatorPort}`;
+	process.env.E2E_MODULES_OPERATOR_BOOTSTRAP_LINK = stage9.link;
+
+	return async () => {
+		await stage9.stop();
+		await stage8.stop();
+		await stopBase();
 	};
 }

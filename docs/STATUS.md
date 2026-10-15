@@ -1,11 +1,11 @@
-# Stand der PWA – 15.10.2026 (Paket L17)
+# Stand der PWA – 15.10.2026 (Paket L18)
 
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
-Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L17, X1).
+Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L18, X1).
 
 ## Technik
 SvelteKit 3 (SPA, `adapter-static`, kein SSR), Svelte 5, TypeScript, Tailwind 4, shadcn-svelte (Nova/Neutral), Vitest + Testing Library, Playwright. Node nur für Entwicklung/Build.
-API-Client `src/lib/api/client.ts` (getippt von Hand nach `contracts/openapi.yaml`, aktuell v0.9.0), Texte `src/lib/i18n/de*.ts`, Mock-API `mock/`.
+API-Client `src/lib/api/client.ts` (getippt von Hand nach `contracts/openapi.yaml`, aktuell v0.10.0), Texte `src/lib/i18n/de*.ts`, Mock-API `mock/`.
 
 ## Routen und Seiten
 Kern (immer an): `/` Dashboard, `/time`, `/time/[date]`, `/notifications` (Hinweiszentrum, Glocke), `/settings/work-model|places|account-time|notifications|passkeys|identities|recovery|sessions|modules`,
@@ -24,6 +24,12 @@ Module (abschaltbar, ADR-0012, Zuordnung in `src/lib/modules/map.ts`):
 `/admin/modules`: serverweite Schalter (`GET/PUT /admin/modules`), Betreiber-Sperren sichtbar, Warndialog „Betrifft alle Konten“ vor dem Abschalten.
 Ein Test (`src/lib/modules/modules.test.ts`) schlägt fehl, wenn eine Seite weder Kern noch genau einem Modul zugeordnet ist.
 
+## Freigestellt und Arbeitszeit-Tabelle (L18, ADR-0013)
+- `excused` („Freigestellt“, bezahlt frei, kein Urlaubsverbrauch, nie geteilt): Abwesenheitsart und Tagesmarkierung, Kalender, Formular, Filter.
+- Import: erkennt das Profil `worktime_workbook` (Banner, Umschalter zum allgemeinen Assistenten), Profil-Schritt mit Pause und Bemerkungsregeln, Vorschau mit Zeitkonto-Hinweis und Regelanlage für unbekannte Bemerkungen, Ergebnis mit Abwesenheiten/eigenen Feiertagen, typisierte Rollback-Konflikte.
+- Export: Format `worktime-xlsx` mit Optionen (bewertet/tatsächlich, Pause, Standard-Beginn, Datumssystem).
+- Bisher nur gegen die Mock-API getestet (C21/C22 im Backend noch offen); Mock-Export ist eine Näherung. Echt-Läufe: Paket L19.
+
 ## PWA / Service Worker
 Manifest, Icons (`npm run icons`), `src/service-worker.ts` (Precache, Navigation netzwerk-first mit `/offline`, API/OAuth/MCP nie gecacht, Update nur nach Bestätigung, Push-Handler), Offline-Banner, Web-Push-Einstellungen. Registrierung nur im Produktionsbuild (https/localhost) oder mit `VITE_SW=1`. Details: `docs/handoffs/L16.md`.
 
@@ -31,18 +37,18 @@ Manifest, Icons (`npm run icons`), `src/service-worker.ts` (Precache, Navigation
 | Befehl | Inhalt |
 | --- | --- |
 | `npm run check` | svelte-check + tsc des Service Workers (0 Fehler/Warnungen) |
-| `npm test` | vitest, 455 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung) |
+| `npm test` | vitest, 488 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung) |
 | `npm run build` | statisches Build nach `build/` |
-| `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 128 Specs |
-| `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), inkl. `e2e-mock/modules.spec.ts` |
+| `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 138 Specs (inkl. 10 Modul-Specs) |
+| `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), inkl. `modules.spec.ts` und `worktime.spec.ts` |
 | `npm run test:e2e:pwa` | Produktionsbuild mit Mock-API: Manifest, Service Worker, Offline, Push |
 
-Umgebungsvariablen: `E2E_BACKEND_DIR` (Backend-Checkout, Standard `../timetrack-backend`), `E2E_PORT` (Basisport, Standard 18090; weitere Instanzen +1 bis +6), `E2E_SKIP_BUILD=1` (vorhandenes Backend-Binary/Build nutzen), `E2E_MOCK_PORT` (Standard 5199).
+Umgebungsvariablen: `E2E_BACKEND_DIR` (Backend-Checkout, Standard `../timetrack-backend`), `E2E_PORT` (Basisport, Standard 18090; weitere Instanzen +1 bis +8), `E2E_SKIP_BUILD=1` (vorhandenes Backend-Binary/Build nutzen), `E2E_MOCK_PORT` (Standard 5199).
 Mock-Modus: `npm run dev:mock`; Demo-Konto `admin` (virtueller Passkey), Einladung `demo-invite`, Recovery-Code `AAAA-BBBB-CCCC`. `MOCK_OIDC=0`, `MOCK_MODULES_DISABLED=reports,mcp` (Betreiber-Sperre). Test-Hooks (nicht im Vertrag): `POST /api/v1/mock/notify|push|oidc|modules`.
 Screenshots: `SCREENSHOT_DIR=<dir>` aktiviert die Screenshot-Specs (390 px und Desktop, hell/dunkel).
 
 ## Bekannte Grenzen / nicht geprüft
-- Modulschalter bisher nur gegen die Mock-API getestet; Echt-Backend-E2E für Vertrag v0.9.0 folgt nach dem Merge von C20 (siehe handoffs/L17.md).
+- Modulschalter sind seit L18 auch gegen das echte Backend geprüft (`e2e/modules.spec.ts`).
 - Mock-Guard bildet die Routengruppen aus ADR-0012 nach; die automation-Events werden nur serverweit geprüft (Token-Konto unbekannt).
 - Nicht geprüft: Firefox/WebKit, Screenreader, MariaDB-Modus, echte ChatGPT-/Claude-Connectoren, echte Push-Zustellung (iOS/Android), echter Shortcuts-Durchlauf, native Apps.
 - Bekannter Backend-Befund (L16): `.webmanifest` ohne Content-Type; Icon-Dateinamen können `immutable` erhalten.

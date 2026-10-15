@@ -95,7 +95,7 @@ test('absences list: filter by status and edit approved to taken without changin
 test('sharing: create, change scopes, revoke; unknown recipient is explained', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser);
 	await page.goto('/settings/sharing');
-	await expect(page.getByTestId('never-shared')).toContainText('Krankheitstage');
+	await expect(page.getByTestId('never-shared')).toContainText('Freistellungstage');
 	for (const name of [/^Planung/, /^Tatsächliche Zeiten/, /^Urlaub/]) await expect(page.getByRole('checkbox', { name }).first()).not.toBeChecked();
 	await page.getByLabel('Kontoname der Person').fill('niemand');
 	await page.getByRole('checkbox', { name: /^Planung/ }).check();

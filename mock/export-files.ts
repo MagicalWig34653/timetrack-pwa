@@ -3,7 +3,7 @@ import type { DayEvaluation } from '../src/lib/api/types.ts';
 import { formatDateNumeric, localTimeOf } from '../src/lib/time/dates.ts';
 import { formatDuration } from '../src/lib/time/format.ts';
 
-const MARKS: Record<string, string> = { holiday: 'Feiertag', vacation: 'Urlaub', sick: 'Krank', school_credit: 'Schultag (Gutschrift)' };
+const MARKS: Record<string, string> = { holiday: 'Feiertag', vacation: 'Urlaub', sick: 'Krank', excused: 'Freigestellt', school_credit: 'Schultag (Gutschrift)' };
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
 /** Formula injection guard of ADR-0006: text cells that start with = + - @ tab or CR are marked as text with a leading apostrophe. */

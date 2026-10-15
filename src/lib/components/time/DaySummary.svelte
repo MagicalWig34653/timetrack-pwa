@@ -7,7 +7,7 @@
 	import { hintLabel, markLabel } from '#lib/time/labels.js';
 
 	let { evaluation, showHints = true }: { evaluation: DayEvaluation; showHints?: boolean } = $props();
-	const markedOff = $derived(evaluation.mark === 'holiday' || evaluation.mark === 'vacation' || evaluation.mark === 'sick');
+	const markedOff = $derived(evaluation.mark === 'holiday' || evaluation.mark === 'vacation' || evaluation.mark === 'sick' || evaluation.mark === 'excused');
 	const targetNote = $derived(
 		!markedOff ? '' : evaluation.targetSeconds === 0 ? t('day.target_note_zero', { mark: markLabel(evaluation.mark!) }) : evaluation.mark === 'vacation' ? t('day.target_note_half') : ''
 	);

@@ -10,7 +10,7 @@ export const deModules = {
 	'module.mcp.name': 'KI-Zugang (MCP)',
 
 	'module.reports.desc': 'Lernfelder, Berichtsheft-Einträge, Wochenansicht, Quellen und die kopierbare Textausgabe für das IHK-Portal. Ohne dieses Modul verschwinden auch die Berichtsheft-Erinnerungen.',
-	'module.planning.desc': 'Urlaubskonto, Abwesenheiten, Kalender mit Feiertagen, Tagesplanung und Planfreigaben (ausgehend und eingehend). Ohne dieses Modul verschwinden auch die Erinnerungen zu Nachweisen.',
+	'module.planning.desc': 'Urlaubskonto, Abwesenheiten (Urlaub, Krank, Freigestellt), Kalender mit Feiertagen, Tagesplanung und Planfreigaben (ausgehend und eingehend). Ohne dieses Modul verschwinden auch die Erinnerungen zu Nachweisen.',
 	'module.transfer.desc': 'Export als Tabelle, PDF oder CSV, Import aus CSV und Excel sowie Dateianhänge an Abwesenheiten und der Speicherort der Dateien.',
 	'module.automation.desc': 'Gerätetoken für Shortcuts und andere Automatik sowie die daraus entstehenden Vorschläge für Zeiteinträge.',
 	'module.mcp.desc': 'Anbindung von KI-Assistenten über MCP: Verbindungen (OAuth), persönliche Zugangstoken und die zugehörige Anleitung. Bestehende Zugänge werden abgelehnt, solange das Modul aus ist.',
@@ -19,7 +19,7 @@ export const deModules = {
 	'modules.description': 'Schalte Funktionen ab, die du nicht brauchst. Ausgeschaltete Module verschwinden aus Navigation, Startseite und Einstellungen.',
 	'modules.note_data': 'Daten bleiben erhalten. Beim Wiedereinschalten ist alles wieder da.',
 	'modules.note_planning':
-		'Ist die Planung ausgeschaltet, wirken Abwesenheiten und Feiertage nicht auf die Tagesbewertung und das Zeitkonto, so als würdest du das Modul nicht nutzen. Manuell gesetzte Tagesmarkierungen bleiben bestehen. Freigaben deiner Planung sind dann unwirksam, ohne gelöscht zu werden.',
+		'Ist die Planung ausgeschaltet, wirken Abwesenheiten und Feiertage nicht auf die Tagesbewertung und das Zeitkonto, so als würdest du das Modul nicht nutzen. Das gilt auch für Freistellungen. Manuell gesetzte Tagesmarkierungen bleiben bestehen. Freigaben deiner Planung sind dann unwirksam, ohne gelöscht zu werden.',
 	'modules.state_on': 'Eingeschaltet',
 	'modules.state_off': 'Ausgeschaltet',
 	'modules.state_operator': 'Vom Betreiber deaktiviert',

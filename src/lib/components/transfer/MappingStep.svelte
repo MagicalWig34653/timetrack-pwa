@@ -12,6 +12,7 @@
 	import { formatDuration } from '#lib/time/format.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import TemplatesPanel from './TemplatesPanel.svelte';
 
 	let {
 		form = $bindable(),
@@ -40,9 +41,6 @@
 		onback: () => void;
 	} = $props();
 
-	let templateId = $state('');
-	let templateName = $state('');
-	let nameError = $state(false);
 
 	const headerRow = $derived(Number(form.headerRow) || 0);
 	const columnCount = $derived(rows.reduce((max, r) => Math.max(max, r.length), 0));
@@ -89,7 +87,6 @@
 		return out;
 	});
 
-	const selected = $derived(templates.find((x) => x.id === templateId));
 	const kinds = ['work', 'travel', 'school'] as const;
 	const columnFields = [
 		{ key: 'date', label: 'import.field_date', required: true },
@@ -100,44 +97,7 @@
 <div class="flex flex-col gap-6">
 	<p class="text-sm text-muted-foreground">{t('import.mapping_text')}</p>
 
-	<section class="flex flex-col gap-3 rounded-lg border p-4" aria-labelledby="templates-heading">
-		<h4 id="templates-heading" class="text-sm font-medium">{t('import.templates_title')}</h4>
-		{#if templatesUnavailable}
-			<p class="text-sm text-muted-foreground">{t('import.templates_unavailable')}</p>
-		{:else}
-			<p class="text-xs text-muted-foreground">{t('import.templates_text')}</p>
-			<div class="flex flex-wrap items-end gap-2">
-				<div class="flex min-w-48 flex-1 flex-col gap-1.5">
-					<Label for="template-select">{t('import.template_select')}</Label>
-					<Select id="template-select" bind:value={templateId}>
-						<option value="">{t('import.template_none')}</option>
-						{#each templates as template (template.id)}<option value={template.id}>{template.name}</option>{/each}
-					</Select>
-				</div>
-				<Button type="button" variant="outline" disabled={!selected || busy} onclick={() => selected && onapply(selected)}>{t('import.template_apply')}</Button>
-				<Button type="button" variant="destructive" disabled={!selected || busy} onclick={() => selected && ondelete(selected)}>{t('import.template_delete')}</Button>
-			</div>
-			<form
-				class="flex flex-wrap items-end gap-2"
-				onsubmit={(e) => {
-					e.preventDefault();
-					const name = templateName.trim();
-					nameError = name === '' || name.length > 80;
-					if (!nameError) {
-						onsave(name);
-						templateName = '';
-					}
-				}}
-			>
-				<div class="flex min-w-48 flex-1 flex-col gap-1.5">
-					<Label for="template-name">{t('import.template_name')}</Label>
-					<Input id="template-name" bind:value={templateName} maxlength={80} aria-invalid={nameError ? true : undefined} />
-					{#if nameError}<p class="text-xs text-destructive">{t('import.template_name_required')}</p>{/if}
-				</div>
-				<Button type="submit" variant="outline" disabled={busy}>{t('import.template_save')}</Button>
-			</form>
-		{/if}
-	</section>
+	<TemplatesPanel {templates} {templatesUnavailable} {busy} {onapply} {onsave} {ondelete} />
 
 	<section class="grid gap-3 sm:grid-cols-2" aria-label={t('import.mapping_title')}>
 		{#each columnFields as field (field.key)}
