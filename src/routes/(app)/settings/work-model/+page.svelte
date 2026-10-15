@@ -11,7 +11,7 @@
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
-	import { formatDateNumeric, todayLocal } from '#lib/time/dates.js';
+	import { addDays, formatDateNumeric, todayLocal } from '#lib/time/dates.js';
 	import { formatDuration, parseDuration } from '#lib/time/format.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
@@ -54,11 +54,20 @@
 			load = toLoadState(error);
 		}
 	}
-	onMount(refresh);
+	/** ?validFrom=YYYY-MM-DD (from the worktime import hint) opens the form for a new version starting on that day */
+	let prefilled = $state(false);
+	onMount(async () => {
+		await refresh();
+		const wanted = new URLSearchParams(window.location.search).get('validFrom') ?? '';
+		if (load.status === 'ready' && /^\d{4}-\d{2}-\d{2}$/.test(wanted) && addDays(wanted, 0) === wanted) {
+			openForm(wanted);
+			prefilled = true;
+		}
+	});
 
-	function openForm() {
+	function openForm(validFrom?: string) {
 		const base = newestFirst[0];
-		const from = todayLocal(zoneStore.value);
+		const from = validFrom ?? todayLocal(zoneStore.value);
 		form = base ? formFromModel(base, from) : defaultWorkModelForm(from, zoneStore.value);
 		errors = {};
 		formError = '';
@@ -256,6 +265,9 @@
 							<div><Button type="button" variant="outline" size="sm" onclick={() => (form.fixedBreaks = [...form.fixedBreaks, { start: '12:00', end: '12:30' }])}>{t('work_model.add_break')}</Button></div>
 						</fieldset>
 
+						{#if prefilled && form.validFrom}
+							<Alert data-testid="work-model-prefilled">{t('work_model.prefilled', { date: formatDateNumeric(form.validFrom) })}</Alert>
+						{/if}
 						{#if form.validFrom && form.validFrom < today}
 							<Alert variant="warning">{t('work_model.past_warning')}</Alert>
 						{/if}
@@ -267,7 +279,7 @@
 				</CardContent>
 			</Card>
 		{:else}
-			<div><Button onclick={openForm}>{t('work_model.new')}</Button></div>
+			<div><Button onclick={() => openForm()}>{t('work_model.new')}</Button></div>
 		{/if}
 	</div>
 {/if}

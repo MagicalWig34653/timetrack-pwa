@@ -99,6 +99,34 @@
 		</label>
 	</section>
 
+	<section class="flex flex-col gap-4 rounded-lg border p-4" aria-labelledby="wt-days-heading" data-testid="wt-day-options">
+		<h4 id="wt-days-heading" class="text-sm font-medium">{t('worktime.days_title')}</h4>
+
+		<fieldset class="flex flex-col gap-2">
+			<legend class="mb-1 text-sm font-medium">{t('worktime.holiday_times')}</legend>
+			<label class="flex items-start gap-2 text-sm">
+				<input type="radio" class="mt-0.5 size-4 accent-primary" name="wt-holiday-times" value="discard" bind:group={form.holidayTimes} data-testid="wt-holiday-discard" />
+				<span>{t('worktime.holiday_times_discard')}<span class="block text-xs text-muted-foreground">{t('worktime.holiday_times_discard_text')}</span></span>
+			</label>
+			<label class="flex items-start gap-2 text-sm">
+				<input type="radio" class="mt-0.5 size-4 accent-primary" name="wt-holiday-times" value="keep" bind:group={form.holidayTimes} data-testid="wt-holiday-keep" />
+				<span>{t('worktime.holiday_times_keep')}<span class="block text-xs text-muted-foreground">{t('worktime.holiday_times_keep_text')}</span></span>
+			</label>
+		</fieldset>
+
+		<fieldset class="flex flex-col gap-2">
+			<legend class="mb-1 text-sm font-medium">{t('worktime.partial_credit')}</legend>
+			<label class="flex items-start gap-2 text-sm">
+				<input type="radio" class="mt-0.5 size-4 accent-primary" name="wt-partial-credit" value="work" bind:group={form.partialCredit} data-testid="wt-credit-work" />
+				<span>{t('worktime.partial_credit_work')}<span class="block text-xs text-muted-foreground">{t('worktime.partial_credit_work_text')}</span></span>
+			</label>
+			<label class="flex items-start gap-2 text-sm">
+				<input type="radio" class="mt-0.5 size-4 accent-primary" name="wt-partial-credit" value="absence" bind:group={form.partialCredit} data-testid="wt-credit-absence" />
+				<span>{t('worktime.partial_credit_absence')}<span class="block text-xs text-muted-foreground">{t('worktime.partial_credit_absence_text')}</span></span>
+			</label>
+		</fieldset>
+	</section>
+
 	<section class="flex flex-col gap-3 rounded-lg border p-4" aria-labelledby="wt-rules-heading">
 		<h4 id="wt-rules-heading" class="text-sm font-medium">{t('worktime.rules_title')}</h4>
 		<p class="text-sm text-muted-foreground" data-testid="wt-rules-intro">{t('worktime.rules_intro')}</p>
