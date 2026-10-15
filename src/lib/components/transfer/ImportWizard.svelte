@@ -333,8 +333,10 @@
 		} catch (e) {
 			rollbackAsk = false;
 			if (e instanceof ApiError && e.status === 409) {
-				const body = e.body as { conflicts?: unknown; error?: { conflicts?: unknown } } | undefined;
-				const list = body?.conflicts ?? body?.error?.conflicts;
+				// contract v0.10.1: typed `conflictItems` ({type,id}) next to the plain UUID list `conflicts`; prefer the typed list
+				const body = e.body as { conflicts?: unknown; conflictItems?: unknown; error?: { conflicts?: unknown; conflictItems?: unknown } } | undefined;
+				const typed = [body?.conflictItems, body?.error?.conflictItems].find((value) => Array.isArray(value) && value.length > 0);
+				const list = typed ?? body?.conflicts ?? body?.error?.conflicts;
 				if (Array.isArray(list)) {
 					conflicts = list.map((entry) => {
 						if (entry && typeof entry === 'object') {

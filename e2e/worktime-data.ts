@@ -110,9 +110,9 @@ export function expectedSegments(rows: Row[]): ExpectedSegment[] {
 		const e = minute(r.end);
 		const note = r.remark ? r.remark : null;
 		const pauseStart = 12 * 60;
-		if (s < pauseStart && pauseStart + 30 < e) {
-			out.push({ date: r.date, kind: action, start: hhmm(s), end: hhmm(pauseStart), note }, { date: r.date, kind: action, start: hhmm(pauseStart + 30), end: hhmm(e), note });
-		} else out.push({ date: r.date, kind: action, start: hhmm(s), end: hhmm(e), note });
+		// the pause window starts at 12:00 when it fits into the interval, otherwise it is centred; the duration stays end - start - pause
+		const gapStart = s <= pauseStart && pauseStart + 30 <= e ? pauseStart : Math.round((s + e) / 2 - 15);
+		out.push({ date: r.date, kind: action, start: hhmm(s), end: hhmm(gapStart), note }, { date: r.date, kind: action, start: hhmm(gapStart + 30), end: hhmm(e), note });
 	}
 	return out;
 }

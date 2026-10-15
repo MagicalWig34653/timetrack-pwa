@@ -200,6 +200,200 @@ test('preview of the same workbook with the 1904 date system detects the system 
 	expect((await absencesOf(page)).length).toBe(5);
 });
 
-void row;
-void book;
-void state;
+
+const SEP_ROLLBACK = book(
+	{
+		sheets: [
+			{
+				year: 2026,
+				days: [
+					row('2026-09-07', '8:00', '16:30'),
+					row('2026-09-08', '8:00', '16:12', 'Urlaub'),
+					row('2026-09-09', '8:00', '16:12', 'Feiertag'),
+					row('2026-09-10', '8:00', '16:12', 'Krank'),
+					row('2026-09-11', '8:00', '12:00')
+				]
+			}
+		]
+	},
+	'rollback.xlsx'
+);
+
+/** Remembers the id of the import job created by the wizard. */
+function trackJob(page: Page) {
+	page.on('response', async (response) => {
+		if (response.request().method() === 'POST' && /\/api\/v1\/imports$/.test(response.url())) state.jobId = (await response.json()).id;
+	});
+}
+
+test('rollback through the wizard removes every item of the batch (segments, absences, custom holiday)', async () => {
+	const { page } = alice;
+	await toProfileStep(page, SEP_ROLLBACK);
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('wt-count-segments')).toHaveText('4'); // 7.9. split at 12:00, 11.9. split in the middle (pause does not fit around 12:00)
+	await confirmAndCommit(page);
+	await expect(page.getByTestId('result-created')).toHaveText('4 Einträge angelegt');
+	await expect(page.getByTestId('result-absences')).toContainText('2 Abwesenheiten angelegt');
+	await expect(page.getByTestId('result-custom-days')).toContainText('1 eigene Feiertage angelegt');
+	const range = 'from=2026-09-06T00:00:00Z&to=2026-09-13T00:00:00Z';
+	expect(canonical(await segmentsOf(page, range)).map((x) => `${x.date} ${x.start}-${x.end}`)).toEqual([
+		'2026-09-07 08:00-12:00',
+		'2026-09-07 12:30-16:30',
+		'2026-09-11 08:00-09:45',
+		'2026-09-11 10:15-12:00'
+	]);
+	expect(await absencesOf(page, '2026-09-01', '2026-09-30')).toHaveLength(2);
+	expect(await customDaysOf(page)).toHaveLength(2);
+
+	await page.getByTestId('rollback').click();
+	await page.getByTestId('rollback-confirm').click();
+	await expect(page.getByTestId('rolled-back')).toBeVisible();
+	expect(await segmentsOf(page, range)).toHaveLength(0);
+	expect((await segmentsOf(page, range, true)).every((s) => s.voided)).toBe(true);
+	expect(await absencesOf(page, '2026-09-01', '2026-09-30')).toHaveLength(0);
+	expect((await customDaysOf(page)).map((d) => d.startDate)).toEqual(['2026-08-12']);
+	// the main import is untouched
+	expect(await absencesOf(page)).toHaveLength(5);
+});
+
+const SEP_CONFLICT = book(
+	{
+		sheets: [
+			{
+				year: 2026,
+				days: [
+					row('2026-09-14', '8:00', '16:30'),
+					row('2026-09-15', '8:00', '16:12', 'Urlaub'),
+					row('2026-09-16', '8:00', '16:12', 'Feiertag (Brücke)'),
+					row('2026-09-17', '8:00', '15:00'),
+					row('2026-09-18', '8:00', '16:12', 'Krank')
+				]
+			}
+		]
+	},
+	'konflikt.xlsx'
+);
+
+test('rollback conflict: edited segment, absence and deleted custom holiday are listed with their types; nothing is rolled back', async () => {
+	const { page } = alice;
+	trackJob(page);
+	await toProfileStep(page, SEP_CONFLICT);
+	await page.getByTestId('wt-validate').click();
+	await confirmAndCommit(page);
+	await expect(page.getByTestId('result-created')).toHaveText('4 Einträge angelegt');
+
+	const segs = (await segmentsOf(page, 'from=2026-09-13T00:00:00Z&to=2026-09-20T00:00:00Z')).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+	expect(segs).toHaveLength(4);
+	const edited = segs[0];
+	const patch = await api(page, 'PATCH', `/api/v1/time/segments/${edited.id}`, { reason: 'Nachträglich korrigiert', note: 'geändert' }, { 'If-Match': String(edited.version) });
+	expect(patch.status).toBe(200);
+	const absences = await absencesOf(page, '2026-09-14', '2026-09-18');
+	expect(absences).toHaveLength(2);
+	const vac = absences.find((a) => a.kind === 'vacation')!;
+	const put = await api(page, 'PUT', `/api/v1/absences/${vac.id}`, { kind: 'vacation', startDate: vac.startDate, endDate: vac.endDate, status: vac.status, note: 'geändert' }, { 'If-Match': String(vac.version) });
+	expect(put.status).toBe(200);
+	const custom = (await customDaysOf(page)).find((d) => d.startDate === '2026-09-16')!;
+	expect(custom.name).toBe('Feiertag (Brücke)');
+	expect((await api(page, 'DELETE', `/api/v1/calendar/custom-days/${custom.id}`)).status).toBe(204);
+
+	await page.getByTestId('rollback').click();
+	await page.getByTestId('rollback-confirm').click();
+	await expect(page.getByTestId('import-error')).toContainText('kann nicht zurückgenommen werden');
+	const list = page.getByTestId('rollback-conflicts');
+	await expect(list).toContainText('Diese 3 Einträge wurden seit dem Import geändert.');
+	await expect(list.locator('[data-conflict-type="segment"]')).toContainText(`Zeitabschnitt ${edited.id}`);
+	await expect(list.locator('[data-conflict-type="absence"]')).toContainText(`Abwesenheit ${vac.id}`);
+	await expect(list.locator('[data-conflict-type="custom_day"]')).toContainText(`Eigener Feiertag ${custom.id}`);
+	await expect(page.getByTestId('rolled-back')).toHaveCount(0);
+
+	// contract v0.10.1: the same answer on the wire carries typed conflictItems next to the UUID list
+	const raw = await api(page, 'POST', `/api/v1/imports/${state.jobId}/rollback`);
+	expect(raw.status).toBe(409);
+	expect(raw.body.error?.code ?? raw.body.code).toBe('rollback_conflict');
+	const items = raw.body.conflictItems ?? raw.body.error?.conflictItems;
+	expect([...items.map((i: { type: string }) => i.type)].sort()).toEqual(['absence', 'custom_day', 'segment']);
+	// nothing changed: the edited segment keeps its note
+	const after = await segmentsOf(page, 'from=2026-09-13T00:00:00Z&to=2026-09-20T00:00:00Z');
+	expect(after.find((s) => s.id === edited.id)?.note).toBe('geändert');
+});
+
+const SEP_PLANNING = book(
+	{
+		sheets: [
+			{
+				year: 2026,
+				days: [
+					row('2026-09-21', '8:00', '16:30'),
+					row('2026-09-22', '8:00', '16:12', 'Urlaub'),
+					row('2026-09-23', '8:00', '16:12', 'Krank'),
+					row('2026-09-24', '8:00', '16:12', 'Feiertag'),
+					row('2026-09-25', '8:00', '12:00')
+				]
+			}
+		]
+	},
+	'planung.xlsx'
+);
+
+test('planning module off: absence and holiday rows fail with planning_disabled (German text), work rows still import', async () => {
+	const { page } = alice;
+	expect((await api(page, 'PUT', '/api/v1/me/modules', { modules: { planning: false } })).status).toBe(200);
+	await toProfileStep(page, SEP_PLANNING);
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('count-errors')).toHaveText('3');
+	const errors = page.getByTestId('error-table');
+	await expect(errors).toContainText('Die Planung ist ausgeschaltet. Abwesenheiten und eigene Feiertage können nicht angelegt werden.');
+	await page.getByRole('button', { name: 'Weiter zur Bestätigung' }).click();
+	await page.getByLabel(/Ich habe die Vorschau geprüft/).check();
+	await expect(page.getByTestId('commit')).toBeDisabled(); // errors must be skipped explicitly
+	await page.getByLabel(/Fehlerzeilen überspringen/).check();
+	await page.getByTestId('commit').click();
+	await expect(page.getByTestId('step-heading')).toHaveText('Ergebnis');
+	await expect(page.getByTestId('result-created')).toHaveText('4 Einträge angelegt'); // 21.9. and 25.9., each split by the pause
+	await expect(page.getByTestId('result-absences')).toHaveCount(0);
+	expect((await segmentsOf(page, 'from=2026-09-20T00:00:00Z&to=2026-09-27T00:00:00Z')).length).toBe(4);
+
+	// back on: the same file now brings the absences and the holiday; the work rows are duplicates
+	expect((await api(page, 'PUT', '/api/v1/me/modules', { modules: { planning: true } })).status).toBe(200);
+	await toProfileStep(page, SEP_PLANNING);
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('count-errors')).toHaveText('0');
+	await confirmAndCommit(page);
+	await expect(page.getByTestId('result-absences')).toContainText('2 Abwesenheiten angelegt');
+	await expect(page.getByTestId('result-custom-days')).toContainText('1 eigene Feiertage angelegt');
+});
+
+test('duplicate dates with conflicting data in two sheets give duplicate_date_conflict with a German text', async () => {
+	const { page } = alice;
+	// the boundary week 2026-W53 appears in both sheets; here the 2027 sheet carries a different time for 2026-12-28 (belongs to ISO year 2026)
+	const conflicting = book({
+		sheets: [
+			{ year: 2026, days: [row('2026-12-28', '8:00', '16:30')] },
+			{ year: 2027, days: [row('2026-12-28', '9:00', '17:30')], writeForeignWeeks: true }
+		]
+	});
+	await toProfileStep(page, conflicting);
+	await page.getByTestId('wt-validate').click();
+	await expect(page.getByTestId('count-errors')).toHaveText('1');
+	await expect(page.getByTestId('error-table')).toContainText('Dasselbe Datum steht in mehreren Blättern mit unterschiedlichen Zeiten oder Bemerkungen.');
+	await page.getByRole('button', { name: 'Weiter zur Bestätigung' }).click();
+	await page.getByLabel(/Ich habe die Vorschau geprüft/).check();
+	await expect(page.getByTestId('commit')).toBeDisabled();
+});
+
+test('generic wizard switch still works', async () => {
+	const { page } = alice;
+	await page.goto('/import');
+	await page.getByTestId('import-file').setInputFiles(mainWorkbook(false));
+	await page.getByRole('button', { name: 'Weiter' }).click();
+	await page.getByTestId('profile-switch-generic').click();
+	await expect(page.getByTestId('no-header')).toBeVisible();
+	await page.getByRole('button', { name: 'Weiter' }).click();
+	await expect(page.getByTestId('step-heading')).toHaveText('Spalten');
+	await page.getByRole('button', { name: 'Zurück' }).click();
+	await page.getByTestId('profile-switch-worktime').click();
+	await page.getByRole('button', { name: 'Weiter' }).click();
+	await expect(page.getByTestId('worktime-step')).toBeVisible();
+});
+
+void MAIN_2027;

@@ -279,6 +279,8 @@ export interface WorktimeSheetInput {
 	/** calendar year; becomes the sheet name */
 	year: number;
 	days: { date: string; start?: string | null; end?: string | null; remark?: string | null }[];
+	/** also write the given days into weeks that belong to another ISO year (a boundary week filled in both sheets; default: date cells only) */
+	writeForeignWeeks?: boolean;
 }
 
 export interface WorktimeWorkbookInput {
@@ -329,7 +331,7 @@ export function buildWorktimeWorkbook(input: WorktimeWorkbookInput): Uint8Array 
 			for (let i = 0; i < 7; i++) {
 				const date = addDays(monday, i);
 				const r = row + 1 + i;
-				const day = isoYear === sheet.year ? byDate.get(date) : undefined;
+				const day = isoYear === sheet.year || sheet.writeForeignWeeks ? byDate.get(date) : undefined;
 				const start = day?.start ? parseHm(day.start) : null;
 				const end = day?.end ? parseHm(day.end) : null;
 				const cells = [cellXml(`A${r}`, dateToSerial(date, date1904)), cellXml(`B${r}`, start), cellXml(`C${r}`, end)];

@@ -476,6 +476,8 @@ export interface ImportResult {
 	customDaysCreated?: number;
 	/** rollback_conflict: plain ids (older contract) or typed entries (ADR-0013) */
 	conflicts?: (string | { id: string; type?: string })[];
+	/** contract v0.10.1: typed conflict list next to `conflicts` (UUIDs) */
+	conflictItems?: { type: 'segment' | 'absence' | 'custom_day'; id: string }[];
 }
 
 export interface ImportTemplate {
