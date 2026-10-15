@@ -101,6 +101,7 @@ export default async function globalSetup() {
 	const notificationsPort = Number(process.env.E2E_NOTIFICATIONS_PORT ?? port + 6);
 	const modulesPort = Number(process.env.E2E_MODULES_PORT ?? port + 7);
 	const modulesOperatorPort = Number(process.env.E2E_MODULES_OPERATOR_PORT ?? port + 8);
+	const worktimePort = Number(process.env.E2E_WORKTIME_PORT ?? port + 9);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -242,7 +243,21 @@ export default async function globalSetup() {
 	process.env.E2E_MODULES_OPERATOR_BASE_URL = `http://localhost:${modulesOperatorPort}`;
 	process.env.E2E_MODULES_OPERATOR_BOOTSTRAP_LINK = stage9.link;
 
+	// Package L19 (worktime workbook import/export, ADR-0013): own instance and database, default settings.
+	let stage10: Instance;
+	try {
+		stage10 = await startInstance(binary, worktimePort);
+	} catch (e) {
+		await stage9.stop();
+		await stage8.stop();
+		await stopBase();
+		throw e;
+	}
+	process.env.E2E_WORKTIME_BASE_URL = `http://localhost:${worktimePort}`;
+	process.env.E2E_WORKTIME_BOOTSTRAP_LINK = stage10.link;
+
 	return async () => {
+		await stage10.stop();
 		await stage9.stop();
 		await stage8.stop();
 		await stopBase();
