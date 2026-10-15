@@ -23,7 +23,7 @@
 			{#each items as warning (warning.code)}
 				<li class="rounded-lg border bg-card p-3 text-card-foreground" data-testid="wt-warning" data-code={warning.code} data-count={warning.count}>
 					<div class="flex flex-wrap items-center gap-2">
-						<StatusChip tone="warning">{t('worktime.warning_days', { count: warning.count ?? 0 })}</StatusChip>
+						<StatusChip tone="warning">{warning.count === 1 ? t('worktime.warning_day_one') : t('worktime.warning_days', { count: warning.count ?? 0 })}</StatusChip>
 						<span class="font-medium">{label(warning.code)}</span>
 					</div>
 					<details class="mt-2">

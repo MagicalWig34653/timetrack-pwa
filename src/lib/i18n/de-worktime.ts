@@ -109,6 +109,7 @@ export const deWorktime = {
 	'worktime.unmapped_created': 'Regel angelegt, die Vorschau wurde aktualisiert.',
 	'worktime.warnings_title': 'Hinweise zum Import',
 	'worktime.warnings_text': 'Diese Hinweise verhindern den Import nicht. Sie zeigen, was die Regeln mit einzelnen Tagen gemacht haben.',
+	'worktime.warning_day_one': '1 Tag',
 	'worktime.warning_days': '{count} Tage',
 	'worktime.warning_what': 'Was bedeutet das?',
 	'worktime.warning.holiday_times_discarded': 'Arbeitszeiten an Feiertagen nicht übernommen',

@@ -82,11 +82,11 @@
 					{:else if hint.beforeWeek}{t('worktime.model_start_text', { modelFrom: formatDateNumeric(hint.modelFrom), date: formatDateNumeric(firstDate) })}
 					{:else}{t('worktime.model_start_midweek', { days: hint.emptyDays, date: formatDateNumeric(firstDate) })}{/if}
 				</p>
-				{#snippet action()}
+				
 					{#if hint && hint.kind !== 'ok'}
-						<a class="inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-medium hover:bg-muted" href="/settings/work-model?validFrom={firstDate}" target="_blank" rel="noopener" data-testid="wt-model-start-link">{t('worktime.model_start_link', { date: formatDateNumeric(firstDate) })}</a>
+						<a class="mt-2 inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-medium hover:bg-muted" href="/settings/work-model?validFrom={firstDate}" target="_blank" rel="noopener" data-testid="wt-model-start-link">{t('worktime.model_start_link', { date: formatDateNumeric(firstDate) })}</a>
 					{/if}
-				{/snippet}
+				
 			</Banner>
 		</div>
 	{/if}

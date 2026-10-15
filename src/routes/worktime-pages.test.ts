@@ -227,7 +227,7 @@ describe('worktime import wizard: holiday times, partial credit, balance split a
 		render(ImportWizard);
 		const u = await openProfileStep(c23Workbook());
 		await toPreview(u);
-		expect(warning('holiday_times_discarded')).toHaveTextContent('1 Tage');
+		expect(warning('holiday_times_discarded')).toHaveTextContent('1 Tag');
 		expect(warning('school_on_holiday')).toHaveTextContent('Schulzeiten an Feiertagen nicht übernommen');
 		expect(warning('credit_partial_as_work')).toHaveAttribute('data-count', '1');
 		expect(warning('credit_partial_as_work')).toHaveTextContent('Was bedeutet das?');
