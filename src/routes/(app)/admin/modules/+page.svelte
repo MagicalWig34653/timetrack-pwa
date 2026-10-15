@@ -86,7 +86,7 @@
 	<div class="flex flex-col gap-4">
 		<Alert data-testid="admin-modules-note">{t('admin_modules.note')}</Alert>
 		{#if error}<Alert variant="destructive">{error}</Alert>{/if}
-		{#if notice}<p class="text-sm text-muted-foreground" role="status">{notice}</p>{/if}
+		{#if notice}<p class="text-sm text-muted-foreground" role="status" data-testid="admin-modules-notice">{notice}</p>{/if}
 
 		<ul class="flex flex-col gap-4" data-testid="admin-module-list">
 			{#each MODULE_KEYS as key (key)}
