@@ -17,7 +17,7 @@ const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" 
 const targets = [
 	{ file: 'icon-192.png', size: 192, svg: symbol },
 	{ file: 'icon-512.png', size: 512, svg: symbol },
-	{ file: 'icon-maskable.png', size: 512, svg: maskable },
+	{ file: 'icon-mask.png', size: 512, svg: maskable },
 	{ file: 'apple-180.png', size: 180, svg: maskable }
 ];
 
