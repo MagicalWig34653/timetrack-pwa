@@ -28,7 +28,11 @@ const WEEK = book({
 	]
 });
 
-async function toProfileStep(page: Page, file = WEEK) {
+/**
+ * Opens the profile step. The legacy specs import full-day credits and expect absences; other specs of the shared mock server may
+ * create work models with another day target, so they pin partialCredit to "absence" (C23 default is covered by the C23 specs).
+ */
+async function toProfileStep(page: Page, file = WEEK, pinAbsence = true) {
 	await page.goto('/import');
 	await page.getByTestId('import-file').setInputFiles(file);
 	await page.getByRole('button', { name: 'Weiter' }).click();
@@ -36,6 +40,7 @@ async function toProfileStep(page: Page, file = WEEK) {
 	await expect(page.getByTestId('profile-banner')).toContainText('Arbeitszeit-Tabelle erkannt');
 	await page.getByRole('button', { name: 'Weiter' }).click();
 	await expect(page.getByTestId('step-heading')).toHaveText('Arbeitszeit-Tabelle');
+	if (pinAbsence) await page.getByTestId('wt-credit-absence').check();
 }
 
 test('worktime import: profile step, preview with unmapped remark rule, commit with absences, excused shows in calendar and day', async ({ browser }) => {
@@ -179,7 +184,7 @@ const C23 = book({
 
 test('worktime import: holiday and partial-credit options, warning list, balance split, model start hint', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
-	await toProfileStep(page, C23);
+	await toProfileStep(page, C23, false);
 	await expect(page.getByTestId('wt-holiday-discard')).toBeChecked();
 	await expect(page.getByTestId('wt-credit-work')).toBeChecked();
 	await expect(page.getByTestId('wt-day-options')).toContainText('Mehrarbeit');
@@ -213,7 +218,7 @@ test('worktime import: holiday and partial-credit options, warning list, balance
 test('worktime import: the model start link opens the work model form with the date prefilled; result shows the warnings', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
 	const thursday = book({ sheets: [{ year: 2036, days: [day('2036-09-04', '8:00', '16:12'), day('2036-09-05', '8:00', '16:12'), day('2036-12-25', '8:00', '16:12')] }] });
-	await toProfileStep(page, thursday);
+	await toProfileStep(page, thursday, false);
 	await page.getByTestId('wt-validate').click();
 	await expect(page.getByTestId('wt-model-start')).toHaveAttribute('data-kind', 'earlier');
 	await expect(page.getByTestId('wt-model-start')).toContainText('04.09.2036');
