@@ -24,7 +24,7 @@ function keys() {
 	const p256dh = Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x!, 'base64url'), Buffer.from(jwk.y!, 'base64url')]).toString('base64url');
 	return { p256dh, auth: randomBytes(16).toString('base64url') };
 }
-const endpoint = (n: number) => `https://push.example.test/wpush/v2/e2e-device-${n}`;
+const endpoint = (n: number) => `https://push.nx-e2e.timetrack-test.net/wpush/v2/e2e-device-${n}`;
 
 test('register the account', async ({ browser }) => {
 	alice = await newActor(browser);
@@ -80,7 +80,7 @@ test('subscriptions: validation, idempotency, list without the endpoint, limit o
 	const k = keys();
 	const created = await api(page, 'POST', '/api/v1/me/push-subscriptions', { endpoint: endpoint(1), keys: k, userAgent: 'e2e' });
 	expect(created.status).toBe(201);
-	expect(created.body.host).toBe('push.example.test');
+	expect(created.body.host).toBe('push.nx-e2e.timetrack-test.net');
 	const again = await api(page, 'POST', '/api/v1/me/push-subscriptions', { endpoint: endpoint(1), keys: k, userAgent: 'e2e' });
 	expect(again.body.id).toBe(created.body.id);
 
@@ -88,7 +88,7 @@ test('subscriptions: validation, idempotency, list without the endpoint, limit o
 	expect(list.body).toHaveLength(1);
 	expect(JSON.stringify(list.body)).not.toContain('e2e-device');
 
-	expect((await api(page, 'POST', '/api/v1/me/push-subscriptions', { endpoint: 'http://push.example.test/x', keys: keys() })).status).toBe(400);
+	expect((await api(page, 'POST', '/api/v1/me/push-subscriptions', { endpoint: 'http://push.nx-e2e.timetrack-test.net/x', keys: keys() })).status).toBe(400);
 	expect((await api(page, 'POST', '/api/v1/me/push-subscriptions', { endpoint: endpoint(2), keys: { p256dh: 'abc', auth: 'def' } })).status).toBe(400);
 
 	for (let n = 2; n <= 10; n++) {
@@ -118,7 +118,7 @@ test('test push to a fake endpoint: what the backend really answers, and the UI 
 	const sub = await api(page, 'POST', '/api/v1/me/push-subscriptions', { endpoint: endpoint(50), keys: keys() });
 	expect(sub.status).toBe(201);
 	const res = await api(page, 'POST', `/api/v1/me/push-subscriptions/${sub.body.id}/test`);
-	// Real behaviour (C18): the fake host cannot be reached, so the backend answers 502 push_failed.
+	// Real behaviour (C18/C19): the host is on the test allow-list but does not resolve (NXDOMAIN), so no real push service is contacted and the backend answers 502 push_failed.
 	expect(res.status).toBe(502);
 	console.log(`test push to fake endpoint answered ${res.status} ${JSON.stringify(res.body)}`);
 
@@ -144,7 +144,7 @@ test('enabling in the UI with granted permission registers the (fake) browser su
 		({ material }) => {
 			let current: unknown = null;
 			const fake = {
-				endpoint: 'https://push.example.test/wpush/v2/ui-device',
+				endpoint: 'https://push.nx-e2e.timetrack-test.net/wpush/v2/ui-device',
 				toJSON() {
 					return { endpoint: this.endpoint, keys: material };
 				},
@@ -164,7 +164,7 @@ test('enabling in the UI with granted permission registers the (fake) browser su
 	const row = page.getByTestId('subscription-list').getByRole('listitem');
 	await expect(row).toHaveCount(1);
 	await expect(row).toContainText('dieses Gerät');
-	await expect(row).toContainText('push.example.test');
+	await expect(row).toContainText('push.nx-e2e.timetrack-test.net');
 	await page.getByRole('button', { name: 'Push auf diesem Gerät deaktivieren' }).click();
 	await expect(page.getByText('Push wurde deaktiviert.')).toBeVisible();
 	expect((await api(page, 'GET', '/api/v1/me/push-subscriptions')).body).toHaveLength(0);

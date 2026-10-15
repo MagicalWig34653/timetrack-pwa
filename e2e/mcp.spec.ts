@@ -247,7 +247,7 @@ test('c) consent page (German): client name, redirect host, scopes; uncheck a wr
 	refresh = tok.json.refresh_token;
 });
 
-test('c) token endpoint: wrong verifier, redirect_uri, resource and client are rejected (each burns its code)', async () => {
+test('c) token endpoint: wrong verifier, redirect_uri, resource and client are rejected without burning the code (C19)', async () => {
 	const { page } = alice;
 	const cases: Array<[string, Record<string, string>]> = [
 		['verifier', { code_verifier: newPkce().verifier }],
@@ -262,15 +262,13 @@ test('c) token endpoint: wrong verifier, redirect_uri, resource and client are r
 		expect(bad.status, label).toBe(400);
 		expect(bad.json.error, label).toMatch(/^(invalid_grant|invalid_target|invalid_client|invalid_request)$/);
 		expect(bad.text).not.toContain(flow.code);
-		// the code is burnt: even the correct request now fails. Exception (observed, see docs/handoffs/X1.md): a wrong
-		// `resource` or unknown client_id is rejected before the code is consumed, so the code stays usable.
+		// C19 (docs/reviews/2026-10-15-codex-review.md #7): binding and PKCE are checked before any state change, so a
+		// wrong attempt neither burns the code nor touches the grant; the correct request afterwards succeeds once.
 		const retry = await exchange(flow);
-		if (label === 'resource' || label === 'client') {
-			expect(retry.status).toBe(200);
-			continue;
-		}
-		expect(retry.status, `${label} retry`).toBe(400);
-		expect(retry.json.error).toBe('invalid_grant');
+		expect(retry.status, `${label} retry`).toBe(200);
+		const replay = await exchange(flow);
+		expect(replay.status, `${label} replay`).toBe(400);
+		expect(replay.json.error).toBe('invalid_grant');
 	}
 	// unsupported grant type, missing verifier
 	expect((await tokenRequest(BASE, { grant_type: 'password', client_id: clientId, username: 'a', password: 'b' })).json.error).toBe('unsupported_grant_type');

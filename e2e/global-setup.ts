@@ -193,7 +193,9 @@ export default async function globalSetup() {
 		stage7 = await startInstance(binary, notificationsPort, {
 			NOTIFICATIONS_ENABLED: 'false',
 			VAPID_PRIVATE_KEY: vapid,
-			VAPID_SUBJECT: 'mailto:e2e@example.com'
+			VAPID_SUBJECT: 'mailto:e2e@example.com',
+			// C19 push endpoint policy: only allow-listed https hosts. This one never resolves, so tests never contact a real push service.
+			PUSH_ALLOWED_HOSTS: '*.nx-e2e.timetrack-test.net'
 		});
 	} catch (e) {
 		await stage6.stop();
