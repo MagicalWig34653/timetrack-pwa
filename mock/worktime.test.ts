@@ -97,7 +97,8 @@ describe('worktime import profile', () => {
 		expect(w.byAction).toMatchObject({ vacation: 8, sick: 2, excused: 1, school: 1, holiday: 2 });
 		// "Arzttermin" matches no rule: reported for review
 		expect(w.unmappedRemarks).toEqual([{ text: 'Arzttermin', count: 1 }]);
-		expect(p.errors).toEqual([{ row: expect.any(Number), code: 'pause_exceeds_day' }]);
+		expect(p.errors).toEqual([]);
+		expect(p.warnings).toEqual([{ code: 'pause_exceeds_day', row: expect.any(Number) }]);
 		expect(p.valid).toBe(12);
 	});
 
@@ -142,7 +143,7 @@ describe('worktime import profile', () => {
 
 	it('honours options: pause none, override minutes, pause start, user rules (first match wins), skip', async () => {
 		const bytes = buildWorktimeWorkbook(SAMPLE);
-		const none = (await preview(bytes, { pauseMode: 'none' })).preview;
+		const none = (await preview(bytes, { pauseMode: 'none', partialCredit: 'absence' })).preview;
 		expect(none.worktime!.segments).toBe(4);
 		expect(none.errors).toEqual([]);
 		const rules = [
@@ -155,7 +156,7 @@ describe('worktime import profile', () => {
 		expect(custom.unmappedRemarks!.map((r) => r.text)).toEqual(['Krank', 'Feiertag', 'Feiertag Betriebsfeier']);
 		// pause override longer than the 20 min day
 		const long = (await preview(bytes, { pauseMinutes: 25 })).preview;
-		expect(long.errors).toEqual([{ row: expect.any(Number), code: 'pause_exceeds_day' }]);
+		expect(long.warnings).toEqual([{ code: 'pause_exceeds_day', row: expect.any(Number) }]);
 	});
 
 	it('reports conflicting duplicate dates across sheets and merges identical ones', async () => {
