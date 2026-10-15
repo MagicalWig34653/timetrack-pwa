@@ -1,6 +1,12 @@
 import { splitRange } from '../time/dates';
+import { pwa } from '../pwa/pwa.svelte';
 import { ApiError } from './errors';
 import type {
+	NotificationList,
+	NotificationSettings,
+	PushConfig,
+	PushSubscriptionInfo,
+	PushSubscriptionInput,
 	DownloadedFile,
 	ExportFormat,
 	FileMeta,
@@ -75,6 +81,18 @@ const BASE = '/api/v1';
 
 let csrfToken: string | null = null;
 
+/** fetch that tells the offline banner whether the network is reachable (any HTTP response counts as reachable). */
+async function netFetch(input: string, init: RequestInit): Promise<Response> {
+	try {
+		const response = await fetch(input, init);
+		pwa.reportNetwork(true);
+		return response;
+	} catch (error) {
+		pwa.reportNetwork(false);
+		throw error;
+	}
+}
+
 export function setCsrfToken(token: string | null): void {
 	csrfToken = token;
 }
@@ -115,7 +133,7 @@ export function filenameFromDisposition(header: string | null): string | null {
 async function download(path: string): Promise<DownloadedFile> {
 	let response: Response;
 	try {
-		response = await fetch(BASE + path, { method: 'GET', credentials: 'include' });
+		response = await netFetch(BASE + path, { method: 'GET', credentials: 'include' });
 	} catch {
 		throw new ApiError(0, 'network_error');
 	}
@@ -131,7 +149,7 @@ async function upload<T>(path: string, file: File): Promise<T> {
 	form.append('file', file, file.name);
 	let response: Response;
 	try {
-		response = await fetch(BASE + path, { method: 'POST', headers, credentials: 'include', body: form });
+		response = await netFetch(BASE + path, { method: 'POST', headers, credentials: 'include', body: form });
 	} catch {
 		throw new ApiError(0, 'network_error');
 	}
@@ -144,7 +162,7 @@ async function upload<T>(path: string, file: File): Promise<T> {
 async function requestText(path: string): Promise<string> {
 	let response: Response;
 	try {
-		response = await fetch(BASE + path, { method: 'GET', headers: { Accept: 'text/plain' }, credentials: 'include' });
+		response = await netFetch(BASE + path, { method: 'GET', headers: { Accept: 'text/plain' }, credentials: 'include' });
 	} catch {
 		throw new ApiError(0, 'network_error');
 	}
@@ -164,7 +182,7 @@ async function request<T>(
 
 	let response: Response;
 	try {
-		response = await fetch(BASE + path, {
+		response = await netFetch(BASE + path, {
 			method,
 			headers,
 			credentials: 'include',
@@ -417,5 +435,25 @@ export const api = {
 	deleteReportEntry: (id: string) => request<void>('DELETE', `/reports/entries/${id}`),
 	listReportSources: (year: number, week: number) => request<ReportSource[]>('GET', `/reports/sources?year=${year}&week=${week}`),
 	createReportSource: (input: ReportSourceInput) => request<ReportSource>('POST', '/reports/sources', input),
-	deleteReportSource: (id: string) => request<void>('DELETE', `/reports/sources/${id}`)
+	deleteReportSource: (id: string) => request<void>('DELETE', `/reports/sources/${id}`),
+
+	// notifications and Web Push, contract v0.8.0 (ADR-0010); `before` is the createdAt cursor of the last loaded item
+	listNotifications: (options: { unreadOnly?: boolean; limit?: number; before?: string } = {}) => {
+		const query = new URLSearchParams();
+		if (options.unreadOnly) query.set('unreadOnly', 'true');
+		if (options.limit) query.set('limit', String(options.limit));
+		if (options.before) query.set('before', options.before);
+		const text = query.toString();
+		return request<NotificationList>('GET', `/notifications${text ? `?${text}` : ''}`);
+	},
+	markNotificationsRead: (selection: { ids: string[] } | { all: true }) =>
+		request<{ unreadCount: number }>('POST', '/notifications/read', selection),
+	deleteNotification: (id: string) => request<void>('DELETE', `/notifications/${id}`),
+	getNotificationSettings: () => request<NotificationSettings>('GET', '/notifications/settings'),
+	putNotificationSettings: (input: NotificationSettings) => request<NotificationSettings>('PUT', '/notifications/settings', input),
+	pushConfig: () => request<PushConfig>('GET', '/push/config'),
+	listPushSubscriptions: () => request<PushSubscriptionInfo[]>('GET', '/me/push-subscriptions'),
+	createPushSubscription: (input: PushSubscriptionInput) => request<PushSubscriptionInfo>('POST', '/me/push-subscriptions', input),
+	deletePushSubscription: (id: string) => request<void>('DELETE', `/me/push-subscriptions/${id}`),
+	sendTestPush: (id: string) => request<void>('POST', `/me/push-subscriptions/${id}/test`)
 };

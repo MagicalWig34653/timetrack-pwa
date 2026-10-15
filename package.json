@@ -8,13 +8,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.service-worker.json --noEmit",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "dev:mock": "VITE_MOCK=1 vite dev",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
-    "test:e2e:mock": "playwright test -c playwright.mock.config.ts"
+    "test:e2e:mock": "playwright test -c playwright.mock.config.ts",
+		"test:e2e:pwa": "npm run build && playwright test -c playwright.pwa.config.ts",
+		"icons": "node scripts/generate-icons.mjs"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.3.0",

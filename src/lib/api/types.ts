@@ -608,3 +608,61 @@ export interface ApiTokenInput {
 	scopes: McpScope[];
 	expiresInDays: number;
 }
+
+// Notifications and Web Push, contract v0.8.0 (ADR-0010)
+export const NOTIFICATION_CATEGORIES = ['running_timer', 'pending_suggestions', 'report_gap', 'document_submission'] as const;
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+export type NotificationKind = NotificationCategory | 'system';
+
+export interface AppNotification {
+	id: string;
+	kind: NotificationKind;
+	title: string;
+	body: string;
+	/** relative PWA path (`/`, `/reports`, `/absences`) */
+	url?: string | null;
+	createdAt: string;
+	read: boolean;
+}
+
+export interface NotificationList {
+	items: AppNotification[];
+	unreadCount: number;
+}
+
+export interface NotificationCategorySettings {
+	inApp: boolean;
+	push: boolean;
+	/** running_timer only: 30..1440 */
+	thresholdMinutes?: number;
+	/** report_gap only: ISO weekday 1 (Monday) .. 7 */
+	weekday?: number;
+	/** report_gap only: local HH:mm */
+	time?: string;
+}
+
+export interface NotificationSettings {
+	categories: Partial<Record<NotificationCategory, NotificationCategorySettings>>;
+	quietStart?: string | null;
+	quietEnd?: string | null;
+}
+
+export interface PushConfig {
+	available: boolean;
+	/** base64url uncompressed P-256 public key */
+	vapidPublicKey?: string;
+}
+
+export interface PushSubscriptionInfo {
+	id: string;
+	host?: string;
+	userAgent?: string | null;
+	createdAt: string;
+	lastSuccessAt?: string | null;
+}
+
+export interface PushSubscriptionInput {
+	endpoint: string;
+	keys: { p256dh: string; auth: string };
+	userAgent?: string;
+}
