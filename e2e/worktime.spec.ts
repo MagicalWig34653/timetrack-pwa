@@ -886,4 +886,19 @@ test('rounding model: "bewertet" exports the rounded start/end, "tatsächlich" t
 	}
 });
 
+// Backend finding from the local real-file check (L19): a school/work row with standard times on a BUILT-IN public holiday becomes a
+// segment, and the holiday has target 0, so the app shows a +7:42 surplus while the sheet's own E column says 0 (credited day).
+// Not fixed here (backend is read-only for L19); see docs/handoffs/L19.md. Remove .fixme once C21 treats such rows as credited.
+const HOLIDAY_SCHOOL = book({ sheets: [{ year: 2027, days: [row('2027-03-26', '8:00', '16:12', 'Berufsschule')] }] }, 'feiertag-schule.xlsx'); // Good Friday 2027
+
+test.fixme('school row with standard times on a built-in holiday must not create a time-account surplus (sheet difference is 0)', async () => {
+	const { page } = bob;
+	await toProfileStep(page, HOLIDAY_SCHOOL);
+	await page.getByTestId('wt-validate').click();
+	await confirmAndCommit(page);
+	const day = (await api(page, 'GET', '/api/v1/time/days/2027-03-26')).body;
+	expect(day.targetSeconds).toBe(0);
+	expect(day.deltaSeconds).toBe(0); // currently 27720 (7:42 surplus)
+});
+
 void MAIN_2027;
