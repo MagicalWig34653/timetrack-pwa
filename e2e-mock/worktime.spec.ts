@@ -196,7 +196,7 @@ test.describe('worktime screenshots', () => {
 				await shot('export');
 				await page.goto('/absences');
 				await page.getByRole('button', { name: 'Abwesenheit anlegen' }).first().click();
-				await page.getByLabel('Art').selectOption('excused');
+				await page.locator('#abs-kind').selectOption('excused');
 				await shot('absence-form');
 				await page.goto('/calendar');
 				await shot('calendar');
