@@ -13,3 +13,7 @@ Keine Secrets oder persönlichen Daten committen. Sessions müssen wegwerfbar bl
 Code, Kommentare, Tests und technische Bezeichner auf Englisch; nutzerseitige Texte auf Deutsch.
 Verbindliche Details stehen im Backend unter docs/ENTWICKLUNGSABLAUF.md,
 Abschnitt „Sprache von Code und Oberfläche“. An alle beauftragten Agents weitergeben.
+
+Arbeitsstand, Testbefehle und Routenübersicht dieses Repos: docs/STATUS.md. Übergaben je Paket: docs/handoffs/.
+Neue Seiten/Routen müssen in `src/lib/modules/map.ts` einem Kern- oder Modulbereich zugeordnet werden (ADR-0012);
+ein Test schlägt sonst fehl. Nutzertexte nur über `src/lib/i18n`, nie direkt in Komponenten.
