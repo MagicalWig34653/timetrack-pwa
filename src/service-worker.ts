@@ -22,7 +22,7 @@ const PRECACHED = new Set(PRECACHE);
 sw.addEventListener('install', (event) => {
 	// No skipWaiting here: a new version waits until the user confirms the update banner (SKIP_WAITING message).
 	event.waitUntil(
-		caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map((path) => new Request(path, { cache: 'reload' }))))
+		caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map((path) => new Request(sw.location.origin + path, { cache: 'reload' }))))
 	);
 });
 
@@ -59,7 +59,7 @@ async function navigate(request: Request, url: URL): Promise<Response> {
 	} catch {
 		const shell = await (await caches.open(CACHE)).match(SHELL);
 		if (url.pathname === OFFLINE_PATH && shell) return shell;
-		return Response.redirect(OFFLINE_PATH, 302);
+		return Response.redirect(sw.location.origin + OFFLINE_PATH, 302);
 	}
 }
 

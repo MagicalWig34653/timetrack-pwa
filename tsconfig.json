@@ -10,6 +10,8 @@
 		"vitest-setup.ts"
 	],
 	"exclude": [
-		"src/service-worker.ts"
+		"src/service-worker",
+		"src/service-worker.ts",
+		"src/service-worker.js"
 	]
 }
