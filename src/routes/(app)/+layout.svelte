@@ -1,13 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import Bell from '@lucide/svelte/icons/bell';
-	import { Button } from '#lib/components/ui/button/index.js';
+	import X from '@lucide/svelte/icons/x';
+	import { focusTrap } from '#lib/a11y/focus-trap.js';
 	import { t } from '#lib/i18n/index.js';
 	import ModuleDisabled from '#lib/components/app/ModuleDisabled.svelte';
+	import HelpDialog from '#lib/components/shell/HelpDialog.svelte';
+	import SidebarNav from '#lib/components/shell/SidebarNav.svelte';
+	import TopBar from '#lib/components/shell/TopBar.svelte';
 	import { moduleOfPath } from '#lib/modules/map.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
-	import { ADMIN_LINKS, MAIN_LINKS } from '#lib/nav.js';
+	import { openSuggestions } from '#lib/notifications/open-suggestions.svelte.js';
 	import { unread } from '#lib/notifications/unread.svelte.js';
 	import { sessionStore } from '#lib/session.svelte.js';
 	import type { LayoutProps } from './$types';
@@ -15,14 +18,6 @@
 	let { children }: LayoutProps = $props();
 
 	const session = $derived(sessionStore.current);
-	const links = $derived(
-		[...MAIN_LINKS, ...(session?.account.role === 'admin' ? ADMIN_LINKS : [])]
-			.filter((link) => {
-				const module = moduleOfPath(link.href);
-				return !module || moduleStore.enabled(module);
-			})
-			.map((link) => ({ ...link, label: t(link.label) }))
-	);
 	/** module of the current page when that module is switched off: the page shows the notice instead of its content */
 	const blockedBy = $derived.by(() => {
 		const module = moduleOfPath(page.url.pathname);
@@ -36,10 +31,24 @@
 		return unread.start();
 	});
 
-	function isActive(link: { href: string; prefix: boolean; section?: string }): boolean {
-		const path = page.url.pathname;
-		if (link.section) return path === link.section || path.startsWith(link.section + '/');
-		return link.prefix ? path === link.href || path.startsWith(link.href + '/') : path === link.href;
+	// The suggestion badge is refreshed on navigation while the automation module is on.
+	$effect(() => {
+		void page.url.pathname;
+		if (polling && moduleStore.enabled('automation')) void openSuggestions.refresh();
+		else openSuggestions.reset();
+	});
+
+	let menuOpen = $state(false);
+	let helpOpen = $state(false);
+
+	// the off-canvas menu closes after every navigation
+	$effect(() => {
+		void page.url.pathname;
+		menuOpen = false;
+	});
+
+	function onWindowResize() {
+		if (window.innerWidth >= 760) menuOpen = false;
 	}
 
 	async function signOut() {
@@ -51,54 +60,52 @@
 	}
 </script>
 
+<svelte:window onresize={onWindowResize} />
+
 <div class="min-h-screen">
-	<header class="border-b bg-card">
-		<div class="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3">
-			<span class="font-semibold tracking-tight">{t('app.name')}</span>
-			<div class="flex items-center gap-3">
-				{#if session}
-					<span class="hidden text-sm text-muted-foreground sm:inline">{session.account.displayName}</span>
-				{/if}
-				{#if polling}
-					<a
-						href="/notifications"
-						class="relative inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-						aria-label={unread.count > 0 ? t('nav.notifications_unread', { count: unread.count }) : t('nav.notifications')}
-						aria-current={page.url.pathname === '/notifications' ? 'page' : undefined}
-						data-testid="bell"
-					>
-						<Bell class="size-5" aria-hidden="true" />
-						{#if unread.count > 0}
-							<span class="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 font-semibold text-primary-foreground" data-testid="bell-badge">{unread.count > 99 ? '99+' : unread.count}</span>
-						{/if}
-					</a>
-				{/if}
-				<Button variant="outline" size="sm" onclick={signOut}>{t('nav.sign_out')}</Button>
+	<aside class="glass-sidebar fixed inset-y-0 left-0 z-40 hidden w-64 border-r menu:block" data-testid="sidebar">
+		<SidebarNav onhelp={() => (helpOpen = true)} />
+	</aside>
+
+	{#if menuOpen}
+		<div class="fixed inset-0 z-50 menu:hidden" data-testid="mobile-menu">
+			<button type="button" class="absolute inset-0 bg-black/10 backdrop-blur-xs" aria-label={t('nav.menu_close')} tabindex="-1" onclick={() => (menuOpen = false)}></button>
+			<div
+				role="dialog"
+				aria-modal="true"
+				aria-label={t('nav.main')}
+				class="glass-sidebar absolute inset-y-0 left-0 w-[min(18rem,85vw)] border-r shadow-[var(--shadow-pop)]"
+				use:focusTrap={{ onclose: () => (menuOpen = false) }}
+			>
+				<button
+					type="button"
+					class="absolute top-4 right-3 z-10 inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+					aria-label={t('nav.menu_close')}
+					onclick={() => (menuOpen = false)}
+				>
+					<X class="size-5" aria-hidden="true" />
+				</button>
+				<SidebarNav
+					onnavigate={() => (menuOpen = false)}
+					onhelp={() => {
+						menuOpen = false;
+						helpOpen = true;
+					}}
+				/>
 			</div>
 		</div>
-		{#if session && !session.recovery}
-			<nav aria-label={t('nav.main')} class="mx-auto max-w-4xl overflow-x-auto px-4">
-				<ul class="flex gap-1 pb-2">
-					{#each links as link (link.href)}
-						<li>
-							<a
-								href={link.href}
-								aria-current={isActive(link) ? 'page' : undefined}
-								class="inline-block rounded-md px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground"
-							>
-								{link.label}
-							</a>
-						</li>
-					{/each}
-				</ul>
-			</nav>
-		{/if}
-	</header>
-	<main class="mx-auto max-w-4xl px-4 py-8">
-		{#if blockedBy}
-			<ModuleDisabled module={blockedBy} />
-		{:else}
-			{@render children()}
-		{/if}
-	</main>
+	{/if}
+
+	<div class="menu:pl-64">
+		<TopBar {polling} {menuOpen} onmenu={() => (menuOpen = true)} onsignout={signOut} />
+		<main class="mx-auto w-full max-w-[1240px] px-4 py-[22px] menu:px-6 menu:py-6 wide:px-10 wide:py-9">
+			{#if blockedBy}
+				<ModuleDisabled module={blockedBy} />
+			{:else}
+				{@render children()}
+			{/if}
+		</main>
+	</div>
 </div>
+
+<HelpDialog bind:open={helpOpen} />

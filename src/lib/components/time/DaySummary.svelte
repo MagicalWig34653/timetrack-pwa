@@ -6,7 +6,7 @@
 	import { formatDelta, formatDuration } from '#lib/time/format.js';
 	import { hintLabel, markLabel } from '#lib/time/labels.js';
 
-	let { evaluation, showHints = true }: { evaluation: DayEvaluation; showHints?: boolean } = $props();
+	let { evaluation, showHints = true, kpis = true }: { evaluation: DayEvaluation; showHints?: boolean; /** false when target/evaluated/delta are shown as KPI cards next to this summary */ kpis?: boolean } = $props();
 	const markedOff = $derived(evaluation.mark === 'holiday' || evaluation.mark === 'vacation' || evaluation.mark === 'sick' || evaluation.mark === 'excused');
 	const targetNote = $derived(
 		!markedOff ? '' : evaluation.targetSeconds === 0 ? t('day.target_note_zero', { mark: markLabel(evaluation.mark!) }) : evaluation.mark === 'vacation' ? t('day.target_note_half') : ''
@@ -25,9 +25,9 @@
 	{#if targetNote}<p class="text-sm text-muted-foreground" data-testid="day-target-note">{targetNote}</p>{/if}
 	{#if sourceNote}<p class="text-xs text-muted-foreground" data-testid="day-mark-source" data-source={evaluation.markSource}>{sourceNote}</p>{/if}
 	<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
-		<div><dt class="text-muted-foreground">{t('day.target')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-target">{formatDuration(evaluation.targetSeconds)}</dd></div>
+		{#if kpis}<div><dt class="text-muted-foreground">{t('day.target')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-target">{formatDuration(evaluation.targetSeconds)}</dd></div>{/if}
 		<div><dt class="text-muted-foreground">{t('day.raw')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-raw">{formatDuration(evaluation.rawWorkSeconds)}</dd></div>
-		<div><dt class="text-muted-foreground">{t('day.evaluated')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-evaluated">{formatDuration(evaluation.evaluatedWorkSeconds)}</dd></div>
+		{#if kpis}<div><dt class="text-muted-foreground">{t('day.evaluated')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-evaluated">{formatDuration(evaluation.evaluatedWorkSeconds)}</dd></div>{/if}
 		{#if rounding !== 0}
 			<div>
 				<dt class="text-muted-foreground">{t('day.rounding')}</dt>
@@ -40,10 +40,12 @@
 		{#if evaluation.creditSeconds > 0}
 			<div><dt class="text-muted-foreground">{t('day.credit')}</dt><dd class="tabular-nums" data-testid="day-credit">+{formatDuration(evaluation.creditSeconds)}</dd></div>
 		{/if}
-		<div>
-			<dt class="text-muted-foreground">{t('day.delta')}</dt>
-			<dd class="text-lg font-semibold tabular-nums {evaluation.deltaSeconds < 0 ? 'text-destructive' : ''}" data-testid="day-delta">{formatDelta(evaluation.deltaSeconds)}</dd>
-		</div>
+		{#if kpis}
+			<div>
+				<dt class="text-muted-foreground">{t('day.delta')}</dt>
+				<dd class="text-lg font-semibold tabular-nums {evaluation.deltaSeconds < 0 ? 'text-destructive' : ''}" data-testid="day-delta">{formatDelta(evaluation.deltaSeconds)}</dd>
+			</div>
+		{/if}
 	</dl>
 	{#if showHints && evaluation.breakHints.length > 0}
 		<Alert data-testid="break-hints">

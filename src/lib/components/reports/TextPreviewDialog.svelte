@@ -76,7 +76,7 @@
 <dialog
 	bind:this={dialog}
 	aria-labelledby="{uid}-title"
-	class="m-auto w-[min(42rem,calc(100vw-2rem))] rounded-xl border bg-card p-0 text-card-foreground shadow-xl backdrop:bg-black/50"
+	class="m-auto w-[min(42rem,calc(100vw-2rem))] glass-pop rounded-2xl border p-0 text-popover-foreground shadow-[var(--shadow-pop)]"
 	data-testid="text-dialog"
 	onclose={() => (open = false)}
 >

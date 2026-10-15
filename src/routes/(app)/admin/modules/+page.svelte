@@ -125,7 +125,7 @@
 		</ul>
 
 		{#if confirming}
-			<div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" class="rounded-lg border border-destructive/50 bg-card p-4" data-testid="admin-confirm">
+			<div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" class="rounded-lg border border-destructive/50 glass-pop p-4" data-testid="admin-confirm">
 				<h2 id="confirm-title" class="font-semibold">{t('admin_modules.confirm_title')}</h2>
 				<p class="mt-1 text-sm">{t('admin_modules.confirm_body', { names: switchingOff.map((m) => nameOf(m.key)).join(', ') })}</p>
 				<div class="mt-3 flex flex-wrap gap-2">

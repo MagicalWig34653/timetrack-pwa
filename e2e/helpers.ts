@@ -111,6 +111,8 @@ export async function loginWithPasskey(page: Page) {
 }
 
 export async function signOut(page: Page) {
+	// the account menu in the top bar holds the sign-out action since L21
+	await page.getByTestId('account-menu').click();
 	await page.getByRole('button', { name: 'Abmelden' }).click();
 	await expect(page).toHaveURL(/\/login/);
 }

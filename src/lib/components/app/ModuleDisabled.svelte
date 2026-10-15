@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ModuleKey } from '#lib/api/types.js';
-	import { Alert } from '#lib/components/ui/alert/index.js';
+	import Banner from './Banner.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t, type MessageKey } from '#lib/i18n/index.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
@@ -14,9 +14,9 @@
 
 <div data-testid="module-disabled" data-module={module}>
 	<PageHeader title={t('modules.disabled_title')} />
-	<Alert variant="warning">
+	<Banner tone="warning">
 		{serverOff ? t('modules.disabled_server', { name }) : t('modules.disabled_account', { name })}
-	</Alert>
+	</Banner>
 	<div class="mt-4 flex flex-wrap gap-2">
 		<Button href="/settings/modules">{t('modules.disabled_settings')}</Button>
 		<Button variant="outline" href="/">{t('modules.disabled_home')}</Button>

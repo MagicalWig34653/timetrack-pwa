@@ -1,4 +1,4 @@
-# Stand der PWA – 15.10.2026 (Paket L19)
+# Stand der PWA – 15.10.2026 (Paket L21)
 
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L19, X1).
@@ -16,6 +16,9 @@ Module (abschaltbar, ADR-0012, Zuordnung in `src/lib/modules/map.ts`):
 - transfer: `/export`, `/import`, `/settings/storage` (Admin), Anhänge (Abwesenheitsformular, Berichtsheft-Quellen)
 - automation: `/settings/devices`, `/suggestions`, Hinweis auf dem Dashboard
 - mcp: `/settings/api-tokens`, `/settings/connections`, `/settings/mcp-help`, `/oauth/consent`
+
+## Designsprache (L21, ADR-0014)
+Zinc-Tokens (OKLCH, hell/dunkel), Glasflächen mit deckenden Rückfällen, Akzentsystem (`src/lib/theme/accent.ts`, Standard #2563EB), Shell mit Seitenleiste (256 px), Kopfzeile (60 px), mobilem Off-Canvas-Menü, Einstellungssuche; Muster-Komponenten (`PageHeader`, `Panel`, `KpiCard`, `SectionHeading`, `EmptyState`, `FilterBar`, `StatusChip`, `Banner`); neue Seite `/settings/appearance`. Details und Abweichungen: `docs/handoffs/L21.md`.
 
 ## Modulschalter (L17)
 `moduleStore` (`src/lib/modules/store.svelte.ts`) lädt `GET /modules` nach dem Login (Routenwächter), cached es und aktualisiert sich nach Änderungen und bei jeder Antwort `404 module_disabled`.

@@ -506,7 +506,8 @@ test('storage admin: a non-admin sees a hint (UI) and gets 403 (API)', async () 
 	expect((await api(page, 'PUT', '/api/v1/admin/storage', { rules: [{ backend: 'db' }] })).status).toBe(403);
 	// the admin sees the navigation entry
 	await alice.page.goto('/settings/work-model');
-	await expect(alice.page.getByRole('link', { name: 'Dateispeicher' })).toBeVisible();
+	// the sidebar (Verwaltung) and the settings tabs both list it since L21
+	await expect(alice.page.getByTestId('settings-tabs').getByRole('link', { name: 'Dateispeicher' })).toBeVisible();
 });
 
 test('storage admin: validation, then rules "up to 1 MiB -> database, above -> local path" are saved', async () => {
