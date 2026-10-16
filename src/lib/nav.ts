@@ -94,8 +94,7 @@ export const NAV_GROUPS: NavGroup[] = [
 		adminOnly: true,
 		items: [
 			{ href: '/admin/invitations', label: 'nav.invitations', prefix: true, icon: 'invite' },
-			{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true, icon: 'modules' },
-			{ href: '/settings/storage', label: 'nav.storage', prefix: true, icon: 'storage' }
+			{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true, icon: 'modules' }
 		]
 	}
 ];
