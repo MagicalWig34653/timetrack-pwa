@@ -90,6 +90,12 @@
 	<Alert variant="destructive">{load.message}</Alert>
 {:else}
 	<div class="flex flex-col gap-4">
+		{#if sessionStore.current?.account.onboardingState === 'pending'}
+			<Banner testid="setup-banner">
+				<span>{t('home.setup_banner')}</span>
+				{#snippet action()}<Button size="sm" href="/onboarding">{t('home.setup_start')}</Button>{/snippet}
+			</Banner>
+		{/if}
 		{#if suggestions.length > 0 && moduleStore.enabled('automation')}
 			<Banner testid="suggestions-notice">
 				<span>{t('home.suggestions_open', { count: suggestions.length })}</span>

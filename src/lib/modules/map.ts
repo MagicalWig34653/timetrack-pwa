@@ -16,6 +16,8 @@ export const CORE_ROUTES = [
 	'/offline',
 	'/mock-idp',
 	'/mock-oauth',
+	'/onboarding',
+	'/settings/profile',
 	'/settings/work-model',
 	'/settings/appearance',
 	'/settings/places',

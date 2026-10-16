@@ -43,6 +43,11 @@ interface MockAccount {
 	displayName: string;
 	role: 'admin' | 'member';
 	email?: string;
+	/** profile e-mail (P1, ADR-0019): only verified addresses count; a pending change waits for the code */
+	emailVerified?: boolean;
+	pendingEmail?: { address: string; attempts: number };
+	/** guided setup flag; pre-existing demo accounts are `skipped`, new ones `pending` */
+	onboarding?: { state: 'pending' | 'completed' | 'skipped'; updatedAt: string | null };
 	recoveryCodes: string[] | null;
 	fallbackPassword: string | null;
 	emailRecovery: { active: boolean; verified: boolean };
@@ -183,6 +188,7 @@ export function createMockApi(options: MockOptions = {}) {
 		recoveryCodes: ['AAAA-BBBB-CCCC'],
 		fallbackPassword: 'correct-horse-battery',
 		emailRecovery: { active: false, verified: false },
+		onboarding: { state: 'skipped', updatedAt: null },
 		createdAt: new Date(Date.now() - 30 * 86_400_000).toISOString()
 	};
 	accounts.set(admin.id, admin);
@@ -199,6 +205,7 @@ export function createMockApi(options: MockOptions = {}) {
 			recoveryCodes: null,
 			fallbackPassword: null,
 			emailRecovery: { active: false, verified: false },
+			onboarding: { state: 'skipped', updatedAt: null },
 			createdAt: new Date(Date.now() - 20 * 86_400_000).toISOString(),
 			lastActivityAt: new Date(Date.now() - 2 * 86_400_000).toISOString()
 		};
@@ -229,7 +236,7 @@ export function createMockApi(options: MockOptions = {}) {
 	function sessionBody(session: MockSession) {
 		const account = accounts.get(session.accountId)!;
 		return {
-			account: { id: account.id, handle: account.handle, displayName: account.displayName, role: account.role },
+			account: { id: account.id, handle: account.handle, displayName: account.displayName, role: account.role, onboardingState: account.onboarding?.state ?? 'pending' },
 			csrfToken: session.csrfToken,
 			recovery: session.recovery,
 			expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString()
@@ -358,12 +365,14 @@ export function createMockApi(options: MockOptions = {}) {
 				email: challenge.data.email,
 				recoveryCodes: null,
 				fallbackPassword: null,
-				emailRecovery: { active: false, verified: false }
+				emailRecovery: { active: false, verified: false },
+				onboarding: { state: 'pending', updatedAt: null }
 			};
 			created.createdAt = new Date().toISOString();
 			accounts.set(created.id, created);
 			seedPasskey(created.id, body.passkeyName || 'Passkey', body.credential.id);
-			const { id, session: opened } = openSession(created.id);
+			// like OIDC sign-ups: a fresh account must not become the fallback of later "unknown passkey" logins (specs sign in as the demo admin)
+			const { id, session: opened } = openSession(created.id, false, false);
 			return { status: 201, body: sessionBody(opened), sessionCookie: id };
 		}
 		if (path === '/api/v1/auth/login/options' && method === 'POST') {
@@ -437,6 +446,8 @@ export function createMockApi(options: MockOptions = {}) {
 					displayName: input.displayName ?? input.handle,
 					role: input.role ?? 'member',
 					email: input.email,
+					emailVerified: !!input.email,
+					onboarding: { state: 'skipped', updatedAt: null },
 					recoveryCodes: null,
 					fallbackPassword: null,
 					emailRecovery: { active: false, verified: false },
@@ -527,7 +538,8 @@ export function createMockApi(options: MockOptions = {}) {
 				role: 'member',
 				recoveryCodes: null,
 				fallbackPassword: null,
-				emailRecovery: { active: false, verified: false }
+				emailRecovery: { active: false, verified: false },
+				onboarding: { state: 'pending', updatedAt: null }
 			};
 			created.createdAt = new Date().toISOString();
 			accounts.set(created.id, created);
@@ -639,6 +651,61 @@ export function createMockApi(options: MockOptions = {}) {
 			if (ownPasskeys().length === 0 && ownIdentities().length === 1) return error(409, 'last_login_method');
 			identities.splice(identities.indexOf(identity), 1);
 			return { status: 204 };
+		}
+
+		// --- profile and guided setup (P1, ADR-0019) ---
+		const profileBody = () => ({
+			handle: account.handle,
+			displayName: account.displayName,
+			email: account.email ?? null,
+			emailVerified: !!account.emailVerified && !!account.email,
+			pendingEmail: account.pendingEmail?.address ?? null,
+			mailAvailable,
+			onboarding: account.onboarding ?? { state: 'pending', updatedAt: null }
+		});
+		if (path === '/api/v1/me/profile' && method === 'GET') return { status: 200, body: profileBody() };
+		if (path === '/api/v1/me/profile' && method === 'PATCH') {
+			const name = typeof body.displayName === 'string' ? body.displayName.trim() : '';
+			if (name.length < 1 || name.length > 80) return error(400, 'bad_request');
+			account.displayName = name;
+			return { status: 200, body: profileBody() };
+		}
+		if (path === '/api/v1/me/profile/email') {
+			if (method === 'PUT') {
+				if (session.stale) return error(403, 'reauth_required');
+				if (!mailAvailable) return error(501, 'not_implemented');
+				const address = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+				if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) || address.length > 254) return error(400, 'bad_request');
+				if (account.emailVerified && account.email === address) return error(400, 'bad_request');
+				account.pendingEmail = { address, attempts: 0 };
+				return { status: 202 };
+			}
+			if (method === 'DELETE') {
+				if (session.stale) return error(403, 'reauth_required');
+				account.email = undefined;
+				account.emailVerified = false;
+				account.pendingEmail = undefined;
+				return { status: 204 };
+			}
+		}
+		if (path === '/api/v1/me/profile/email/verify' && method === 'POST') {
+			if (session.stale) return error(403, 'reauth_required');
+			if (!mailAvailable) return error(501, 'not_implemented');
+			const pending = account.pendingEmail;
+			if (!pending || pending.attempts >= 5) return error(400, 'invalid_code');
+			pending.attempts += 1;
+			if (body.code !== '123456') return error(400, 'invalid_code');
+			account.pendingEmail = undefined;
+			// another account that already holds the address wins; the request is consumed
+			if ([...accounts.values()].some((a) => a.id !== account.id && a.emailVerified && a.email === pending.address)) return error(409, 'email_taken');
+			account.email = pending.address;
+			account.emailVerified = true;
+			return { status: 200, body: profileBody() };
+		}
+		if (path === '/api/v1/me/onboarding' && method === 'PUT') {
+			if (!['pending', 'completed', 'skipped'].includes(body.state)) return error(400, 'bad_request');
+			account.onboarding = { state: body.state, updatedAt: new Date().toISOString() };
+			return { status: 200, body: profileBody() };
 		}
 
 		if (path === '/api/v1/me/recovery' && method === 'GET') {

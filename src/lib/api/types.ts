@@ -7,6 +7,23 @@ export interface Account {
 	handle: string;
 	displayName: string;
 	role: Role;
+	/** Guided setup flag (contract v0.13.0); missing on older servers, which counts as done. */
+	onboardingState?: OnboardingState;
+}
+
+export type OnboardingState = 'pending' | 'completed' | 'skipped';
+
+/** Own profile (contract v0.13.0, ADR-0019). The handle is read-only. */
+export interface Profile {
+	handle: string;
+	displayName: string;
+	email?: string | null;
+	emailVerified: boolean;
+	/** address that still waits for its confirmation code */
+	pendingEmail?: string | null;
+	/** false when the server has no SMTP: the address cannot be verified then */
+	mailAvailable: boolean;
+	onboarding: { state: OnboardingState; updatedAt?: string | null };
 }
 
 export interface Session {
