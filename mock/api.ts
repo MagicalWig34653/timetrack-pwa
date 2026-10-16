@@ -665,9 +665,8 @@ export function createMockApi(options: MockOptions = {}) {
 		});
 		if (path === '/api/v1/me/profile' && method === 'GET') return { status: 200, body: profileBody() };
 		if (path === '/api/v1/me/profile' && method === 'PATCH') {
-			const keys = Object.keys(body ?? {});
 			const name = typeof body.displayName === 'string' ? body.displayName.trim() : '';
-			if (keys.some((k) => k !== 'displayName') || name.length < 1 || name.length > 80) return error(400, 'bad_request');
+			if (name.length < 1 || name.length > 80) return error(400, 'bad_request');
 			account.displayName = name;
 			return { status: 200, body: profileBody() };
 		}

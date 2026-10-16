@@ -103,6 +103,9 @@ export default async function globalSetup() {
 	const modulesOperatorPort = Number(process.env.E2E_MODULES_OPERATOR_PORT ?? port + 8);
 	const worktimePort = Number(process.env.E2E_WORKTIME_PORT ?? port + 9);
 	const accountsPort = Number(process.env.E2E_ACCOUNTS_PORT ?? port + 10);
+	const profilePort = Number(process.env.E2E_PROFILE_PORT ?? port + 11);
+	const profileNoMailPort = Number(process.env.E2E_PROFILE_NOMAIL_PORT ?? port + 12);
+	const profileSmtpPort = Number(process.env.E2E_PROFILE_SMTP_PORT ?? port + 13);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -271,7 +274,40 @@ export default async function globalSetup() {
 	process.env.E2E_ACCOUNTS_BASE_URL = `http://localhost:${accountsPort}`;
 	process.env.E2E_ACCOUNTS_BOOTSTRAP_LINK = stage11.link;
 
+	// Package P1 (profile, guided setup; ADR-0019): one instance with SMTP (the spec runs a tiny capturing SMTP server on
+	// E2E_PROFILE_SMTP_PORT) and one without any mail transport.
+	let stage12: Instance;
+	try {
+		stage12 = await startInstance(binary, profilePort, { SMTP_HOST: '127.0.0.1', SMTP_PORT: String(profileSmtpPort), SMTP_TLS: 'off', SMTP_FROM: 'timetrack@example.test' });
+	} catch (e) {
+		await stage11.stop();
+		await stage10.stop();
+		await stage9.stop();
+		await stage8.stop();
+		await stopBase();
+		throw e;
+	}
+	process.env.E2E_PROFILE_BASE_URL = `http://localhost:${profilePort}`;
+	process.env.E2E_PROFILE_BOOTSTRAP_LINK = stage12.link;
+	process.env.E2E_PROFILE_SMTP_PORT = String(profileSmtpPort);
+	let stage13: Instance;
+	try {
+		stage13 = await startInstance(binary, profileNoMailPort);
+	} catch (e) {
+		await stage12.stop();
+		await stage11.stop();
+		await stage10.stop();
+		await stage9.stop();
+		await stage8.stop();
+		await stopBase();
+		throw e;
+	}
+	process.env.E2E_PROFILE_NOMAIL_BASE_URL = `http://localhost:${profileNoMailPort}`;
+	process.env.E2E_PROFILE_NOMAIL_BOOTSTRAP_LINK = stage13.link;
+
 	return async () => {
+		await stage13.stop();
+		await stage12.stop();
 		await stage11.stop();
 		await stage10.stop();
 		await stage9.stop();

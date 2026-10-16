@@ -26,7 +26,8 @@ describe('profile mock (ADR-0019)', () => {
 		expect((await call('PATCH', '/api/v1/me/profile', { displayName: ' Neu ' })).body.displayName).toBe('Neu');
 		expect((await call('PATCH', '/api/v1/me/profile', { displayName: '' })).status).toBe(400);
 		expect((await call('PATCH', '/api/v1/me/profile', { displayName: 'x'.repeat(81) })).status).toBe(400);
-		expect((await call('PATCH', '/api/v1/me/profile', { displayName: 'A', handle: 'other' })).status).toBe(400);
+		// unknown fields are ignored: the handle never changes
+		expect((await call('PATCH', '/api/v1/me/profile', { displayName: 'A', handle: 'other' })).body).toMatchObject({ displayName: 'A', handle: 'admin' });
 	});
 
 	it('changes the e-mail only after the code, with attempt limit and removal', async () => {
