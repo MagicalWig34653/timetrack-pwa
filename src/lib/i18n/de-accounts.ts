@@ -20,6 +20,7 @@ export const deAccounts = {
 	'accounts.description': 'Verwalte die Konten dieses Servers. Hier siehst du nur Identität, Rolle und Zustand, nie Zeiten, Abwesenheiten oder Berichte.',
 	'accounts.list': 'Konten',
 	'accounts.count': '{total} Konten',
+	'accounts.count_one': '1 Konto',
 	'accounts.empty': 'Keine Konten gefunden.',
 	'accounts.you': 'Du',
 	'accounts.role.admin': 'Administrator',

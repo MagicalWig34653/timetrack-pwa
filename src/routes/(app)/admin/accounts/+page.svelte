@@ -146,7 +146,7 @@
 	{:else if loading && items.length === 0}
 		<p class="text-sm text-muted-foreground" role="status">{t('common.loading')}</p>
 	{:else}
-		<p class="text-sm text-muted-foreground" data-testid="accounts-count">{t('accounts.count', { total })}</p>
+		<p class="text-sm text-muted-foreground" data-testid="accounts-count">{total === 1 ? t('accounts.count_one') : t('accounts.count', { total })}</p>
 		<ul class="flex flex-col gap-3" aria-label={t('accounts.list')} data-testid="account-list">
 			{#each items as account (account.id)}
 				{@const own = account.id === ownId}

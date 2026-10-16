@@ -102,6 +102,7 @@ export default async function globalSetup() {
 	const modulesPort = Number(process.env.E2E_MODULES_PORT ?? port + 7);
 	const modulesOperatorPort = Number(process.env.E2E_MODULES_OPERATOR_PORT ?? port + 8);
 	const worktimePort = Number(process.env.E2E_WORKTIME_PORT ?? port + 9);
+	const accountsPort = Number(process.env.E2E_ACCOUNTS_PORT ?? port + 10);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -256,7 +257,22 @@ export default async function globalSetup() {
 	process.env.E2E_WORKTIME_BASE_URL = `http://localhost:${worktimePort}`;
 	process.env.E2E_WORKTIME_BOOTSTRAP_LINK = stage10.link;
 
+	// Package L23 (account administration, export, self-deletion; ADR-0016): own instance and database, default settings.
+	let stage11: Instance;
+	try {
+		stage11 = await startInstance(binary, accountsPort);
+	} catch (e) {
+		await stage10.stop();
+		await stage9.stop();
+		await stage8.stop();
+		await stopBase();
+		throw e;
+	}
+	process.env.E2E_ACCOUNTS_BASE_URL = `http://localhost:${accountsPort}`;
+	process.env.E2E_ACCOUNTS_BOOTSTRAP_LINK = stage11.link;
+
 	return async () => {
+		await stage11.stop();
 		await stage10.stop();
 		await stage9.stop();
 		await stage8.stop();
