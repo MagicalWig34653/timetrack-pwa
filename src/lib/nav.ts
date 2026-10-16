@@ -22,6 +22,7 @@ export const ADMIN_LINKS: { href: string; label: MessageKey; prefix: boolean }[]
 ];
 
 export const SETTINGS_LINKS: { href: string; label: MessageKey }[] = [
+	{ href: '/settings/profile', label: 'nav.profile' },
 	{ href: '/settings/work-model', label: 'nav.work_model' },
 	{ href: '/settings/appearance', label: 'nav.appearance' },
 	{ href: '/settings/places', label: 'nav.places' },
@@ -43,6 +44,27 @@ export const SETTINGS_LINKS: { href: string; label: MessageKey }[] = [
 
 /** Admin-only settings entries. */
 export const SETTINGS_ADMIN_LINKS: { href: string; label: MessageKey }[] = [{ href: '/settings/storage', label: 'nav.storage' }];
+
+/**
+ * Grouped settings navigation (P1): the former single row of 18 tabs became a sidebar list on wide screens and a
+ * collapsible grouped list on phones. Every settings link belongs to exactly one group (nav.test.ts).
+ */
+export const SETTINGS_GROUPS: { id: string; label: MessageKey; hrefs: string[] }[] = [
+	{ id: 'account', label: 'nav.settings_group.account', hrefs: ['/settings/profile', '/settings/passkeys', '/settings/identities', '/settings/recovery', '/settings/sessions', '/settings/privacy'] },
+	{ id: 'work', label: 'nav.settings_group.work', hrefs: ['/settings/work-model', '/settings/places', '/settings/account-time', '/settings/learning-fields'] },
+	{ id: 'app', label: 'nav.settings_group.app', hrefs: ['/settings/appearance', '/settings/notifications', '/settings/modules'] },
+	{ id: 'connections', label: 'nav.settings_group.connections', hrefs: ['/settings/devices', '/settings/sharing', '/settings/connections', '/settings/api-tokens', '/settings/mcp-help'] },
+	{ id: 'admin', label: 'nav.settings_group.admin', hrefs: ['/settings/storage'] }
+];
+
+/** Groups the visible links; empty groups disappear. */
+export function groupSettingsLinks<T extends { href: string }>(links: T[]): { id: string; label: MessageKey; links: T[] }[] {
+	return SETTINGS_GROUPS.map((group) => ({
+		id: group.id,
+		label: group.label,
+		links: group.hrefs.map((href) => links.find((link) => link.href === href)).filter((link): link is T => !!link)
+	})).filter((group) => group.links.length > 0);
+}
 
 export interface NavItem {
 	href: string;
@@ -104,6 +126,7 @@ export const NAV_GROUPS: NavGroup[] = [
 
 /** Extra search terms per settings page (German); the page title is always searched too. */
 export const SETTINGS_KEYWORDS: Record<string, string> = {
+	'/settings/profile': 'profil name anzeigename e-mail adresse konto einrichtung wiederholen onboarding',
 	'/settings/work-model': 'arbeitszeit soll woche tag pause rundung schule fahrtzeit modell',
 	'/settings/appearance': 'darstellung hell dunkel akzent farbe theme transparenz design',
 	'/settings/places': 'orte standort ort automatik geofence',

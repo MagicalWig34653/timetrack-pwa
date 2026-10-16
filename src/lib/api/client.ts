@@ -45,6 +45,8 @@ import type {
 	VacationBalance,
 	VacationEntries,
 	VacationSettings,
+	OnboardingState,
+	Profile,
 	CreationOptions,
 	DayEvaluation,
 	DayPreferences,
@@ -271,6 +273,14 @@ export const api = {
 		}
 		setCsrfToken(null);
 	},
+
+	// profile and guided setup (contract v0.13.0, ADR-0019)
+	getProfile: () => request<Profile>('GET', '/me/profile'),
+	updateProfile: (displayName: string) => request<Profile>('PATCH', '/me/profile', { displayName }),
+	requestEmailChange: (email: string) => request<void>('PUT', '/me/profile/email', { email }),
+	verifyEmailChange: (code: string) => request<Profile>('POST', '/me/profile/email/verify', { code }),
+	removeProfileEmail: () => request<void>('DELETE', '/me/profile/email'),
+	setOnboarding: (state: OnboardingState) => request<Profile>('PUT', '/me/onboarding', { state }),
 
 	// invitations and registration
 	inspectInvitation: (token: string) =>

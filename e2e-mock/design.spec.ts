@@ -183,7 +183,7 @@ test('reduced transparency and reduced motion fall back to opaque surfaces witho
 
 const MAIN_PAGES = [
 	'/', '/time', '/calendar', '/reports', '/vacation', '/absences', '/shared', '/suggestions', '/export', '/import', '/notifications',
-	'/settings/work-model', '/settings/appearance', '/settings/places', '/settings/account-time', '/settings/learning-fields', '/settings/notifications',
+	'/settings/profile', '/onboarding', '/settings/work-model', '/settings/appearance', '/settings/places', '/settings/account-time', '/settings/learning-fields', '/settings/notifications',
 	'/settings/modules', '/settings/devices', '/settings/sharing', '/settings/passkeys', '/settings/identities', '/settings/connections',
 	'/settings/api-tokens', '/settings/mcp-help', '/settings/recovery', '/settings/sessions', '/settings/storage', '/admin/invitations', '/admin/modules'
 ];

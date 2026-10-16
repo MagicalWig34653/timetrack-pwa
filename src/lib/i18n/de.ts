@@ -4,6 +4,7 @@ import { deMcp } from './de-mcp';
 import { deModules } from './de-modules';
 import { deOidc } from './de-oidc';
 import { dePlanning } from './de-planning';
+import { deProfile } from './de-profile';
 import { dePwa } from './de-pwa';
 import { deReports } from './de-reports';
 import { deTransfer } from './de-transfer';
@@ -18,6 +19,7 @@ export const de = {
 	...deModules,
 	...deOidc,
 	...dePlanning,
+	...deProfile,
 	...dePwa,
 	...deReports,
 	...deTransfer,
