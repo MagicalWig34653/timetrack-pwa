@@ -371,7 +371,8 @@ export function createMockApi(options: MockOptions = {}) {
 			created.createdAt = new Date().toISOString();
 			accounts.set(created.id, created);
 			seedPasskey(created.id, body.passkeyName || 'Passkey', body.credential.id);
-			const { id, session: opened } = openSession(created.id);
+			// like OIDC sign-ups: a fresh account must not become the fallback of later "unknown passkey" logins (specs sign in as the demo admin)
+			const { id, session: opened } = openSession(created.id, false, false);
 			return { status: 201, body: sessionBody(opened), sessionCookie: id };
 		}
 		if (path === '/api/v1/auth/login/options' && method === 'POST') {
