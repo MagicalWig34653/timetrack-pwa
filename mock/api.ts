@@ -428,7 +428,9 @@ export function createMockApi(options: MockOptions = {}) {
 			// test hook, not part of the contract: add accounts, fail the next deletion, age sessions (reauth_required)
 			if (typeof body.failDeletion === 'boolean') failDeletion = body.failDeletion;
 			if (body.staleSessions === true) for (const other of sessions.values()) other.stale = true;
+			// idempotent per handle so a spec can run twice against the same server
 			for (const input of (body.add ?? []) as { handle: string; displayName?: string; role?: 'admin' | 'member'; disabled?: boolean; passkeys?: number; email?: string; lastActivityAt?: string }[]) {
+				if ([...accounts.values()].some((a) => a.handle === input.handle)) continue;
 				const created: MockAccount = {
 					id: uuid(),
 					handle: input.handle,
