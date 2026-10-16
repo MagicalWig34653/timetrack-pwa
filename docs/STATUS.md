@@ -1,11 +1,11 @@
-# Stand der PWA – 16.10.2026 (Paket P1 auf L23)
+# Stand der PWA – 16.10.2026 (Pakete P1 und P2 auf L23)
 
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
 ## Technik
 SvelteKit 3 (SPA, `adapter-static`, kein SSR), Svelte 5, TypeScript, Tailwind 4, shadcn-svelte (Nova/Neutral), Vitest + Testing Library, Playwright. Node nur für Entwicklung/Build.
-API-Client `src/lib/api/client.ts` (getippt von Hand nach `contracts/openapi.yaml`, aktuell v0.13.0 für Profil und Einrichtung, v0.12.0 für Konten und Push-Ersetzen, übrige Teile v0.10.x), Texte `src/lib/i18n/de*.ts`, Mock-API `mock/`.
+API-Client `src/lib/api/client.ts` (getippt von Hand nach `contracts/openapi.yaml`, aktuell v0.14.0 für Darstellung je Konto, v0.13.0 für Profil und Einrichtung, v0.12.0 für Konten und Push-Ersetzen, übrige Teile v0.10.x), Texte `src/lib/i18n/de*.ts`, Mock-API `mock/`.
 
 ## Routen und Seiten
 Kern (immer an): `/` Dashboard, `/time`, `/time/[date]`, `/notifications` (Hinweiszentrum, Glocke), `/settings/profile|work-model|places|account-time|notifications|passkeys|identities|recovery|sessions|modules|privacy`, `/onboarding`,
@@ -19,6 +19,11 @@ Module (abschaltbar, ADR-0012, Zuordnung in `src/lib/modules/map.ts`):
 
 ## Designsprache (L21, ADR-0014)
 Zinc-Tokens (OKLCH, hell/dunkel), Glasflächen mit deckenden Rückfällen, Akzentsystem (`src/lib/theme/accent.ts`, Standard #2563EB), Shell mit Seitenleiste (256 px), Kopfzeile (60 px), mobilem Off-Canvas-Menü, Einstellungssuche; Muster-Komponenten (`PageHeader`, `Panel`, `KpiCard`, `SectionHeading`, `EmptyState`, `FilterBar`, `StatusChip`, `Banner`); neue Seite `/settings/appearance`. Details und Abweichungen: `docs/handoffs/L21.md`.
+
+## Darstellung je Konto (P2, ADR-0020, Vertrag v0.14.0; Lead-Prüfung offen)
+Akzentfarbe (Voreinstellungen `blue|teal|violet|green|orange|pink|graphite` oder eigene Farbe) und Farbschema gehören zum Konto (`GET/PATCH /me/preferences`, in `GET /auth/session` als `account.preferences`); localStorage (`tt.accent`, `tt.accentId`, `tt.theme`) ist Sofort-Cache und Offline-Rückfall. Transparenz (`tt.transparency`) und App-Symbol bleiben Gerätewahl.
+Abgleich in `ThemeStore.reconcile` (`src/lib/theme/theme.svelte.ts`, aufgerufen von `sessionStore`): eine ungesendete lokale Änderung desselben Kontos (`tt.prefsPending` = Konto-ID) gewinnt und wird gesendet; sonst überschreiben die Kontowerte den Cache. Hat das Konto nie Werte und weicht der Cache von den Standardwerten ab, wird die lokale Wahl einmal übertragen (nicht, wenn der Cache `tt.prefsOwner` einem anderen Konto gehört). Anmeldeseite nutzt nur den Cache. Statuszeile `appearance-sync` auf `/settings/appearance`. Ältere Server ohne `account.preferences`: rein lokal wie zuvor.
+Details und Tests: `docs/handoffs/P2.md`.
 
 ## Modulschalter (L17)
 `moduleStore` (`src/lib/modules/store.svelte.ts`) lädt `GET /modules` nach dem Login (Routenwächter), cached es und aktualisiert sich nach Änderungen und bei jeder Antwort `404 module_disabled`.

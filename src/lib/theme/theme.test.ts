@@ -1,0 +1,160 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Preferences } from '#lib/api/types.js';
+
+const update = vi.fn();
+const fetchPrefs = vi.fn();
+
+vi.mock('#lib/api/client.js', async (original) => ({
+	...(await original<typeof import('#lib/api/client.js')>()),
+	api: { updatePreferences: (...args: unknown[]) => update(...args), getPreferences: () => fetchPrefs() }
+}));
+
+async function freshTheme() {
+	vi.resetModules();
+	const { theme } = await import('./theme.svelte.js');
+	theme.init();
+	return theme;
+}
+
+const defaults: Preferences = { accent: 'blue', colorScheme: 'system' };
+const stored = (accent: Preferences['accent'], colorScheme: Preferences['colorScheme'] = 'system', accentCustomHex: string | null = null): Preferences => ({
+	accent,
+	accentCustomHex,
+	colorScheme,
+	updatedAt: '2026-10-16T10:00:00Z'
+});
+const accentVar = () => document.documentElement.style.getPropertyValue('--ui-accent');
+
+describe('theme store with account preferences', () => {
+	beforeEach(() => {
+		localStorage.clear();
+		update.mockReset();
+		update.mockImplementation(async (patch) => ({ ...defaults, ...patch, updatedAt: '2026-10-16T11:00:00Z' }));
+		fetchPrefs.mockReset();
+		document.documentElement.removeAttribute('style');
+		document.documentElement.className = '';
+	});
+
+	it('applies the cache at startup and understands caches written before the account sync', async () => {
+		localStorage.setItem('tt.accent', '#0d9488');
+		localStorage.setItem('tt.theme', 'dark');
+		const theme = await freshTheme();
+		expect(theme.accentId).toBe('teal');
+		expect(accentVar()).toBe('#0d9488');
+		expect(document.documentElement.classList.contains('dark')).toBe(true);
+		localStorage.setItem('tt.accent', '#facc15');
+		expect((await freshTheme()).accentId).toBe('custom');
+	});
+
+	it('adopts the account values and refreshes the cache', async () => {
+		const theme = await freshTheme();
+		theme.reconcile('a1', stored('violet', 'dark'));
+		expect(theme.accentId).toBe('violet');
+		expect(accentVar()).toBe('#7c3aed');
+		expect(theme.mode).toBe('dark');
+		expect(localStorage.getItem('tt.accentId')).toBe('violet');
+		expect(localStorage.getItem('tt.theme')).toBe('dark');
+		expect(theme.sync).toBe('saved');
+		expect(update).not.toHaveBeenCalled();
+		theme.reconcile('a1', stored('custom', 'light', '#12AB9F'));
+		expect(theme.accentId).toBe('custom');
+		expect(theme.accent).toBe('#12ab9f');
+	});
+
+	it('sends a change as a patch and marks it saved', async () => {
+		const theme = await freshTheme();
+		theme.reconcile('a1', stored('blue'));
+		theme.setPreset('pink');
+		await theme.flush();
+		await vi.waitFor(() => expect(theme.sync).toBe('saved'));
+		expect(update).toHaveBeenCalledWith({ accent: 'pink', colorScheme: 'system' });
+		theme.setAccent('#FACC15');
+		await vi.waitFor(() => expect(theme.sync).toBe('saved'));
+		expect(update).toHaveBeenLastCalledWith({ accent: 'custom', accentCustomHex: '#facc15', colorScheme: 'system' });
+		theme.setMode('dark');
+		await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(3));
+		await vi.waitFor(() => expect(theme.sync).toBe('saved'));
+		expect(localStorage.getItem('tt.prefsPending')).toBeNull();
+	});
+
+	it('keeps an unsent change and sends it with the next session (last write wins)', async () => {
+		const theme = await freshTheme();
+		theme.reconcile('a1', stored('blue'));
+		update.mockRejectedValueOnce(new TypeError('offline'));
+		theme.setPreset('green');
+		await vi.waitFor(() => expect(theme.sync).toBe('pending'));
+		expect(localStorage.getItem('tt.prefsPending')).toBe('a1');
+		// the next session still carries the old server value: the local choice is kept and pushed
+		const reloaded = await freshTheme();
+		reloaded.reconcile('a1', stored('blue'));
+		await vi.waitFor(() => expect(reloaded.sync).toBe('saved'));
+		expect(reloaded.accentId).toBe('green');
+		expect(update).toHaveBeenLastCalledWith({ accent: 'green', colorScheme: 'system' });
+	});
+
+	it('does not leak an unsent change of one account into another', async () => {
+		const theme = await freshTheme();
+		theme.reconcile('a1', stored('blue'));
+		update.mockRejectedValueOnce(new TypeError('offline'));
+		theme.setPreset('green');
+		await vi.waitFor(() => expect(theme.sync).toBe('pending'));
+		const other = await freshTheme();
+		update.mockClear();
+		other.reconcile('b2', stored('orange'));
+		expect(other.accentId).toBe('orange');
+		expect(update).not.toHaveBeenCalled();
+		expect(localStorage.getItem('tt.prefsPending')).toBeNull();
+	});
+
+	it('uploads the pre-account choice of this browser once, but not into another account', async () => {
+		localStorage.setItem('tt.accent', '#7c3aed');
+		const theme = await freshTheme();
+		theme.reconcile('a1', defaults);
+		await vi.waitFor(() => expect(theme.sync).toBe('saved'));
+		expect(update).toHaveBeenCalledWith({ accent: 'violet', colorScheme: 'system' });
+
+		localStorage.clear();
+		localStorage.setItem('tt.accent', '#7c3aed');
+		localStorage.setItem('tt.prefsOwner', 'a1');
+		const other = await freshTheme();
+		update.mockClear();
+		other.reconcile('b2', defaults);
+		expect(update).not.toHaveBeenCalled();
+		expect(other.accentId).toBe('blue');
+	});
+
+	it('does not write for recovery sessions or older servers, and drops values the server refuses', async () => {
+		const theme = await freshTheme();
+		theme.reconcile('a1', stored('teal'), false);
+		theme.setPreset('pink');
+		expect(update).not.toHaveBeenCalled();
+		theme.reconcile('a1', undefined);
+		theme.setPreset('green');
+		expect(update).not.toHaveBeenCalled();
+		expect(theme.sync).toBe('idle');
+
+		const { ApiError } = await import('#lib/api/client.js');
+		theme.reconcile('a1', stored('teal'));
+		update.mockRejectedValueOnce(new ApiError(400, 'bad_request', 'x'));
+		theme.setPreset('orange');
+		await vi.waitFor(() => expect(theme.sync).toBe('idle'));
+		expect(localStorage.getItem('tt.prefsPending')).toBeNull();
+	});
+
+	it('keeps the transparency switch device-local', async () => {
+		const theme = await freshTheme();
+		theme.reconcile('a1', stored('blue'));
+		theme.setTransparency('reduced');
+		expect(update).not.toHaveBeenCalled();
+		expect(localStorage.getItem('tt.transparency')).toBe('reduced');
+	});
+
+	it('refreshFromServer adopts changes made elsewhere unless a local change is pending', async () => {
+		const theme = await freshTheme();
+		theme.reconcile('a1', stored('blue'));
+		fetchPrefs.mockResolvedValue(stored('graphite', 'light'));
+		await theme.refreshFromServer();
+		expect(theme.accentId).toBe('graphite');
+		expect(theme.mode).toBe('light');
+	});
+});

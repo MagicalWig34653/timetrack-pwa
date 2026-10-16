@@ -48,6 +48,8 @@ interface MockAccount {
 	pendingEmail?: { address: string; attempts: number };
 	/** guided setup flag; pre-existing demo accounts are `skipped`, new ones `pending` */
 	onboarding?: { state: 'pending' | 'completed' | 'skipped'; updatedAt: string | null };
+	/** appearance preferences (P2, ADR-0020); undefined = never set = defaults */
+	preferences?: { accent: string; accentCustomHex: string | null; colorScheme: string; updatedAt: string };
 	recoveryCodes: string[] | null;
 	fallbackPassword: string | null;
 	emailRecovery: { active: boolean; verified: boolean };
@@ -233,10 +235,14 @@ export function createMockApi(options: MockOptions = {}) {
 		status: 'open'
 	});
 
+	function preferencesBody(account: MockAccount) {
+		return account.preferences ?? { accent: 'blue', colorScheme: 'system' };
+	}
+
 	function sessionBody(session: MockSession) {
 		const account = accounts.get(session.accountId)!;
 		return {
-			account: { id: account.id, handle: account.handle, displayName: account.displayName, role: account.role, onboardingState: account.onboarding?.state ?? 'pending' },
+			account: { id: account.id, handle: account.handle, displayName: account.displayName, role: account.role, onboardingState: account.onboarding?.state ?? 'pending', preferences: preferencesBody(account) },
 			csrfToken: session.csrfToken,
 			recovery: session.recovery,
 			expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString()
@@ -701,6 +707,33 @@ export function createMockApi(options: MockOptions = {}) {
 			account.email = pending.address;
 			account.emailVerified = true;
 			return { status: 200, body: profileBody() };
+		}
+		if (path === '/api/v1/me/preferences' && method === 'GET') return { status: 200, body: preferencesBody(account) };
+		if (path === '/api/v1/me/preferences' && method === 'PATCH') {
+			// same rules as the backend (ADR-0020): merge patch, whitelist of keys, strict values
+			const accents = ['blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite', 'custom'];
+			const schemes = ['system', 'light', 'dark'];
+			if (!body || typeof body !== 'object' || Array.isArray(body) || JSON.stringify(body).length > 1024) return error(400, 'bad_request');
+			const keys = Object.keys(body);
+			if (keys.length === 0 || keys.some((key) => !['accent', 'accentCustomHex', 'colorScheme'].includes(key))) return error(400, 'bad_request');
+			const next = { accent: 'blue', accentCustomHex: null as string | null, colorScheme: 'system', ...account.preferences };
+			if ('accent' in body) {
+				if (!accents.includes(body.accent)) return error(400, 'bad_request');
+				next.accent = body.accent;
+				if (body.accent !== 'custom' && !('accentCustomHex' in body)) next.accentCustomHex = null;
+			}
+			if ('colorScheme' in body) {
+				if (!schemes.includes(body.colorScheme)) return error(400, 'bad_request');
+				next.colorScheme = body.colorScheme;
+			}
+			if ('accentCustomHex' in body) {
+				if (body.accentCustomHex === null) next.accentCustomHex = null;
+				else if (typeof body.accentCustomHex === 'string' && /^#[0-9a-fA-F]{6}$/.test(body.accentCustomHex)) next.accentCustomHex = body.accentCustomHex.toUpperCase();
+				else return error(400, 'bad_request');
+			}
+			if ((next.accent === 'custom') !== (next.accentCustomHex !== null)) return error(400, 'bad_request');
+			account.preferences = { ...next, updatedAt: new Date().toISOString() };
+			return { status: 200, body: account.preferences };
 		}
 		if (path === '/api/v1/me/onboarding' && method === 'PUT') {
 			if (!['pending', 'completed', 'skipped'].includes(body.state)) return error(400, 'bad_request');

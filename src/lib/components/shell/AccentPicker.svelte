@@ -3,7 +3,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { t } from '#lib/i18n/index.js';
-	import { ACCENT_PRESETS, DEFAULT_ACCENT, normalizeHex } from '#lib/theme/accent.js';
+	import { ACCENT_PRESETS, DEFAULT_ACCENT, normalizeHex, type PresetId } from '#lib/theme/accent.js';
 	import { theme } from '#lib/theme/theme.svelte.js';
 
 	let { idPrefix = 'accent' }: { idPrefix?: string } = $props();
@@ -12,9 +12,9 @@
 	let custom = $state(theme.accent);
 	let invalid = $state(false);
 
-	function pick(hex: string) {
-		theme.setAccent(hex);
-		custom = hex;
+	function pickPreset(id: PresetId) {
+		theme.setPreset(id);
+		custom = theme.accent;
 		invalid = false;
 	}
 	function applyCustom() {
@@ -23,7 +23,9 @@
 			invalid = true;
 			return;
 		}
-		pick(hex);
+		theme.setAccent(hex);
+		custom = hex;
+		invalid = false;
 	}
 </script>
 
@@ -33,15 +35,15 @@
 			<button
 				type="button"
 				role="radio"
-				aria-checked={theme.accent === preset.hex}
+				aria-checked={theme.accentId === preset.id}
 				aria-label={names[index] ?? preset.id}
 				title={names[index] ?? preset.id}
 				data-testid="accent-{preset.id}"
 				class="inline-flex size-8 items-center justify-center rounded-full border-2 border-transparent text-white transition-transform duration-150 hover:scale-105 aria-checked:border-foreground"
 				style="background: {preset.hex}"
-				onclick={() => pick(preset.hex)}
+				onclick={() => pickPreset(preset.id)}
 			>
-				{#if theme.accent === preset.hex}<Check class="size-4" aria-hidden="true" />{/if}
+				{#if theme.accentId === preset.id}<Check class="size-4" aria-hidden="true" />{/if}
 			</button>
 		{/each}
 	</div>
@@ -66,6 +68,6 @@
 	{#if invalid}<p id="{idPrefix}-hex-error" class="text-[13px] text-destructive" role="alert">{t('appearance.accent_invalid')}</p>{/if}
 	<div class="flex items-center justify-between gap-2 text-[13px] text-muted-foreground">
 		<span data-testid="accent-current">{t('appearance.accent_current', { hex: theme.accent.toUpperCase() })}</span>
-		<Button variant="ghost" size="sm" onclick={() => pick(DEFAULT_ACCENT)}>{t('appearance.accent_reset')}</Button>
+		<Button variant="ghost" size="sm" onclick={() => pickPreset('blue')}>{t('appearance.accent_reset')}</Button>
 	</div>
 </div>

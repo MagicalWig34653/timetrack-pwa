@@ -9,7 +9,21 @@ export interface Account {
 	role: Role;
 	/** Guided setup flag (contract v0.13.0); missing on older servers, which counts as done. */
 	onboardingState?: OnboardingState;
+	/** Appearance preferences of the account (contract v0.14.0); missing on older servers. */
+	preferences?: Preferences;
 }
+
+/** Account-wide appearance (contract v0.14.0, ADR-0020). App icon and transparency stay device-local. */
+export interface Preferences {
+	accent: 'blue' | 'teal' | 'violet' | 'green' | 'orange' | 'pink' | 'graphite' | 'custom';
+	/** `#RRGGBB` (upper case) exactly when accent is `custom`. */
+	accentCustomHex?: string | null;
+	colorScheme: 'system' | 'light' | 'dark';
+	/** Missing while the defaults apply (never changed). */
+	updatedAt?: string | null;
+}
+
+export type PreferencesPatch = Partial<Pick<Preferences, 'accent' | 'colorScheme'>> & { accentCustomHex?: string | null };
 
 export type OnboardingState = 'pending' | 'completed' | 'skipped';
 

@@ -98,13 +98,35 @@ export function accentTokens(input: string, dark: boolean): AccentTokens | null 
 	};
 }
 
-/** Presets offered in the palette. */
-export const ACCENT_PRESETS: { id: string; hex: string }[] = [
+/**
+ * Presets offered in the palette. The ids are the contract ids of `accent` in GET/PATCH /me/preferences (ADR-0020);
+ * every client maps them to its own colour values. The order is the display order.
+ */
+export const ACCENT_IDS = ['blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite'] as const;
+export type PresetId = (typeof ACCENT_IDS)[number];
+/** `custom` means "the colour is `accentCustomHex`". */
+export type AccentId = PresetId | 'custom';
+
+export const ACCENT_PRESETS: { id: PresetId; hex: string }[] = [
 	{ id: 'blue', hex: '#2563eb' },
 	{ id: 'teal', hex: '#0d9488' },
-	{ id: 'green', hex: '#16a34a' },
-	{ id: 'amber', hex: '#d97706' },
-	{ id: 'rose', hex: '#e11d48' },
 	{ id: 'violet', hex: '#7c3aed' },
-	{ id: 'slate', hex: '#475569' }
+	{ id: 'green', hex: '#16a34a' },
+	{ id: 'orange', hex: '#d97706' },
+	{ id: 'pink', hex: '#db2777' },
+	{ id: 'graphite', hex: '#52525b' }
 ];
+
+export function isPresetId(value: unknown): value is PresetId {
+	return typeof value === 'string' && (ACCENT_IDS as readonly string[]).includes(value);
+}
+
+export function presetHex(id: PresetId): string {
+	return ACCENT_PRESETS.find((preset) => preset.id === id)!.hex;
+}
+
+/** The preset a colour belongs to, or null when it is a custom colour. */
+export function presetIdForHex(hex: string): PresetId | null {
+	const normalized = normalizeHex(hex);
+	return ACCENT_PRESETS.find((preset) => preset.hex === normalized)?.id ?? null;
+}
