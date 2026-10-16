@@ -2,6 +2,9 @@ import { splitRange } from '../time/dates';
 import { pwa } from '../pwa/pwa.svelte';
 import { ApiError } from './errors';
 import type {
+	AdminAccount,
+	AdminAccountPage,
+	AdminAccountPatch,
 	NotificationList,
 	NotificationSettings,
 	PushConfig,
@@ -250,6 +253,24 @@ export const api = {
 		setCsrfToken(null);
 	},
 	revokeOtherSessions: () => request<void>('DELETE', '/me/sessions'),
+
+	// account administration and privacy (contract v0.11.0, ADR-0016)
+	listAccounts: (limit: number, offset: number) => request<AdminAccountPage>('GET', `/admin/accounts?limit=${limit}&offset=${offset}`),
+	updateAccount: (id: string, patch: AdminAccountPatch) => request<AdminAccount>('PATCH', `/admin/accounts/${id}`, patch),
+	revokeAccountSessions: (id: string) => request<void>('DELETE', `/admin/accounts/${id}/sessions`),
+	deleteAccount: (id: string, confirmHandle: string) => request<void>('DELETE', `/admin/accounts/${id}`, { confirmHandle }),
+	exportMyData: () => download('/me/export'),
+	/** Self-deletion; the server clears the cookie, so the client forgets its CSRF token afterwards. */
+	async deleteMyAccount(confirmHandle: string): Promise<void> {
+		try {
+			await request<void>('DELETE', '/me', { confirmHandle });
+		} catch (error) {
+			// 503 account_deletion_incomplete: the session is revoked as well
+			if (error instanceof ApiError && error.status === 503) setCsrfToken(null);
+			throw error;
+		}
+		setCsrfToken(null);
+	},
 
 	// invitations and registration
 	inspectInvitation: (token: string) =>

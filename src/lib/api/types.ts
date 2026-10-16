@@ -17,6 +17,32 @@ export interface Session {
 	expiresAt?: string;
 }
 
+/** Row of the admin account list (contract v0.11.0, ADR-0016): identity and state only, never private data. */
+export interface AdminAccount {
+	id: string;
+	handle: string;
+	displayName: string;
+	email?: string | null;
+	role: Role;
+	state: 'active' | 'disabled';
+	createdAt: string;
+	disabledAt?: string | null;
+	lastActivityAt?: string | null;
+	passkeyCount: number;
+}
+
+export interface AdminAccountPage {
+	items: AdminAccount[];
+	total: number;
+	limit: number;
+	offset: number;
+}
+
+export interface AdminAccountPatch {
+	role?: Role;
+	state?: 'active' | 'disabled';
+}
+
 export interface Passkey {
 	id: string;
 	name: string;

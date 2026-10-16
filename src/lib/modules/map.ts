@@ -26,7 +26,9 @@ export const CORE_ROUTES = [
 	'/settings/recovery',
 	'/settings/sessions',
 	'/settings/modules',
+	'/settings/privacy',
 	'/admin/invitations',
+	'/admin/accounts',
 	'/admin/modules'
 ] as const;
 
