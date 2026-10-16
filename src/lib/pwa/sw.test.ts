@@ -10,6 +10,7 @@ type Handler = (event: any) => void;
 const listeners: Record<string, Handler> = {};
 const showNotification = vi.fn(async () => {});
 const skipWaiting = vi.fn(async () => {});
+const pushSubscribe = vi.fn();
 const matchAll = vi.fn();
 const openWindow = vi.fn(async () => null);
 const cacheStore = new Map<string, Response>();
@@ -23,7 +24,8 @@ beforeAll(async () => {
 	vi.stubGlobal('self', {
 		addEventListener: (type: string, handler: Handler) => (listeners[type] = handler),
 		location: { origin: 'https://app.example' },
-		registration: { showNotification },
+		registration: { showNotification, pushManager: { subscribe: pushSubscribe } },
+		navigator: { userAgent: 'SW-Test/1.0' },
 		clients: { matchAll, openWindow, claim: vi.fn(async () => {}) },
 		skipWaiting
 	});
@@ -170,5 +172,29 @@ describe('notificationclick', () => {
 		expect(openWindow).toHaveBeenLastCalledWith('/');
 		await clickEvent(null);
 		expect(openWindow).toHaveBeenLastCalledWith('/');
+	});
+});
+
+describe('pushsubscriptionchange', () => {
+	const subscription = (endpoint: string) => ({ endpoint, toJSON: () => ({ keys: { p256dh: 'pk', auth: 'ak' } }), getKey: () => null });
+
+	it('re-subscribes with the old key and replaces the stored subscription', async () => {
+		pushSubscribe.mockResolvedValue(subscription('https://push.example/new'));
+		const requests: { url: string; init?: RequestInit }[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string, init?: RequestInit) => {
+				requests.push({ url, init });
+				return url.endsWith('/auth/session') ? new Response(JSON.stringify({ csrfToken: 'tok' })) : new Response('{}', { status: 200 });
+			})
+		);
+		const waits: Promise<unknown>[] = [];
+		const old = { ...subscription('https://push.example/old'), options: { applicationServerKey: new Uint8Array([9, 9]).buffer } };
+		listeners.pushsubscriptionchange({ oldSubscription: old, newSubscription: null, waitUntil: (p: Promise<unknown>) => waits.push(p) });
+		expect(await waits[0]).toBe('replaced');
+		expect(pushSubscribe).toHaveBeenCalledWith({ userVisibleOnly: true, applicationServerKey: expect.any(Uint8Array) });
+		const post = requests.find((r) => r.init?.method === 'POST')!;
+		expect(post.url).toBe('/api/v1/me/push-subscriptions/replace');
+		expect(JSON.parse(post.init!.body as string)).toMatchObject({ previousEndpoint: 'https://push.example/old', endpoint: 'https://push.example/new', keys: { p256dh: 'pk', auth: 'ak' }, userAgent: 'SW-Test/1.0' });
 	});
 });

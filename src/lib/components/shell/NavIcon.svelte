@@ -11,11 +11,12 @@
 	import Plane from '@lucide/svelte/icons/plane';
 	import Share from '@lucide/svelte/icons/share-2';
 	import Storage from '@lucide/svelte/icons/hard-drive';
+	import Users from '@lucide/svelte/icons/users';
 	import Upload from '@lucide/svelte/icons/upload';
 	import type { NavItem } from '#lib/nav.js';
 
 	let { name }: { name: NavItem['icon'] } = $props();
-	const icons = { house: House, clock: Clock, calendar: Calendar, book: Book, plane: Plane, absence: Absence, share: Share, bulb: Bulb, download: Download, upload: Upload, invite: Invite, modules: Modules, storage: Storage };
+	const icons = { house: House, clock: Clock, calendar: Calendar, book: Book, plane: Plane, absence: Absence, share: Share, bulb: Bulb, download: Download, upload: Upload, invite: Invite, users: Users, modules: Modules, storage: Storage };
 	const Icon = $derived(icons[name]);
 </script>
 

@@ -5,6 +5,7 @@ import { createPlanningMock } from './planning.ts';
 import { createReportsMock } from './reports.ts';
 import { createTimeMock } from './time.ts';
 import { createTransferMock, type UploadedFile } from './transfer.ts';
+import { writeZip } from './worktime-xlsx.ts';
 
 // In-memory mock of the happy paths in contracts/openapi.yaml (backend repo), API v0.1.0.
 // Framework-free so it can back both the Vite dev middleware and vitest fetch stubs.
@@ -45,6 +46,10 @@ interface MockAccount {
 	recoveryCodes: string[] | null;
 	fallbackPassword: string | null;
 	emailRecovery: { active: boolean; verified: boolean };
+	/** account administration (ADR-0016) */
+	createdAt?: string;
+	disabledAt?: string | null;
+	lastActivityAt?: string | null;
 }
 
 interface MockSession {
@@ -177,7 +182,8 @@ export function createMockApi(options: MockOptions = {}) {
 		role: 'admin',
 		recoveryCodes: ['AAAA-BBBB-CCCC'],
 		fallbackPassword: 'correct-horse-battery',
-		emailRecovery: { active: false, verified: false }
+		emailRecovery: { active: false, verified: false },
+		createdAt: new Date(Date.now() - 30 * 86_400_000).toISOString()
 	};
 	accounts.set(admin.id, admin);
 	lastAccountId = admin.id;
@@ -192,7 +198,9 @@ export function createMockApi(options: MockOptions = {}) {
 			role: 'member',
 			recoveryCodes: null,
 			fallbackPassword: null,
-			emailRecovery: { active: false, verified: false }
+			emailRecovery: { active: false, verified: false },
+			createdAt: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+			lastActivityAt: new Date(Date.now() - 2 * 86_400_000).toISOString()
 		};
 		accounts.set(lena.id, lena);
 		time.seedDemo(lena.id);
@@ -234,6 +242,8 @@ export function createMockApi(options: MockOptions = {}) {
 		// passkey sign-in with an unknown credential falls back to this account; OIDC sessions must not hijack that
 		if (rememberAsLast) lastAccountId = accountId;
 		sessions.set(id, session);
+		const opener = accounts.get(accountId);
+		if (opener) opener.lastActivityAt = new Date().toISOString();
 		return { id, session };
 	}
 
@@ -252,6 +262,48 @@ export function createMockApi(options: MockOptions = {}) {
 				attestation: 'none'
 			}
 		};
+	}
+
+	// --- account administration, export and deletion (contract v0.11.0, ADR-0016) ---
+	/** test hook state: the next deletion fails like an unreachable storage backend (503 account_deletion_incomplete) */
+	let failDeletion = false;
+	const isDisabled = (accountId: string) => !!accounts.get(accountId)?.disabledAt;
+	const activeAdmins = () => [...accounts.values()].filter((a) => a.role === 'admin' && !a.disabledAt);
+	const revokeSessionsOf = (accountId: string) => {
+		for (const [id, other] of sessions) if (other.accountId === accountId) sessions.delete(id);
+	};
+	const adminAccountView = (a: MockAccount) => ({
+		id: a.id,
+		handle: a.handle,
+		displayName: a.displayName,
+		email: a.email ?? null,
+		role: a.role,
+		state: a.disabledAt ? 'disabled' : 'active',
+		createdAt: a.createdAt ?? new Date(0).toISOString(),
+		disabledAt: a.disabledAt ?? null,
+		lastActivityAt: a.lastActivityAt ?? null,
+		passkeyCount: passkeys.filter((p) => p.accountId === a.id).length
+	});
+	function wipeAccount(accountId: string) {
+		revokeSessionsOf(accountId);
+		accounts.delete(accountId);
+		for (let i = passkeys.length - 1; i >= 0; i--) if (passkeys[i].accountId === accountId) passkeys.splice(i, 1);
+		for (let i = identities.length - 1; i >= 0; i--) if (identities[i].accountId === accountId) identities.splice(i, 1);
+	}
+	/** Shared rules of DELETE /admin/accounts/{id} and DELETE /me; `self` marks the self-service path. */
+	function deleteAccountRules(actorSession: MockSession, target: MockAccount, confirmHandle: unknown, self: boolean): MockResponse {
+		if (actorSession.stale) return error(403, 'reauth_required');
+		if (confirmHandle !== target.handle) return error(400, 'confirmation_mismatch');
+		if (!self && actorSession.accountId === target.id) return error(409, 'self_lockout');
+		if (target.role === 'admin' && !target.disabledAt && activeAdmins().length <= 1) return error(409, 'last_admin');
+		if (failDeletion) {
+			failDeletion = false;
+			target.disabledAt = target.disabledAt ?? new Date().toISOString();
+			revokeSessionsOf(target.id);
+			return { status: 503, body: { error: { code: 'account_deletion_incomplete', message: 'account_deletion_incomplete' } }, sessionCookie: self ? null : undefined };
+		}
+		wipeAccount(target.id);
+		return { status: 204, sessionCookie: self ? null : undefined };
 	}
 
 	function handle(req: MockRequest): MockResponse {
@@ -308,6 +360,7 @@ export function createMockApi(options: MockOptions = {}) {
 				fallbackPassword: null,
 				emailRecovery: { active: false, verified: false }
 			};
+			created.createdAt = new Date().toISOString();
 			accounts.set(created.id, created);
 			seedPasskey(created.id, body.passkeyName || 'Passkey', body.credential.id);
 			const { id, session: opened } = openSession(created.id);
@@ -332,6 +385,7 @@ export function createMockApi(options: MockOptions = {}) {
 			// anything else signs in the most recently active account (admin by default).
 			const known = passkeys.find((p) => p.credentialId === body.credential.id);
 			const target = (known && accounts.get(known.accountId)) || accounts.get(lastAccountId) || admin;
+			if (target.disabledAt) return error(401, 'unauthorized');
 			const { id, session: opened } = openSession(target.id);
 			return { status: 200, body: sessionBody(opened), sessionCookie: id };
 		}
@@ -356,6 +410,7 @@ export function createMockApi(options: MockOptions = {}) {
 			if (recovery!.method === 'recovery-code') {
 				target!.recoveryCodes = target!.recoveryCodes!.filter((c) => c !== proof);
 			}
+			if (target!.disabledAt) return error(401, 'unauthorized');
 			const { id, session: opened } = openSession(target!.id, true);
 			return { status: 200, body: sessionBody(opened), sessionCookie: id };
 		}
@@ -368,6 +423,30 @@ export function createMockApi(options: MockOptions = {}) {
 			if (typeof body.name === 'string') oidc.name = body.name;
 			if (body.staleSessions === true) for (const other of sessions.values()) other.stale = true;
 			return { status: 200, body: { enabled: oidc.enabled, name: oidc.name } };
+		}
+		if (path === '/api/v1/mock/accounts' && method === 'POST') {
+			// test hook, not part of the contract: add accounts, fail the next deletion, age sessions (reauth_required)
+			if (typeof body.failDeletion === 'boolean') failDeletion = body.failDeletion;
+			if (body.staleSessions === true) for (const other of sessions.values()) other.stale = true;
+			for (const input of (body.add ?? []) as { handle: string; displayName?: string; role?: 'admin' | 'member'; disabled?: boolean; passkeys?: number; email?: string; lastActivityAt?: string }[]) {
+				const created: MockAccount = {
+					id: uuid(),
+					handle: input.handle,
+					displayName: input.displayName ?? input.handle,
+					role: input.role ?? 'member',
+					email: input.email,
+					recoveryCodes: null,
+					fallbackPassword: null,
+					emailRecovery: { active: false, verified: false },
+					createdAt: new Date().toISOString(),
+					disabledAt: input.disabled ? new Date().toISOString() : null,
+					lastActivityAt: input.lastActivityAt ?? null
+				};
+				created.createdAt = new Date().toISOString();
+			accounts.set(created.id, created);
+				for (let i = 0; i < (input.passkeys ?? 0); i++) seedPasskey(created.id, `Passkey ${i + 1}`);
+			}
+			return { status: 200, body: { accounts: accounts.size, failDeletion } };
 		}
 		if (path === '/api/v1/auth/oidc/config' && method === 'GET') {
 			return { status: 200, body: oidc.enabled ? { enabled: true, name: oidc.name } : { enabled: false } };
@@ -401,7 +480,7 @@ export function createMockApi(options: MockOptions = {}) {
 			if (!subject) return fail('oidc_failed');
 			const known = identities.find((i) => i.sub === subject.sub);
 			if (flow.purpose === 'login') {
-				if (!known) return fail('oidc_not_linked');
+				if (!known || isDisabled(known.accountId)) return fail('oidc_not_linked');
 				known.lastUsedAt = new Date().toISOString();
 				const { id } = openSession(known.accountId, false, false);
 				return { status: 302, redirect: '/', sessionCookie: id };
@@ -448,6 +527,7 @@ export function createMockApi(options: MockOptions = {}) {
 				fallbackPassword: null,
 				emailRecovery: { active: false, verified: false }
 			};
+			created.createdAt = new Date().toISOString();
 			accounts.set(created.id, created);
 			identities.push({
 				id: uuid(),
@@ -480,7 +560,7 @@ export function createMockApi(options: MockOptions = {}) {
 		}
 
 		// --- authenticated endpoints ---
-		if (!session || !account) return error(401, 'unauthorized');
+		if (!session || !account || account.disabledAt) return error(401, 'unauthorized');
 		if (mutating && req.csrfToken !== session.csrfToken) return error(403, 'csrf_invalid');
 
 		if (path === '/api/v1/auth/session' && method === 'GET') return { status: 200, body: sessionBody(session) };
@@ -500,6 +580,20 @@ export function createMockApi(options: MockOptions = {}) {
 		const ownIdentities = () => identities.filter((i) => i.accountId === account.id);
 		const recoveryAllowed = path.startsWith('/api/v1/me/passkeys') && (method === 'POST' || method === 'GET');
 		if (session.recovery && !recoveryAllowed) return error(403, 'recovery_session_restricted');
+
+		if (path === '/api/v1/me/export' && method === 'GET') {
+			const stamp = new Date().toISOString();
+			const zip = writeZip({
+				'manifest.json': JSON.stringify({ format: 'timetrack-export', version: 1, generatedAt: stamp, accountId: account.id, mock: true }, null, 2),
+				'account.json': JSON.stringify({ handle: account.handle, displayName: account.displayName, role: account.role }, null, 2),
+				'files.json': '[]'
+			});
+			return {
+				status: 200,
+				binary: { bytes: zip, contentType: 'application/zip', headers: { 'Content-Disposition': `attachment; filename="timetrack-export-${account.handle}.zip"` } }
+			};
+		}
+		if (path === '/api/v1/me' && method === 'DELETE') return deleteAccountRules(session, account, body.confirmHandle, true);
 
 		if (path === '/api/v1/me/passkeys' && method === 'GET') return { status: 200, body: ownPasskeys().map(publicPasskey) };
 		if (path === '/api/v1/me/passkeys/options' && method === 'POST') {
@@ -638,6 +732,42 @@ export function createMockApi(options: MockOptions = {}) {
 
 		if (path.startsWith('/api/v1/admin/')) {
 			if (account.role !== 'admin') return error(403, 'forbidden');
+			if (path === '/api/v1/admin/accounts' && method === 'GET') {
+				const query = new URLSearchParams(req.path.split('?')[1] ?? '');
+				const limit = query.has('limit') ? Number(query.get('limit')) : 50;
+				const offset = query.has('offset') ? Number(query.get('offset')) : 0;
+				if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0) return error(400, 'bad_request');
+				const all = [...accounts.values()].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.handle.localeCompare(b.handle));
+				return { status: 200, body: { items: all.slice(offset, offset + limit).map(adminAccountView), total: all.length, limit, offset } };
+			}
+			if ((m = path.match(/^\/api\/v1\/admin\/accounts\/([^/]+)\/sessions$/)) && method === 'DELETE') {
+				if (!accounts.has(m[1])) return error(404, 'not_found');
+				revokeSessionsOf(m[1]);
+				return { status: 204 };
+			}
+			if ((m = path.match(/^\/api\/v1\/admin\/accounts\/([^/]+)$/))) {
+				const target = accounts.get(m[1]);
+				if (!target) return error(404, 'not_found');
+				if (method === 'PATCH') {
+					const role = body.role;
+					const state = body.state;
+					if ((role === undefined && state === undefined) || (role !== undefined && role !== 'admin' && role !== 'member') || (state !== undefined && state !== 'active' && state !== 'disabled')) {
+						return error(400, 'bad_request');
+					}
+					if (role !== undefined && session.stale) return error(403, 'reauth_required');
+					if (target.id === account.id) return error(409, 'self_lockout');
+					const losesAdmin = target.role === 'admin' && !target.disabledAt && (role === 'member' || state === 'disabled');
+					if (losesAdmin && activeAdmins().length <= 1) return error(409, 'last_admin');
+					if (role !== undefined) target.role = role;
+					if (state === 'disabled' && !target.disabledAt) {
+						target.disabledAt = new Date().toISOString();
+						revokeSessionsOf(target.id);
+					}
+					if (state === 'active') target.disabledAt = null;
+					return { status: 200, body: adminAccountView(target) };
+				}
+				if (method === 'DELETE') return deleteAccountRules(session, target, body.confirmHandle, false);
+			}
 			if (path === '/api/v1/admin/invitations' && method === 'GET') {
 				const now = Date.now();
 				for (const i of invitations) {

@@ -17,6 +17,7 @@ export const MAIN_LINKS: { href: string; label: MessageKey; prefix: boolean; sec
 
 export const ADMIN_LINKS: { href: string; label: MessageKey; prefix: boolean }[] = [
 	{ href: '/admin/invitations', label: 'nav.invitations', prefix: true },
+	{ href: '/admin/accounts', label: 'nav.accounts', prefix: true },
 	{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true }
 ];
 
@@ -36,7 +37,8 @@ export const SETTINGS_LINKS: { href: string; label: MessageKey }[] = [
 	{ href: '/settings/api-tokens', label: 'nav.api_tokens' },
 	{ href: '/settings/mcp-help', label: 'nav.mcp_help' },
 	{ href: '/settings/recovery', label: 'nav.recovery' },
-	{ href: '/settings/sessions', label: 'nav.sessions' }
+	{ href: '/settings/sessions', label: 'nav.sessions' },
+	{ href: '/settings/privacy', label: 'nav.privacy' }
 ];
 
 /** Admin-only settings entries. */
@@ -46,7 +48,7 @@ export interface NavItem {
 	href: string;
 	label: MessageKey;
 	prefix: boolean;
-	icon: 'house' | 'clock' | 'calendar' | 'book' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'modules' | 'storage';
+	icon: 'house' | 'clock' | 'calendar' | 'book' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'users' | 'modules' | 'storage';
 	/** badge source rendered by the sidebar */
 	badge?: 'suggestions';
 }
@@ -94,6 +96,7 @@ export const NAV_GROUPS: NavGroup[] = [
 		adminOnly: true,
 		items: [
 			{ href: '/admin/invitations', label: 'nav.invitations', prefix: true, icon: 'invite' },
+			{ href: '/admin/accounts', label: 'nav.accounts', prefix: true, icon: 'users' },
 			{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true, icon: 'modules' }
 		]
 	}
@@ -117,6 +120,7 @@ export const SETTINGS_KEYWORDS: Record<string, string> = {
 	'/settings/mcp-help': 'ki mcp anbindung hilfe',
 	'/settings/recovery': 'wiederherstellung recovery codes passwort',
 	'/settings/sessions': 'sitzungen abmelden geräte sicherheit',
+	'/settings/privacy': 'daten datenschutz export herunterladen löschen konto dsgvo auskunft',
 	'/settings/storage': 'speicher dateien s3 anhänge'
 };
 

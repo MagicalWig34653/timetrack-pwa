@@ -4,7 +4,8 @@
 /// <reference lib="webworker" />
 import { version } from '$app/env';
 import { assets, immutable } from '$app/manifest';
-import { cacheNameFor, isInterceptable, isOldCache, parsePushPayload, safeRelativeUrl } from './lib/pwa/core';
+import { base64urlToBytes, cacheNameFor, isInterceptable, isOldCache, parsePushPayload, safeRelativeUrl } from './lib/pwa/core';
+import { handleSubscriptionChange, type SubscriptionLike } from './lib/pwa/subscription-change';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
@@ -109,5 +110,18 @@ sw.addEventListener('notificationclick', (event) => {
 			}
 			await sw.clients.openWindow(target);
 		})()
+	);
+});
+
+// The push service rotated or expired the subscription: subscribe again and tell the server (B2, ADR-0017).
+sw.addEventListener('pushsubscriptionchange', (event) => {
+	const change = event as unknown as { oldSubscription?: SubscriptionLike | null; newSubscription?: SubscriptionLike | null; waitUntil(promise: Promise<unknown>): void };
+	change.waitUntil(
+		handleSubscriptionChange(change.oldSubscription ?? null, change.newSubscription ?? null, {
+			fetch: (input, init) => fetch(input, init),
+			subscribe: (applicationServerKey) => sw.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey }) as Promise<SubscriptionLike>,
+			userAgent: sw.navigator.userAgent,
+			keyToBytes: base64urlToBytes
+		})
 	);
 });
