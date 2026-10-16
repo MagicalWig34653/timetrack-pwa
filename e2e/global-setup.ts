@@ -106,6 +106,7 @@ export default async function globalSetup() {
 	const profilePort = Number(process.env.E2E_PROFILE_PORT ?? port + 11);
 	const profileNoMailPort = Number(process.env.E2E_PROFILE_NOMAIL_PORT ?? port + 12);
 	const profileSmtpPort = Number(process.env.E2E_PROFILE_SMTP_PORT ?? port + 13);
+	const appearancePort = Number(process.env.E2E_APPEARANCE_PORT ?? port + 14);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -305,7 +306,25 @@ export default async function globalSetup() {
 	process.env.E2E_PROFILE_NOMAIL_BASE_URL = `http://localhost:${profileNoMailPort}`;
 	process.env.E2E_PROFILE_NOMAIL_BOOTSTRAP_LINK = stage13.link;
 
+	// Package P2 (appearance per account; ADR-0020): one plain instance.
+	let stage14: Instance;
+	try {
+		stage14 = await startInstance(binary, appearancePort);
+	} catch (e) {
+		await stage13.stop();
+		await stage12.stop();
+		await stage11.stop();
+		await stage10.stop();
+		await stage9.stop();
+		await stage8.stop();
+		await stopBase();
+		throw e;
+	}
+	process.env.E2E_APPEARANCE_BASE_URL = `http://localhost:${appearancePort}`;
+	process.env.E2E_APPEARANCE_BOOTSTRAP_LINK = stage14.link;
+
 	return async () => {
+		await stage14.stop();
 		await stage13.stop();
 		await stage12.stop();
 		await stage11.stop();

@@ -29,7 +29,11 @@ export const deDesign = {
 	'help.mcp': 'KI-Anbindung einrichten',
 
 	'appearance.title': 'Darstellung',
-	'appearance.description': 'Farbschema, Akzentfarbe und Transparenz. Die Auswahl gilt nur für diesen Browser.',
+	'appearance.description': 'Farbschema und Akzentfarbe gehören zu deinem Konto und gelten auf allen Geräten, auch in den Apple-Apps. Transparenz gilt nur für diesen Browser.',
+	'appearance.sync_saved': 'Im Konto gespeichert.',
+	'appearance.sync_saving': 'Wird im Konto gespeichert …',
+	'appearance.sync_pending': 'Noch nicht im Konto gespeichert. Die Auswahl gilt hier schon und wird bei der nächsten Verbindung übertragen.',
+	'appearance.sync_idle': 'Nicht angemeldet oder Server ohne Kontoeinstellungen: Die Auswahl gilt nur in diesem Browser.',
 	'appearance.mode': 'Farbschema',
 	'appearance.mode_system': 'System',
 	'appearance.mode_light': 'Hell',
@@ -52,7 +56,7 @@ export const deDesign = {
 	'appearance.preview_nav': 'Aktiver Eintrag',
 	'appearance.contrast': 'Kontrast Text: {ratio}:1',
 	'appearance.panel_label': 'Darstellung und Akzentfarbe',
-	'appearance.color_names': 'Blau,Türkis,Grün,Bernstein,Rosé,Violett,Schiefer',
+	'appearance.color_names': 'Blau,Türkis,Violett,Grün,Orange,Rosa,Graphit',
 
 	'kpi.target': 'Soll',
 	'kpi.actual': 'Ist',

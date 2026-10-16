@@ -46,6 +46,8 @@ import type {
 	VacationEntries,
 	VacationSettings,
 	OnboardingState,
+	Preferences,
+	PreferencesPatch,
 	Profile,
 	CreationOptions,
 	DayEvaluation,
@@ -281,6 +283,10 @@ export const api = {
 	verifyEmailChange: (code: string) => request<Profile>('POST', '/me/profile/email/verify', { code }),
 	removeProfileEmail: () => request<void>('DELETE', '/me/profile/email'),
 	setOnboarding: (state: OnboardingState) => request<Profile>('PUT', '/me/onboarding', { state }),
+
+	// appearance preferences per account (contract v0.14.0, ADR-0020)
+	getPreferences: () => request<Preferences>('GET', '/me/preferences'),
+	updatePreferences: (patch: PreferencesPatch) => request<Preferences>('PATCH', '/me/preferences', patch),
 
 	// invitations and registration
 	inspectInvitation: (token: string) =>

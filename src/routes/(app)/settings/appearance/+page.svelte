@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import Panel from '#lib/components/app/Panel.svelte';
 	import StatusChip from '#lib/components/app/StatusChip.svelte';
@@ -11,12 +12,18 @@
 	import { theme } from '#lib/theme/theme.svelte.js';
 
 	const tokens = $derived(accentTokens(theme.accent, theme.dark));
+	const syncLabel = $derived(theme.sync === 'saved' ? 'appearance.sync_saved' : theme.sync === 'saving' ? 'appearance.sync_saving' : theme.sync === 'pending' ? 'appearance.sync_pending' : 'appearance.sync_idle');
+
+	// another device may have changed the account's values since this session was loaded
+	onMount(() => void theme.refreshFromServer());
+
 	const ratio = $derived(tokens ? contrastRatio(tokens.ink, tokens.softResolved).toFixed(1) : '');
 </script>
 
 <PageHeader title={t('appearance.title')} description={t('appearance.description')} />
 
 <div class="flex flex-col gap-4">
+	<p class="text-[13px] text-muted-foreground" role="status" aria-live="polite" data-testid="appearance-sync" data-state={theme.sync}>{t(syncLabel)}</p>
 	<Panel title={t('appearance.mode')}>
 		<ModeSwitch />
 	</Panel>
