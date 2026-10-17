@@ -39,28 +39,34 @@
 	const timeZone = $derived(zoneStore.value);
 	const today = $derived(todayLocal(timeZone, new Date(now)));
 
-	async function refresh() {
+	/**
+	 * `full` also reloads the slow, non-critical parts (time account, suggestions, places). The 60 s poll only
+	 * refreshes what changes by itself (running timer, today's evaluation and segments). A failure of a
+	 * non-critical part never blocks or replaces the page.
+	 */
+	async function refresh(full = true) {
 		try {
 			const zone = await zoneStore.ensure();
 			const date = todayLocal(zone);
 			const { start, end } = dayBounds(date, zone);
-			const [timer, evaluation, daySegments, placeList, balance, open] = await Promise.all([
+			if (full) {
+				// Non-critical calls start immediately but are applied independently of the critical ones.
+				void api.getTimeAccount().then((balance) => (account = balance), () => {});
+				void api.listPlaces().then((list) => (places = list), () => {});
+				if (moduleStore.enabled('automation')) void api.listSuggestions().then((open) => (suggestions = open), () => {});
+			}
+			const [timer, evaluation, daySegments] = await Promise.all([
 				api.currentTimer(),
 				api.getDay(date),
-				api.listSegments(start.toISOString(), end.toISOString()),
-				api.listPlaces(),
-				api.getTimeAccount(),
-				moduleStore.enabled('automation') ? api.listSuggestions() : Promise.resolve([] as Suggestion[])
+				api.listSegments(start.toISOString(), end.toISOString())
 			]);
 			running = timer;
 			day = evaluation;
 			segments = daySegments;
-			places = placeList;
-			account = balance;
-			suggestions = open;
 			load = { status: 'ready' };
 		} catch (error) {
-			load = toLoadState(error);
+			// A background poll that fails keeps the last good data instead of replacing the page by an error.
+			if (full || load.status !== 'ready') load = toLoadState(error);
 		}
 	}
 
@@ -72,7 +78,7 @@
 	onMount(() => {
 		void refresh();
 		const tick = setInterval(() => (now = Date.now()), 1000);
-		const poll = setInterval(() => void refresh(), 60_000);
+		const poll = setInterval(() => void refresh(false), 60_000);
 		return () => {
 			clearInterval(tick);
 			clearInterval(poll);

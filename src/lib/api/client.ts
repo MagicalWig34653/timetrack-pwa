@@ -114,6 +114,7 @@ export function setModuleDisabledHandler(handler: (() => void) | null): void {
 
 export function setCsrfToken(token: string | null): void {
 	csrfToken = token;
+	invalidateReadCache();
 }
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -174,6 +175,7 @@ async function upload<T>(path: string, file: File): Promise<T> {
 		throw new ApiError(0, 'network_error');
 	}
 	if (!response.ok) throw await toApiError(response);
+	invalidateReadCache();
 	const text = await response.text();
 	return (text ? JSON.parse(text) : undefined) as T;
 }
@@ -190,6 +192,29 @@ async function requestText(path: string): Promise<string> {
 	return response.text();
 }
 
+/** Backoff before the 2nd and 3rd attempt of a GET. Tests set it to [] via setRetryDelays. */
+let RETRY_DELAYS_MS: number[] = [400, 1200];
+export function setRetryDelays(delays: number[]): void {
+	RETRY_DELAYS_MS = delays;
+}
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const isTransientStatus = (status: number) => status === 502 || status === 503 || status === 504;
+
+/** Short-lived cache for expensive, rarely changing reads (time account); any successful write clears it. */
+const readCache = new Map<string, { at: number; value: Promise<unknown> }>();
+const READ_CACHE_TTL_MS = 30_000;
+export function invalidateReadCache(): void {
+	readCache.clear();
+}
+function cachedRead<T>(key: string, load: () => Promise<T>): Promise<T> {
+	const hit = readCache.get(key);
+	if (hit && Date.now() - hit.at < READ_CACHE_TTL_MS) return hit.value as Promise<T>;
+	const value = load();
+	readCache.set(key, { at: Date.now(), value });
+	value.catch(() => readCache.delete(key));
+	return value;
+}
+
 async function request<T>(
 	method: Method,
 	path: string,
@@ -200,19 +225,34 @@ async function request<T>(
 	if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
 	if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-	let response: Response;
-	try {
-		response = await netFetch(BASE + path, {
-			method,
-			headers,
-			credentials: 'include',
-			body: body === undefined ? undefined : JSON.stringify(body)
-		});
-	} catch {
-		throw new ApiError(0, 'network_error');
+	// Idempotent reads are retried a bounded number of times on transient failures (network drop, 502/503/504 from the
+	// proxy or a replacing container, or a 500 `not_ready` while the server is busy), so a hiccup is invisible to the user.
+	const attempts = method === 'GET' ? RETRY_DELAYS_MS.length + 1 : 1;
+	let response: Response | undefined;
+	for (let attempt = 0; attempt < attempts; attempt++) {
+		const last = attempt === attempts - 1;
+		try {
+			response = await netFetch(BASE + path, {
+				method,
+				headers,
+				credentials: 'include',
+				body: body === undefined ? undefined : JSON.stringify(body)
+			});
+		} catch {
+			if (last) throw new ApiError(0, 'network_error');
+			await sleep(RETRY_DELAYS_MS[attempt]);
+			continue;
+		}
+		if (!last && isTransientStatus(response.status)) {
+			await sleep(RETRY_DELAYS_MS[attempt]);
+			continue;
+		}
+		break;
 	}
+	if (!response) throw new ApiError(0, 'network_error');
 
 	if (!response.ok) throw await toApiError(response);
+	if (method !== 'GET') invalidateReadCache();
 	// 204 and bodyless 202 (e.g. PUT /me/recovery/email) carry no JSON.
 	const text = await response.text();
 	return (text ? JSON.parse(text) : undefined) as T;
@@ -386,7 +426,8 @@ export const api = {
 	getDay: (date: string) => request<DayEvaluation>('GET', `/time/days/${date}`),
 	setDayPreferences: (date: string, input: DayPreferences) =>
 		request<DayEvaluation>('PUT', `/time/days/${date}`, input),
-	getTimeAccount: (asOf?: string) => request<TimeAccount>('GET', `/time/account${asOf ? `?asOf=${asOf}` : ''}`),
+	getTimeAccount: (asOf?: string) =>
+		cachedRead(`account:${asOf ?? ''}`, () => request<TimeAccount>('GET', `/time/account${asOf ? `?asOf=${asOf}` : ''}`)),
 	createAccountAdjustment: (input: AccountAdjustmentInput) =>
 		request<TimeAccount>('POST', '/time/account/adjustments', input),
 

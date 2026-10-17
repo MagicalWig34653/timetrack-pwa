@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockFetch } from '../../../mock/fetch.ts';
 import { splitRange } from '../time/dates.js';
-import { api, ApiError, mergeSharedViews, setCsrfToken } from './client.js';
+import { api, ApiError, invalidateReadCache, mergeSharedViews, setCsrfToken, setRetryDelays } from './client.js';
 
 describe('api client', () => {
 	let mock: ReturnType<typeof createMockFetch>;
@@ -95,5 +95,55 @@ describe('range helpers', () => {
 		await api.oidcRegister({ pendingId: 'p', handle: 'xyz', displayName: 'X' });
 		await api.unlinkIdentity('11111111-1111-1111-1111-111111111111').catch(() => undefined);
 		expect((fetchSpy.mock.calls.at(-1)![1]!.headers as Record<string, string>)['X-CSRF-Token']).toBe('csrf-oidc');
+	});
+
+	describe('transient failures and read cache (X1)', () => {
+		const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+		beforeEach(() => {
+			setRetryDelays([0, 0]);
+			invalidateReadCache();
+		});
+		afterEach(() => setRetryDelays([400, 1200]));
+
+		it('retries an idempotent GET after 503 and after a network error, then succeeds', async () => {
+			const fetchMock = vi
+				.fn()
+				.mockResolvedValueOnce(json(503, { error: { code: 'not_ready', message: 'x' } }))
+				.mockRejectedValueOnce(new TypeError('network'))
+				.mockResolvedValueOnce(json(200, []));
+			vi.stubGlobal('fetch', fetchMock);
+			await expect(api.listPlaces()).resolves.toEqual([]);
+			expect(fetchMock).toHaveBeenCalledTimes(3);
+		});
+
+		it('gives up after the bounded number of attempts and reports the last error', async () => {
+			const fetchMock = vi.fn(async () => json(503, { error: { code: 'not_ready', message: 'x' } }));
+			vi.stubGlobal('fetch', fetchMock);
+			await expect(api.listPlaces()).rejects.toMatchObject({ status: 503 });
+			expect(fetchMock).toHaveBeenCalledTimes(3);
+		});
+
+		it('never retries mutating requests and does not retry client errors', async () => {
+			const fetchMock = vi.fn(async () => json(503, { error: { code: 'not_ready', message: 'x' } }));
+			vi.stubGlobal('fetch', fetchMock);
+			await expect(api.revokeOtherSessions()).rejects.toMatchObject({ status: 503 });
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			const notFound = vi.fn(async () => json(404, { error: { code: 'not_found', message: 'x' } }));
+			vi.stubGlobal('fetch', notFound);
+			await expect(api.listPlaces()).rejects.toMatchObject({ status: 404 });
+			expect(notFound).toHaveBeenCalledTimes(1);
+		});
+
+		it('serves the time account from a short cache until a write succeeds', async () => {
+			const account = { asOf: '2026-10-16', balanceSeconds: 1, openingSeconds: 0, adjustmentSeconds: 0, provisional: false };
+			const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => (init?.method === 'GET' ? json(200, account) : new Response(null, { status: 204 })));
+			vi.stubGlobal('fetch', fetchMock);
+			await api.getTimeAccount();
+			await api.getTimeAccount();
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			await api.revokeOtherSessions();
+			await api.getTimeAccount();
+			expect(fetchMock).toHaveBeenCalledTimes(3);
+		});
 	});
 });
