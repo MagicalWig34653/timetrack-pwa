@@ -302,3 +302,45 @@ test('without a mail transport the profile explains it and the e-mail stays opti
 	await loner.page.getByRole('button', { name: 'Speichern' }).click();
 	await expect(loner.page.getByTestId('name-notice')).toBeVisible();
 });
+
+// Package MAIL1 (ADR-0022): status, connection check and test mail of the admin page against the real backend.
+test('mail diagnosis: the check passes against the capturing SMTP server, the test mail arrives with the fixed subject', async () => {
+	const page = alice.page;
+	await page.goto('/admin/mail');
+	await expect(page.getByTestId('mail-configured')).toHaveText('Eingerichtet');
+	await expect(page.getByTestId('mail-host')).toHaveText('127.0.0.1');
+	await expect(page.getByTestId('mail-tls')).toHaveText('Unverschlüsselt');
+	await expect(page.getByTestId('mail-auth')).toHaveText('Keine Anmeldung');
+	await page.getByTestId('mail-check-run').click();
+	await expect(page.getByTestId('mail-result')).toHaveAttribute('data-ok', 'true');
+	for (const id of ['dns', 'tcp', 'ehlo', 'mailFrom']) await expect(page.getByTestId(`mail-step-${id}`)).toHaveAttribute('data-status', 'ok');
+	for (const id of ['tls', 'auth']) await expect(page.getByTestId(`mail-step-${id}`)).toHaveAttribute('data-status', 'skipped');
+
+	const before = mails.length;
+	await page.getByLabel('Empfänger').fill('ziel.mail@example.test');
+	await page.getByTestId('mail-test-send').click();
+	await expect(page.getByTestId('mail-test-sent')).toContainText('Gesendet an ziel.mail@example.test');
+	const mail = mails.slice(before).find((m) => m.to === 'ziel.mail@example.test');
+	expect(mail).toBeTruthy();
+	const subject = mail!.body.split('\r\n\r\n')[0].replace(/\r\n /g, ' ').split('\r\n').find((l) => l.startsWith('Subject:'))!;
+	const decoded = [...subject.matchAll(/=\?UTF-8\?B\?([^?]+)\?=/g)].map((m) => Buffer.from(m[1], 'base64').toString('utf8')).join('');
+	expect(decoded).toBe('Timetrack: Testnachricht');
+	// the check itself never sends a message
+	expect(mails.slice(before).filter((m) => m.to !== 'ziel.mail@example.test')).toHaveLength(0);
+});
+
+test('mail diagnosis: members are refused, and an unconfigured server shows the checklist', async () => {
+	const forbidden = await api(bob.page, 'GET', '/api/v1/admin/mail');
+	expect(forbidden.status).toBe(403);
+	expect((await api(bob.page, 'POST', '/api/v1/admin/mail/check')).status).toBe(403);
+	await bob.page.goto('/admin/mail');
+	await expect(bob.page.getByTestId('mail-forbidden')).toBeVisible();
+
+	await loner.page.goto('/settings/profile');
+	await loner.page.getByTestId('no-mail-admin-link').click();
+	await expect(loner.page).toHaveURL(/\/admin\/mail$/);
+	await expect(loner.page.getByTestId('mail-configured')).toHaveText('Nicht eingerichtet');
+	await expect(loner.page.getByTestId('mail-example')).toContainText('SMTP_HOST=');
+	await expect(loner.page.getByTestId('mail-check-run')).toHaveCount(0);
+	expect((await api(loner.page, 'POST', '/api/v1/admin/mail/check')).status).toBe(501);
+});

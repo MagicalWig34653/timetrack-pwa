@@ -19,7 +19,8 @@ export const MAIN_LINKS: { href: string; label: MessageKey; prefix: boolean; sec
 export const ADMIN_LINKS: { href: string; label: MessageKey; prefix: boolean }[] = [
 	{ href: '/admin/invitations', label: 'nav.invitations', prefix: true },
 	{ href: '/admin/accounts', label: 'nav.accounts', prefix: true },
-	{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true }
+	{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true },
+	{ href: '/admin/mail', label: 'nav.mail', prefix: true }
 ];
 
 export const SETTINGS_LINKS: { href: string; label: MessageKey }[] = [
@@ -44,7 +45,10 @@ export const SETTINGS_LINKS: { href: string; label: MessageKey }[] = [
 ];
 
 /** Admin-only settings entries. */
-export const SETTINGS_ADMIN_LINKS: { href: string; label: MessageKey }[] = [{ href: '/settings/storage', label: 'nav.storage' }];
+export const SETTINGS_ADMIN_LINKS: { href: string; label: MessageKey }[] = [
+	{ href: '/settings/storage', label: 'nav.storage' },
+	{ href: '/admin/mail', label: 'nav.mail' }
+];
 
 /**
  * Grouped settings navigation (P1): the former single row of 18 tabs became a sidebar list on wide screens and a
@@ -55,7 +59,7 @@ export const SETTINGS_GROUPS: { id: string; label: MessageKey; hrefs: string[] }
 	{ id: 'work', label: 'nav.settings_group.work', hrefs: ['/settings/work-model', '/settings/places', '/settings/account-time', '/settings/learning-fields'] },
 	{ id: 'app', label: 'nav.settings_group.app', hrefs: ['/settings/appearance', '/settings/notifications', '/settings/modules'] },
 	{ id: 'connections', label: 'nav.settings_group.connections', hrefs: ['/settings/devices', '/settings/sharing', '/settings/connections', '/settings/api-tokens', '/settings/mcp-help'] },
-	{ id: 'admin', label: 'nav.settings_group.admin', hrefs: ['/settings/storage'] }
+	{ id: 'admin', label: 'nav.settings_group.admin', hrefs: ['/settings/storage', '/admin/mail'] }
 ];
 
 /** Groups the visible links; empty groups disappear. */
@@ -71,7 +75,7 @@ export interface NavItem {
 	href: string;
 	label: MessageKey;
 	prefix: boolean;
-	icon: 'house' | 'clock' | 'week' | 'calendar' | 'book' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'users' | 'modules' | 'storage';
+	icon: 'house' | 'clock' | 'week' | 'calendar' | 'book' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'users' | 'modules' | 'storage' | 'mail';
 	/** further path prefixes that keep the entry highlighted (the planner tab of "Woche" lives at /plan) */
 	alsoActive?: string[];
 	/** badge source rendered by the sidebar */
@@ -123,7 +127,8 @@ export const NAV_GROUPS: NavGroup[] = [
 		items: [
 			{ href: '/admin/invitations', label: 'nav.invitations', prefix: true, icon: 'invite' },
 			{ href: '/admin/accounts', label: 'nav.accounts', prefix: true, icon: 'users' },
-			{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true, icon: 'modules' }
+			{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true, icon: 'modules' },
+			{ href: '/admin/mail', label: 'nav.mail', prefix: true, icon: 'mail' }
 		]
 	}
 ];
@@ -148,7 +153,8 @@ export const SETTINGS_KEYWORDS: Record<string, string> = {
 	'/settings/recovery': 'wiederherstellung recovery codes passwort',
 	'/settings/sessions': 'sitzungen abmelden geräte sicherheit',
 	'/settings/privacy': 'daten datenschutz export herunterladen löschen konto dsgvo auskunft',
-	'/settings/storage': 'speicher dateien s3 anhänge'
+	'/settings/storage': 'speicher dateien s3 anhänge',
+	'/admin/mail': 'e-mail mail smtp versand server testmail verbindung prüfen'
 };
 
 export interface Crumb {

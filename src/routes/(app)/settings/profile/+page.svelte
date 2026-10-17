@@ -158,7 +158,14 @@
 				{#if reauth}<ReauthNotice next="/settings/profile" />{/if}
 				{#if emailError}<Alert variant="destructive" data-testid="email-error">{emailError}</Alert>{/if}
 				{#if emailNotice}<Alert variant="success" data-testid="email-notice">{emailNotice}</Alert>{/if}
-				{#if !profile.mailAvailable}<Alert data-testid="no-mail">{t('profile.email_no_mail')}</Alert>{/if}
+				{#if !profile.mailAvailable}
+					<Alert data-testid="no-mail">
+						{t('profile.email_no_mail')}
+						{#if sessionStore.current?.account.role === 'admin'}
+							<a class="mt-1 block font-medium underline underline-offset-2" href="/admin/mail" data-testid="no-mail-admin-link">{t('mail.profile_hint_link')}</a>
+						{/if}
+					</Alert>
+				{/if}
 
 				{#if profile.email}
 					<div class="flex flex-wrap items-center gap-2" data-testid="email-current">
