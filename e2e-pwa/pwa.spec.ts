@@ -25,6 +25,22 @@ async function activeWorker(page: Page) {
 	await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
 }
 
+test('favicons are served as images and linked from the page', async ({ request, page }) => {
+	for (const [url, type] of [
+		['/favicon.svg', 'image/svg+xml'],
+		['/favicon.ico', 'image/x-icon'],
+		['/favicon-32.png', 'image/png'],
+		['/icons/apple-180.png', 'image/png']
+	]) {
+		const response = await request.get(url);
+		expect(response.status(), url).toBe(200);
+		expect(response.headers()['content-type'], url).toContain(type);
+	}
+	await page.goto('/');
+	const links = await page.locator('head link[rel~="icon"], head link[rel="apple-touch-icon"]').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
+	expect(links).toEqual(expect.arrayContaining(['/favicon.svg', '/favicon-32.png', '/favicon.ico', '/icons/apple-180.png']));
+});
+
 test('manifest declares the app and every icon exists with the declared size', async ({ request, page }) => {
 	const response = await request.get('/manifest.webmanifest');
 	expect(response.status()).toBe(200);

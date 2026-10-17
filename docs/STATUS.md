@@ -58,6 +58,7 @@ Ein Test (`src/lib/modules/modules.test.ts`) schlägt fehl, wenn eine Seite wede
 
 ## PWA / Service Worker
 Manifest, Icons (`npm run icons`), `src/service-worker.ts` (Precache, Navigation netzwerk-first mit `/offline`, API/OAuth/MCP nie gecacht, Update nur nach Bestätigung, Push-Handler), Offline-Banner, Web-Push-Einstellungen. Registrierung nur im Produktionsbuild (https/localhost) oder mit `VITE_SW=1`. Details: `docs/handoffs/L16.md`.
+Favicon + App-Icons im Design der nativen App (F1, Branch `f1-icons`): `static/favicon.svg|ico`, `icons/*`, Generator `npm run icons`; Details: `docs/handoffs/F1.md`.
 
 ## Tests und Befehle
 | Befehl | Inhalt |
