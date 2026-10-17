@@ -1,0 +1,152 @@
+# PWA CI: type check, unit tests, production build and the Playwright suites that need no backend
+# (mock and pwa-build). The real-backend E2E is a separate optional job (see below).
+# Documentation: docs/CI.md in the backend repository.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      real_backend:
+        description: "Also run the real-backend E2E (builds the Swift backend, takes long)"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "37 3 * * 1" # weekly: real-backend E2E against current main of both repositories
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Check, unit tests, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - name: svelte-check and service worker types
+        run: npm run check
+      - name: Unit tests (Vitest)
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwa-build
+          path: build
+          retention-days: 7
+
+  e2e-mock:
+    name: Playwright (mock API)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Mock-mode E2E
+        run: npm run test:e2e:mock
+      - name: Upload Playwright output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-mock
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e-pwa:
+    name: Playwright (production build, service worker)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Build and run the production-build checks
+        run: npm run test:e2e:pwa
+      - name: Upload Playwright output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-pwa
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e-real-backend:
+    # Builds the Swift backend from source (same owner, repository timetrack-backend) in the official Swift image
+    # and runs the E2E suites that start one backend instance per spec group (SQLite throwaway databases, virtual
+    # WebAuthn authenticator). Chosen over pulling the GHCR image because e2e/global-setup.ts starts the debug binary
+    # (.build/debug/App) itself, one instance per group, and the image is not available before the first release.
+    # Heavy (Swift build), therefore only on manual dispatch with real_backend=true and the weekly schedule, never
+    # required for merging. If the backend repository is private, add a repository secret BACKEND_REPO_TOKEN with
+    # read access to it (fine-grained token, contents: read); without it the checkout step fails and the job is red
+    # but non-blocking.
+    name: Playwright (real backend, optional)
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.real_backend)
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    container: swift:6.3-noble
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: timetrack-pwa
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/timetrack-backend
+          path: timetrack-backend
+          token: ${{ secrets.BACKEND_REPO_TOKEN || github.token }}
+      - uses: actions/cache@v4
+        with:
+          path: timetrack-backend/.build
+          key: backend-build-swift-6.3-${{ hashFiles('timetrack-backend/Package.resolved') }}
+          restore-keys: backend-build-swift-6.3-
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: timetrack-pwa/.node-version
+          cache: npm
+          cache-dependency-path: timetrack-pwa/package-lock.json
+      - name: Install dependencies and Chromium
+        working-directory: timetrack-pwa
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Real-backend E2E (builds the backend first; E2E_BACKEND_DIR defaults to ../timetrack-backend)
+        working-directory: timetrack-pwa
+        run: npm run test:e2e
+      - name: Upload Playwright output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-real-backend
+          path: |
+            timetrack-pwa/test-results
+            timetrack-pwa/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
