@@ -87,7 +87,7 @@
 	<CardHeader>
 		<CardTitle class="flex items-center gap-2">
 			{t('timer.title')}
-			{#if running}<Badge variant="secondary">{t('timer.running')}</Badge>{/if}
+			{#if running}<span class="glow-filter size-2 rounded-full bg-ui-accent" aria-hidden="true" data-testid="timer-dot"></span><Badge variant="secondary">{t('timer.running')}</Badge>{/if}
 		</CardTitle>
 		<CardDescription>
 			{#if running}

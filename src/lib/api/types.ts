@@ -1,5 +1,8 @@
 // Hand-written types mirroring contracts/openapi.yaml in the backend repository (API v0.1.0).
 
+import type { PresetId } from '#lib/theme/accent.js';
+import type { GlowId } from '#lib/theme/glow.js';
+
 export type Role = 'admin' | 'member';
 
 export interface Account {
@@ -15,15 +18,17 @@ export interface Account {
 
 /** Account-wide appearance (contract v0.14.0, ADR-0020). App icon and transparency stay device-local. */
 export interface Preferences {
-	accent: 'blue' | 'teal' | 'violet' | 'green' | 'orange' | 'pink' | 'graphite' | 'custom';
+	accent: PresetId | 'custom';
 	/** `#RRGGBB` (upper case) exactly when accent is `custom`. */
 	accentCustomHex?: string | null;
 	colorScheme: 'system' | 'light' | 'dark';
+	/** Glow level (contract v0.15.0); missing on older servers. */
+	glow?: GlowId;
 	/** Missing while the defaults apply (never changed). */
 	updatedAt?: string | null;
 }
 
-export type PreferencesPatch = Partial<Pick<Preferences, 'accent' | 'colorScheme'>> & { accentCustomHex?: string | null };
+export type PreferencesPatch = Partial<Pick<Preferences, 'accent' | 'colorScheme' | 'glow'>> & { accentCustomHex?: string | null };
 
 export type OnboardingState = 'pending' | 'completed' | 'skipped';
 

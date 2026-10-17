@@ -22,6 +22,13 @@ Module (abschaltbar, ADR-0012, Zuordnung in `src/lib/modules/map.ts`):
 ## Designsprache (L21, ADR-0014)
 Zinc-Tokens (OKLCH, hell/dunkel), Glasflächen mit deckenden Rückfällen, Akzentsystem (`src/lib/theme/accent.ts`, Standard #2563EB), Shell mit Seitenleiste (256 px), Kopfzeile (60 px), mobilem Off-Canvas-Menü, Einstellungssuche; Muster-Komponenten (`PageHeader`, `Panel`, `KpiCard`, `SectionHeading`, `EmptyState`, `FilterBar`, `StatusChip`, `Banner`); neue Seite `/settings/appearance`. Details und Abweichungen: `docs/handoffs/L21.md`.
 
+## Glas und Leuchteffekt (G1, Vertrag v0.15.0; Branch g1-glass, nicht gemergt, Lead-Prüfung offen)
+
+- Alle schwebenden Flächen (Popover inkl. Palette, native Dialoge und Scrim, Toast, Drawer, Seitenleiste, Kopfzeile) tragen Blur über gemeinsame Tokens/Klassen in `layout.css` (`--bf-*`, `--glass-*`, `.glass-pop/-soft/-scrim`); Seitenleiste/Kopfzeile malen ihr Glas auf `::before`, damit Popover darin den Seitengrund verwischen. Rückfälle (reduzierte Transparenz, In-App-Schalter, kein `backdrop-filter`) machen alles deckend.
+- Neue Konto-Einstellung „Leuchteffekt“ (`glow`: Aus/Dezent/Mittel/Stark, Standard Dezent) auf der Darstellungsseite und in der Palette; Cache `tt.glow`, früh gesetzt in `app.html`. Ältere Server ohne `glow`: lokal, ohne Sendefehler.
+- Acht weitere Akzent-Voreinstellungen mit weißer Schrift (Indigo, Marine, Purpur, Magenta, Karmin, Waldgrün, Petrol, Bronze); ältere Server speichern sie als `custom` plus Hex.
+- Details: `docs/handoffs/G1.md`.
+
 ## Darstellung je Konto (P2, ADR-0020, Vertrag v0.14.0; Lead-Prüfung offen)
 Akzentfarbe (Voreinstellungen `blue|teal|violet|green|orange|pink|graphite` oder eigene Farbe) und Farbschema gehören zum Konto (`GET/PATCH /me/preferences`, in `GET /auth/session` als `account.preferences`); localStorage (`tt.accent`, `tt.accentId`, `tt.theme`) ist Sofort-Cache und Offline-Rückfall. Transparenz (`tt.transparency`) und App-Symbol bleiben Gerätewahl.
 Abgleich in `ThemeStore.reconcile` (`src/lib/theme/theme.svelte.ts`, aufgerufen von `sessionStore`): eine ungesendete lokale Änderung desselben Kontos (`tt.prefsPending` = Konto-ID) gewinnt und wird gesendet; sonst überschreiben die Kontowerte den Cache. Hat das Konto nie Werte und weicht der Cache von den Standardwerten ab, wird die lokale Wahl einmal übertragen (nicht, wenn der Cache `tt.prefsOwner` einem anderen Konto gehört). Anmeldeseite nutzt nur den Cache. Statuszeile `appearance-sync` auf `/settings/appearance`. Ältere Server ohne `account.preferences`: rein lokal wie zuvor.
@@ -64,9 +71,9 @@ Favicon + App-Icons im Design der nativen App (F1, Branch `f1-icons`): `static/f
 | Befehl | Inhalt |
 | --- | --- |
 | `npm run check` | svelte-check + tsc des Service Workers (0 Fehler/Warnungen) |
-| `npm test` | vitest, 587 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung; Lead, Paket P2) |
+| `npm test` | vitest, 643 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung; Lead, Paket P2) |
 | `npm run build` | statisches Build nach `build/` |
-| `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 180 Specs (inkl. Modul-, Arbeitszeit-, Konten-, Profil- und Darstellungs-Specs; Lead gegen frisch gebautes Backend, Paket P2) |
+| `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 181 Specs (inkl. Modul-, Arbeitszeit-, Konten-, Profil- und Darstellungs-Specs; Lead gegen frisch gebautes Backend, Paket P2) |
 | `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), 84 Specs (Lead, P2), inkl. `modules.spec.ts` und `worktime.spec.ts` |
 | `npm run test:e2e:pwa` | Produktionsbuild mit Mock-API: Manifest, Service Worker, Offline, Push; 6 Specs |
 

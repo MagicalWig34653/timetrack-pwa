@@ -22,8 +22,8 @@ async function signedIn() {
 describe('preferences mock (ADR-0020)', () => {
 	it('returns the defaults, also inside the session, and merges patches', async () => {
 		const { call, login } = await signedIn();
-		expect(login.account.preferences).toEqual({ accent: 'blue', colorScheme: 'system' });
-		expect((await call('GET', '/api/v1/me/preferences')).body).toEqual({ accent: 'blue', colorScheme: 'system' });
+		expect(login.account.preferences).toEqual({ accent: 'blue', colorScheme: 'system', glow: 'subtle' });
+		expect((await call('GET', '/api/v1/me/preferences')).body).toEqual({ accent: 'blue', colorScheme: 'system', glow: 'subtle' });
 		const teal = await call('PATCH', '/api/v1/me/preferences', { accent: 'teal' });
 		expect(teal.body).toMatchObject({ accent: 'teal', colorScheme: 'system' });
 		expect(teal.body.updatedAt).toBeTruthy();
@@ -46,6 +46,6 @@ describe('preferences mock (ADR-0020)', () => {
 		for (const body of [{}, { theme: 'x' }, { accent: 'red' }, { colorScheme: 'auto' }, { accent: 'blue', appIcon: 'x' }]) {
 			expect((await call('PATCH', '/api/v1/me/preferences', body)).status, JSON.stringify(body)).toBe(400);
 		}
-		expect((await call('GET', '/api/v1/me/preferences')).body).toEqual({ accent: 'blue', colorScheme: 'system' });
+		expect((await call('GET', '/api/v1/me/preferences')).body).toEqual({ accent: 'blue', colorScheme: 'system', glow: 'subtle' });
 	});
 });

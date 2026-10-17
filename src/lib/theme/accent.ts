@@ -102,7 +102,11 @@ export function accentTokens(input: string, dark: boolean): AccentTokens | null 
  * Presets offered in the palette. The ids are the contract ids of `accent` in GET/PATCH /me/preferences (ADR-0020);
  * every client maps them to its own colour values. The order is the display order.
  */
-export const ACCENT_IDS = ['blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite'] as const;
+export const ACCENT_IDS = [
+	'blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite',
+	// contract v0.15.0: darker fills that carry white text
+	'indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze'
+] as const;
 export type PresetId = (typeof ACCENT_IDS)[number];
 /** `custom` means "the colour is `accentCustomHex`". */
 export type AccentId = PresetId | 'custom';
@@ -114,8 +118,24 @@ export const ACCENT_PRESETS: { id: PresetId; hex: string }[] = [
 	{ id: 'green', hex: '#16a34a' },
 	{ id: 'orange', hex: '#d97706' },
 	{ id: 'pink', hex: '#db2777' },
-	{ id: 'graphite', hex: '#52525b' }
+	{ id: 'graphite', hex: '#52525b' },
+	{ id: 'indigo', hex: '#4338ca' },
+	{ id: 'navy', hex: '#1e3a8a' },
+	{ id: 'purple', hex: '#7e22ce' },
+	{ id: 'magenta', hex: '#a21caf' },
+	{ id: 'crimson', hex: '#b91c1c' },
+	{ id: 'forest', hex: '#166534' },
+	{ id: 'petrol', hex: '#0f766e' },
+	{ id: 'bronze', hex: '#92400e' }
 ];
+
+/** Ids that older servers (before contract v0.15.0) reject; the store falls back to `custom` plus the colour for them. */
+export const ACCENT_IDS_V015: readonly PresetId[] = ['indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze'];
+
+/** True when the text on the accent fill is white (the fill is dark enough for 4.5:1). */
+export function whiteOnAccent(hex: string): boolean {
+	return foregroundFor(hex) === '#ffffff';
+}
 
 export function isPresetId(value: unknown): value is PresetId {
 	return typeof value === 'string' && (ACCENT_IDS as readonly string[]).includes(value);

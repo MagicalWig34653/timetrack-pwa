@@ -14,7 +14,7 @@
 </script>
 
 <svelte:head><title>{title} – Timetrack</title></svelte:head>
-<header class="mb-7 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between" data-testid="page-header">
+<header class="page-head mb-7 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between" data-testid="page-header">
 	<div class="min-w-0">
 		<h1 class="text-[28px] leading-tight font-[650] tracking-[-0.8px] sm:text-[32px]">{title}</h1>
 		{#if description}<p class="mt-1.5 text-[15px] text-muted-foreground">{description}</p>{/if}

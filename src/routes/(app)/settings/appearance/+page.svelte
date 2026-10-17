@@ -4,6 +4,7 @@
 	import Panel from '#lib/components/app/Panel.svelte';
 	import StatusChip from '#lib/components/app/StatusChip.svelte';
 	import AccentPicker from '#lib/components/shell/AccentPicker.svelte';
+	import GlowSwitch from '#lib/components/shell/GlowSwitch.svelte';
 	import ModeSwitch from '#lib/components/shell/ModeSwitch.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
@@ -30,6 +31,19 @@
 
 	<Panel title={t('appearance.accent')} description={t('appearance.accent_hint')}>
 		<AccentPicker idPrefix="page-accent" />
+	</Panel>
+
+	<Panel title={t('appearance.glow')} description={t('appearance.glow_hint')}>
+		<div class="flex flex-col gap-4">
+			<GlowSwitch />
+			<p class="text-[13px] text-muted-foreground" data-testid="glow-description">{t(`appearance.glow_desc_${theme.glow}`)}</p>
+			<div class="ui-card flex flex-wrap items-center gap-3 rounded-[10px] border bg-card p-4" data-testid="glow-preview" aria-label={t('appearance.glow_preview')}>
+				<span class="text-sm font-medium">{t('appearance.glow_preview_card')}</span>
+				<Button size="sm">{t('appearance.preview_primary')}</Button>
+				<StatusChip tone="success">{t('appearance.preview_chip')}</StatusChip>
+				<span class="glow-filter size-2.5 rounded-full bg-ui-accent" aria-hidden="true"></span>
+			</div>
+		</div>
 	</Panel>
 
 	<Panel title={t('appearance.transparency')} description={t('appearance.transparency_hint')}>

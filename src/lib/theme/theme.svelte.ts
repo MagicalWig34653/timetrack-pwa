@@ -1,6 +1,7 @@
 import { api, ApiError } from '#lib/api/client.js';
 import type { Preferences, PreferencesPatch } from '#lib/api/types.js';
 import {
+	ACCENT_IDS_V015,
 	ACCENT_PRESETS,
 	DEFAULT_ACCENT,
 	accentTokens,
@@ -10,6 +11,7 @@ import {
 	presetIdForHex,
 	type AccentId
 } from './accent';
+import { DEFAULT_GLOW, glowTokens, isGlowId, type GlowId } from './glow';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type TransparencyMode = 'system' | 'reduced';
@@ -19,6 +21,7 @@ export type SyncState = 'idle' | 'saving' | 'saved' | 'pending';
 const KEY_MODE = 'tt.theme';
 const KEY_ACCENT = 'tt.accent';
 const KEY_ACCENT_ID = 'tt.accentId';
+const KEY_GLOW = 'tt.glow';
 const KEY_TRANSPARENCY = 'tt.transparency';
 /** Account the cached accent/scheme belongs to (set after a reconcile). */
 const KEY_OWNER = 'tt.prefsOwner';
@@ -55,12 +58,15 @@ class ThemeStore {
 	accentId = $state<AccentId>('blue');
 	accent = $state<string>(DEFAULT_ACCENT);
 	transparency = $state<TransparencyMode>('system');
+	glow = $state<GlowId>(DEFAULT_GLOW);
 	systemDark = $state(false);
 	sync = $state<SyncState>('idle');
 	private started = false;
 	/** Account whose preferences are synced; null while signed out, in a recovery session or on a server without the endpoint. */
 	private syncAccount: string | null = null;
 	private flushing = false;
+	/** True once the server turned out to predate contract v0.15.0 (no `glow`, no new accent ids): the patch then keeps to the v0.14.0 shape. */
+	private legacyServer = false;
 
 	get dark(): boolean {
 		return this.mode === 'dark' || (this.mode === 'system' && this.systemDark);
@@ -80,6 +86,8 @@ class ThemeStore {
 			this.accentId = id === 'custom' ? 'custom' : isPresetId(id) && presetHex(id) === accent ? id : (presetIdForHex(accent) ?? 'custom');
 		}
 		if (read(KEY_TRANSPARENCY) === 'reduced') this.transparency = 'reduced';
+		const glow = read(KEY_GLOW);
+		if (isGlowId(glow)) this.glow = glow;
 		const query = window.matchMedia?.('(prefers-color-scheme: dark)');
 		if (query) {
 			this.systemDark = query.matches;
@@ -124,6 +132,13 @@ class ThemeStore {
 		this.setPreset('blue');
 	}
 
+	setGlow(level: GlowId): void {
+		this.glow = level;
+		write(KEY_GLOW, level);
+		this.apply();
+		this.changed();
+	}
+
 	setTransparency(mode: TransparencyMode): void {
 		this.transparency = mode;
 		write(KEY_TRANSPARENCY, mode);
@@ -139,9 +154,13 @@ class ThemeStore {
 
 	/** The state as a PATCH body (the colour only for a custom accent). */
 	private patch(): PreferencesPatch {
-		return this.accentId === 'custom'
+		// a server older than v0.15.0 knows neither the newer preset ids nor `glow`; it stores those colours as custom ones
+		const asCustom = this.accentId === 'custom' || (this.legacyServer && ACCENT_IDS_V015.includes(this.accentId as never));
+		const body: PreferencesPatch = asCustom
 			? { accent: 'custom', accentCustomHex: this.accent, colorScheme: this.mode }
-			: { accent: this.accentId, colorScheme: this.mode };
+			: { accent: this.accentId as Exclude<AccentId, 'custom'>, colorScheme: this.mode };
+		if (!this.legacyServer) body.glow = this.glow;
+		return body;
 	}
 
 	private changed(): void {
@@ -164,6 +183,11 @@ class ThemeStore {
 				try {
 					await api.updatePreferences(this.patch());
 				} catch (error) {
+					// a server that predates v0.15.0 rejects `glow` and the newer accent ids: repeat in the old shape
+					if (error instanceof ApiError && error.status === 400 && !this.legacyServer) {
+						this.legacyServer = true;
+						continue;
+					}
 					// a refused value (400) would fail forever: drop it, the next session load shows the account's value
 					if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 401 && error.status !== 403 && error.status !== 429) {
 						write(KEY_PENDING, null);
@@ -194,10 +218,11 @@ class ThemeStore {
 			return;
 		}
 		this.syncAccount = canWrite ? accountId : null;
+		this.legacyServer = preferences.glow === undefined;
 		const owner = read(KEY_OWNER);
 		const pendingFor = read(KEY_PENDING);
 		const neverSet = !preferences.updatedAt;
-		const cacheIsDefault = this.accentId === 'blue' && this.mode === 'system';
+		const cacheIsDefault = this.accentId === 'blue' && this.mode === 'system' && this.glow === DEFAULT_GLOW;
 		if (pendingFor === accountId || (neverSet && !cacheIsDefault && (owner === null || owner === accountId))) {
 			// an unsent local change, or a pre-account choice of this browser that the account has not seen yet
 			if (canWrite) {
@@ -229,6 +254,10 @@ class ThemeStore {
 			this.accent = presetHex(id);
 		}
 		this.storeAccent();
+		if (isGlowId(preferences.glow)) {
+			this.glow = preferences.glow;
+			write(KEY_GLOW, this.glow);
+		}
 		this.apply();
 	}
 
@@ -263,6 +292,8 @@ class ThemeStore {
 		else delete root.dataset.transparency;
 		const tokens = accentTokens(this.accent, this.dark) ?? accentTokens(DEFAULT_ACCENT, this.dark);
 		if (!tokens) return;
+		root.dataset.glow = this.glow;
+		for (const [name, value] of Object.entries(glowTokens(tokens.primary, this.dark))) root.style.setProperty(name, value);
 		root.style.setProperty('--ui-accent', tokens.primary);
 		root.style.setProperty('--ui-accent-foreground', tokens.foreground);
 		root.style.setProperty('--ui-accent-ink', tokens.ink);

@@ -23,7 +23,7 @@
 	<div class="max-h-96 overflow-auto rounded-lg border" tabindex="0" role="region" aria-label={t('import.raw_caption')} data-testid="raw-table">
 		<table class="w-full text-sm">
 			<caption class="sr-only">{t('import.raw_caption')}</caption>
-			<thead class="sticky top-0 bg-muted text-left">
+			<thead class="glass-soft sticky top-0 text-left">
 				<tr>
 					<th scope="col" class="px-2 py-1.5 font-medium">{t('import.raw_header_col')}</th>
 					<th scope="col" class="px-2 py-1.5 font-medium">{t('import.raw_row')}</th>
