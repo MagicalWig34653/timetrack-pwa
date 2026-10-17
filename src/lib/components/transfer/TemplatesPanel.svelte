@@ -12,7 +12,10 @@
 		busy,
 		onapply,
 		onsave,
-		ondelete
+		ondelete,
+		title = t('import.templates_title'),
+		text = t('import.templates_text'),
+		bare = false
 	}: {
 		templates: ImportTemplate[];
 		templatesUnavailable: boolean;
@@ -20,6 +23,10 @@
 		onapply: (template: ImportTemplate) => void;
 		onsave: (name: string) => void;
 		ondelete: (template: ImportTemplate) => void;
+		title?: string;
+		text?: string;
+		/** without own border (embedded in another section) */
+		bare?: boolean;
 	} = $props();
 
 	let templateId = $state('');
@@ -28,12 +35,12 @@
 	const selected = $derived(templates.find((x) => x.id === templateId));
 </script>
 
-<section class="flex flex-col gap-3 rounded-lg border p-4" aria-labelledby="templates-heading">
-	<h4 id="templates-heading" class="text-sm font-medium">{t('import.templates_title')}</h4>
+<section class="flex flex-col gap-3 {bare ? '' : 'rounded-lg border p-4'}" aria-labelledby="templates-heading">
+	<h4 id="templates-heading" class="text-sm font-medium">{title}</h4>
 	{#if templatesUnavailable}
 		<p class="text-sm text-muted-foreground">{t('import.templates_unavailable')}</p>
 	{:else}
-		<p class="text-xs text-muted-foreground">{t('import.templates_text')}</p>
+		<p class="text-xs text-muted-foreground">{text}</p>
 		<div class="flex flex-wrap items-end gap-2">
 			<div class="flex min-w-48 flex-1 flex-col gap-1.5">
 				<Label for="template-select">{t('import.template_select')}</Label>

@@ -65,24 +65,40 @@ async function customDaysOf(page: Page, year = 2026) {
 	return (res.body as any[]).filter((d) => d.source === 'custom');
 }
 
-/** Upload -> (banner) -> profile step. */
+/** Upload -> recognition card (template preselected) -> preview. */
 async function toProfileStep(page: Page, file: { name: string; mimeType: string; buffer: Buffer }) {
 	await page.goto('/import');
 	// generous: the very first hydration of a freshly navigated page occasionally takes long on a busy machine
-	await expect(page.getByTestId('step-heading')).toHaveText('Datei', { timeout: 20_000 });
+	await expect(page.getByTestId('step-heading')).toHaveText('Datei wählen', { timeout: 20_000 });
 	await page.getByTestId('import-file').setInputFiles(file);
 	await page.getByRole('button', { name: 'Weiter' }).click();
-	await expect(page.getByTestId('step-heading')).toHaveText('Blatt und Kopfzeile');
-	await expect(page.getByTestId('profile-banner')).toContainText('Arbeitszeit-Tabelle erkannt');
-	await page.getByRole('button', { name: 'Weiter' }).click();
-	await expect(page.getByTestId('step-heading')).toHaveText('Arbeitszeit-Tabelle');
+	await expect(page.getByTestId('profile-banner')).toContainText('Das ist deine Arbeitszeit-Tabelle');
+	await expect(page.getByTestId('profile-template')).toContainText('Vorlage: Meine Arbeitszeit-Tabelle (empfohlen)');
+	await expect(page.getByTestId('profile-facts')).toBeVisible();
+	await page.getByTestId('profile-next').click();
+	await expect(page.getByTestId('step-heading')).toHaveText('Vorschau');
+	await expect(page.getByTestId('worktime-preview')).toBeVisible();
 }
 
+/** Opens the collapsed "Anpassen (nur wenn nötig)" section (and the expert options). */
+async function openCustomize(page: Page, expert = false) {
+	const outer = page.getByTestId('wt-customize');
+	if (!(await outer.evaluate((el) => (el as HTMLDetailsElement).open))) await outer.locator('summary').first().click();
+	if (expert) {
+		const inner = page.getByTestId('wt-expert');
+		if (!(await inner.evaluate((el) => (el as HTMLDetailsElement).open))) await inner.locator('summary').first().click();
+	}
+}
+
+/** Waits until the preview reflects the options (changes refresh it by themselves). */
+async function previewSettled(page: Page) {
+	await expect(page.getByTestId('wt-refreshing')).toHaveCount(0);
+}
+
+/** The ONE primary button of the preview; errors have to be skipped explicitly first. */
 async function confirmAndCommit(page: Page, ignoreErrors = false) {
-	await page.getByRole('button', { name: 'Weiter zur Bestätigung' }).click();
-	await expect(page.getByTestId('step-heading')).toHaveText('Bestätigen');
-	await page.getByLabel(/Ich habe die Vorschau geprüft/).check();
-	if (ignoreErrors) await page.getByLabel(/Fehlerzeilen überspringen/).check();
+	await previewSettled(page);
+	if (ignoreErrors) await page.getByLabel(/Diese Zeilen auslassen/).check();
 	await page.getByTestId('commit').click();
 	await expect(page.getByTestId('step-heading')).toHaveText('Ergebnis');
 }
@@ -109,9 +125,9 @@ test('Alice registers (bootstrap + virtual passkey), creates the 38:30 h model w
 test('wizard: upload, banner, profile step with default rules, preview with counts, unmapped remarks, one-click rule, confirm, result', async () => {
 	const { page } = alice;
 	await toProfileStep(page, mainWorkbook(false));
+	await openCustomize(page, true);
 	await expect(page.getByTestId('wt-rule')).toHaveCount(6);
 	await expect(page.getByTestId('wt-pause-split')).toBeChecked();
-	await page.getByTestId('wt-validate').click();
 	await expect(page.getByTestId('worktime-preview')).toBeVisible();
 
 	const expectedWork = expectedSegments(MAIN_2026.concat(MAIN_2027));
@@ -132,8 +148,8 @@ test('wizard: upload, banner, profile step with default rules, preview with coun
 	// three distinct free texts are listed as unmapped
 	await expect(page.getByTestId('wt-unmapped-item')).toHaveCount(3);
 	await expect(page.getByTestId('wt-unmapped')).toContainText('Arzttermin');
-	await page.getByRole('button', { name: 'Regel für „Arzttermin“ anlegen' }).click();
-	await expect(page.getByTestId('import-notice')).toContainText('Regel angelegt');
+	await page.getByRole('button', { name: 'Bedeutung für „Arzttermin“ merken' }).click();
+	await expect(page.getByTestId('import-notice')).toContainText('Gemerkt');
 	await expect(page.getByTestId('wt-unmapped-item')).toHaveCount(2);
 	await expect(page.getByTestId('wt-count-segments')).toHaveText(String(expectedWork.length));
 	await confirmAndCommit(page);
@@ -191,13 +207,9 @@ test('vacation: only vacation consumes days, excused does not; the time account 
 test('preview of the same workbook with the 1904 date system detects the system and yields the same data (idempotent re-import: 0 created)', async () => {
 	const { page } = alice;
 	await toProfileStep(page, mainWorkbook(true));
-	await page.getByTestId('wt-validate').click();
 	await expect(page.getByTestId('wt-date-system')).toContainText('1904');
-	await expect(page.getByTestId('count-valid')).toHaveText('0');
-	await expect(page.getByTestId('count-duplicates')).not.toHaveText('0');
-	await confirmAndCommit(page);
-	await expect(page.getByTestId('result-created')).toHaveText('0 Einträge angelegt');
-	await expect(page.getByText('Wahrscheinlich war die Datei schon importiert.')).toBeVisible();
+	await expect(page.getByTestId('wt-summary')).toContainText('Alles aus dieser Datei ist schon in der App');
+	await expect(page.getByTestId('commit')).toBeDisabled(); // nothing new: the wizard does not even offer the import
 	// unchanged
 	expect(canonical(await segmentsOf(page))).toEqual(sortSegments(expectedSegments(MAIN_2026.concat(MAIN_2027))));
 	expect((await absencesOf(page)).length).toBe(5);
@@ -232,7 +244,6 @@ function trackJob(page: Page) {
 test('rollback through the wizard removes every item of the batch (segments, absences, custom holiday)', async () => {
 	const { page } = alice;
 	await toProfileStep(page, SEP_ROLLBACK);
-	await page.getByTestId('wt-validate').click();
 	await expect(page.getByTestId('wt-count-segments')).toHaveText('4'); // 7.9. split at 12:00, 11.9. split in the middle (pause does not fit around 12:00)
 	await confirmAndCommit(page);
 	await expect(page.getByTestId('result-created')).toHaveText('4 Einträge angelegt');
@@ -281,7 +292,6 @@ test('rollback conflict: edited segment, absence and deleted custom holiday are 
 	const { page } = alice;
 	trackJob(page);
 	await toProfileStep(page, SEP_CONFLICT);
-	await page.getByTestId('wt-validate').click();
 	await confirmAndCommit(page);
 	await expect(page.getByTestId('result-created')).toHaveText('4 Einträge angelegt');
 
@@ -342,14 +352,11 @@ test('planning module off: absence and holiday rows fail with planning_disabled 
 	const { page } = alice;
 	expect((await api(page, 'PUT', '/api/v1/me/modules', { modules: { planning: false } })).status).toBe(200);
 	await toProfileStep(page, SEP_PLANNING);
-	await page.getByTestId('wt-validate').click();
-	await expect(page.getByTestId('count-errors')).toHaveText('3');
 	const errors = page.getByTestId('error-table');
-	await expect(errors).toContainText('Die Planung ist ausgeschaltet. Abwesenheiten und eigene Feiertage können nicht angelegt werden.');
-	await page.getByRole('button', { name: 'Weiter zur Bestätigung' }).click();
-	await page.getByLabel(/Ich habe die Vorschau geprüft/).check();
+	await expect(errors.locator('tr[data-code="planning_disabled"]')).toHaveCount(3);
+	await expect(errors).toContainText('Die Planung ist ausgeschaltet. Urlaub, Krankheit und eigene Feiertage können deshalb nicht angelegt werden.');
 	await expect(page.getByTestId('commit')).toBeDisabled(); // errors must be skipped explicitly
-	await page.getByLabel(/Fehlerzeilen überspringen/).check();
+	await page.getByLabel(/Diese Zeilen auslassen/).check();
 	await page.getByTestId('commit').click();
 	await expect(page.getByTestId('step-heading')).toHaveText('Ergebnis');
 	await expect(page.getByTestId('result-created')).toHaveText('4 Einträge angelegt'); // 21.9. and 25.9., each split by the pause
@@ -359,8 +366,7 @@ test('planning module off: absence and holiday rows fail with planning_disabled 
 	// back on: the same file now brings the absences and the holiday; the work rows are duplicates
 	expect((await api(page, 'PUT', '/api/v1/me/modules', { modules: { planning: true } })).status).toBe(200);
 	await toProfileStep(page, SEP_PLANNING);
-	await page.getByTestId('wt-validate').click();
-	await expect(page.getByTestId('count-errors')).toHaveText('0');
+	await expect(page.getByTestId('error-table').locator('tr[data-code]:not([data-warning])')).toHaveCount(0);
 	await confirmAndCommit(page);
 	await expect(page.getByTestId('result-absences')).toContainText('2 Abwesenheiten angelegt');
 	await expect(page.getByTestId('result-custom-days')).toContainText('1 eigene Feiertage angelegt');
@@ -376,11 +382,8 @@ test('duplicate dates with conflicting data in two sheets give duplicate_date_co
 		]
 	});
 	await toProfileStep(page, conflicting);
-	await page.getByTestId('wt-validate').click();
-	await expect(page.getByTestId('count-errors')).toHaveText('1');
-	await expect(page.getByTestId('error-table')).toContainText('Dasselbe Datum steht in mehreren Blättern mit unterschiedlichen Zeiten oder Bemerkungen.');
-	await page.getByRole('button', { name: 'Weiter zur Bestätigung' }).click();
-	await page.getByLabel(/Ich habe die Vorschau geprüft/).check();
+	await expect(page.getByTestId('error-table').locator('tr[data-code="duplicate_date_conflict"]')).toHaveCount(1);
+	await expect(page.getByTestId('error-table')).toContainText('Dasselbe Datum steht in zwei Blättern mit unterschiedlichen Zeiten oder Bemerkungen.');
 	await expect(page.getByTestId('commit')).toBeDisabled();
 });
 
@@ -395,10 +398,9 @@ test('note_too_long (holiday name over 80 characters) is an error row, pause_exc
 		]
 	});
 	await toProfileStep(page, long);
-	await page.getByTestId('wt-validate').click();
-	await expect(page.getByTestId('count-errors')).toHaveText('1');
-	await expect(page.getByTestId('error-table')).toContainText('Die Notiz ist zu lang.');
-	await expect(page.getByTestId('error-table').locator('[data-warning="true"]')).toContainText('Der Tag ist nicht länger als die Pause. Er wird als ein Abschnitt übernommen.');
+	await expect(page.getByTestId('error-table').locator('tr[data-code="note_too_long"]')).toHaveCount(1);
+	await expect(page.getByTestId('error-table')).toContainText('Eine Bemerkung ist zu lang');
+	await expect(page.getByTestId('error-table').locator('[data-warning="true"]')).toContainText('Der Eintrag ist nicht länger als die Pause. Er wird als ein Abschnitt ohne Pause importiert.');
 	// nothing was committed
 	expect(await segmentsOf(page, 'from=2026-10-04T00:00:00Z&to=2026-10-11T00:00:00Z')).toHaveLength(0);
 });
@@ -408,14 +410,15 @@ test('generic wizard switch still works', async () => {
 	await page.goto('/import');
 	await page.getByTestId('import-file').setInputFiles(mainWorkbook(false));
 	await page.getByRole('button', { name: 'Weiter' }).click();
+	await expect(page.getByTestId('profile-switch-generic')).toHaveText('Stattdessen Spalten selbst zuordnen');
 	await page.getByTestId('profile-switch-generic').click();
 	await expect(page.getByTestId('no-header')).toBeVisible();
 	await page.getByRole('button', { name: 'Weiter' }).click();
 	await expect(page.getByTestId('step-heading')).toHaveText('Spalten');
 	await page.getByRole('button', { name: 'Zurück' }).click();
 	await page.getByTestId('profile-switch-worktime').click();
-	await page.getByRole('button', { name: 'Weiter' }).click();
-	await expect(page.getByTestId('worktime-step')).toBeVisible();
+	await expect(page.getByTestId('step-heading')).toHaveText('Vorschau');
+	await expect(page.getByTestId('worktime-preview')).toBeVisible();
 });
 
 
@@ -802,8 +805,7 @@ test('round trip: Bob (fresh account, same model) imports Alice\'s exported file
 	const RANGE_TO = '2027-01-31';
 	const exported = await exportWorktime(page, RANGE_FROM, RANGE_TO, { pause: 30 });
 	await toProfileStep(bob.page, { name: 'export.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: exported.bytes });
-	await bob.page.getByTestId('wt-validate').click();
-	await expect(bob.page.getByTestId('count-errors')).toHaveText('0');
+	await expect(bob.page.getByTestId('error-table').locator('tr[data-code]:not([data-warning])')).toHaveCount(0);
 	await expect(bob.page.getByTestId('wt-date-system')).toContainText('1900');
 	await confirmAndCommit(bob.page);
 
@@ -835,20 +837,16 @@ test('round trip: Bob (fresh account, same model) imports Alice\'s exported file
 	expect(compact(again)).toEqual(compact(first));
 	// importing the same file again into Bob's account is idempotent
 	await toProfileStep(bob.page, { name: 'export.xlsx', mimeType: XLSX_MIME, buffer: exported.bytes });
-	await bob.page.getByTestId('wt-validate').click();
-	await expect(bob.page.getByTestId('count-valid')).toHaveText('0');
-	await confirmAndCommit(bob.page);
-	await expect(bob.page.getByTestId('result-created')).toHaveText('0 Einträge angelegt');
+	await expect(bob.page.getByTestId('wt-summary')).toContainText('Alles aus dieser Datei ist schon in der App');
+	await expect(bob.page.getByTestId('commit')).toBeDisabled();
 });
 
 test('the 1904 export of the round-trip range is read back as 1904 and is idempotent in Bob\'s account', async () => {
 	const exported = await exportWorktime(alice.page, WINDOW_FROM, '2027-01-31', { pause: 30, dateSystem: '1904' });
 	await toProfileStep(bob.page, { name: 'export-1904.xlsx', mimeType: XLSX_MIME, buffer: exported.bytes });
-	await bob.page.getByTestId('wt-validate').click();
 	await expect(bob.page.getByTestId('wt-date-system')).toContainText('1904');
-	await expect(bob.page.getByTestId('count-valid')).toHaveText('0');
-	await confirmAndCommit(bob.page);
-	await expect(bob.page.getByTestId('result-created')).toHaveText('0 Einträge angelegt');
+	await expect(bob.page.getByTestId('wt-summary')).toContainText('Alles aus dieser Datei ist schon in der App');
+	await expect(bob.page.getByTestId('commit')).toBeDisabled();
 });
 
 test('rounding model: "bewertet" exports the rounded start/end, "tatsächlich" the raw ones, arithmetic stays consistent', async () => {
@@ -893,21 +891,20 @@ const HOLIDAY_SCHOOL = book({ sheets: [{ year: 2027, days: [row('2027-03-26', '8
 test('C23: school row on a built-in holiday is discarded by default (warning, no surplus); "keep" imports it as before', async () => {
 	const { page } = bob;
 	await toProfileStep(page, HOLIDAY_SCHOOL);
-	await page.getByTestId('wt-validate').click();
 	// the preview of the holiday fixture must carry the new warning: this also proves the backend binary includes C23
 	await expect(page.getByTestId('wt-warnings').locator('[data-code="school_on_holiday"]')).toHaveAttribute('data-count', '1');
 	await expect(page.getByTestId('wt-count-segments')).toHaveText('0');
-	// nothing is left to import, so the wizard offers no way to the confirmation
-	await expect(page.getByRole('button', { name: 'Weiter zur Bestätigung' })).toBeDisabled();
+	// nothing is left to import, so the primary button is disabled
+	await expect(page.getByTestId('commit')).toBeDisabled();
 	const day = (await api(page, 'GET', '/api/v1/time/days/2027-03-26')).body;
 	expect(day.targetSeconds).toBe(0);
 	expect(day.deltaSeconds).toBe(0);
 
 	// keep: same file, option switched, the earlier behaviour (a school segment on the holiday)
 	await toProfileStep(page, HOLIDAY_SCHOOL);
+	await openCustomize(page);
 	await page.getByTestId('wt-holiday-keep').check();
-	await page.getByTestId('wt-validate').click();
-	await expect(page.getByTestId('worktime-preview')).toBeVisible();
+	await previewSettled(page);
 	await expect(page.getByTestId('wt-warnings')).toHaveCount(0);
 	await expect(page.getByTestId('wt-count-segments')).not.toHaveText('0');
 });
@@ -924,12 +921,11 @@ const C23_FILE = book(
 	'c23.xlsx'
 );
 
-test('C23: defaults, warnings with counts, split sheet balance, model start hint with link, option switches', async ({ browser }) => {
+test('C23: defaults, plain warnings with counts, split sheet balance, option switches, reset to the recommendation, model step in the result', async ({ browser }) => {
 	const { page, context } = alice;
 	await toProfileStep(page, C23_FILE);
 	await expect(page.getByTestId('wt-holiday-discard')).toBeChecked();
 	await expect(page.getByTestId('wt-credit-work')).toBeChecked();
-	await page.getByTestId('wt-validate').click();
 	await expect(page.getByTestId('worktime-preview')).toBeVisible();
 
 	const warnings = page.getByTestId('wt-warnings');
@@ -942,34 +938,32 @@ test('C23: defaults, warnings with counts, split sheet balance, model start hint
 	await expect(page.getByTestId('wt-balance-future')).toHaveText('-4:12');
 	await expect(page.getByTestId('wt-balance-total')).toContainText('-9:24');
 
-	// the work model starts 2026-08-03, before the first content day (Thursday 8.10.2026)
-	const hint = page.getByTestId('wt-model-start');
-	await expect(hint).toHaveAttribute('data-kind', 'earlier');
-	await expect(hint).toContainText('08.10.2026');
-	await expect(page.getByTestId('wt-model-start-link')).toHaveAttribute('href', '/settings/work-model?validFrom=2026-10-08');
-	const [popup] = await Promise.all([context.waitForEvent('page'), page.getByTestId('wt-model-start-link').click()]);
-	await expect(popup.getByTestId('work-model-prefilled')).toContainText('08.10.2026', { timeout: 20_000 });
-	await expect(popup.getByLabel('Gültig ab')).toHaveValue('2026-10-08');
-	await popup.close();
-
-	// option switches: keep + absence leave no warnings and turn both Freigestellt rows into one absence range
-	await page.getByRole('button', { name: 'Zurück zur Zuordnung' }).click();
+	// option switches refresh the preview by themselves: keep + absence leave no warnings and turn both Freigestellt rows into one absence range
+	await openCustomize(page);
 	await page.getByTestId('wt-holiday-keep').check();
 	await page.getByTestId('wt-credit-absence').check();
-	await page.getByTestId('wt-validate').click();
-	await expect(page.getByTestId('worktime-preview')).toBeVisible();
+	await previewSettled(page);
 	await expect(page.getByTestId('wt-warnings')).toHaveCount(0);
 	await expect(page.getByTestId('wt-count-absences')).toHaveText('1');
 	await expect(page.getByTestId('wt-count-segments')).toHaveText('6'); // 8.10. + two 2036 days, each split by the 30 min pause
 
-	// defaults again, commit: partial day became work with the remark as note, holiday rows are gone
-	await page.getByRole('button', { name: 'Zurück zur Zuordnung' }).click();
-	await page.getByTestId('wt-holiday-discard').check();
-	await page.getByTestId('wt-credit-work').check();
-	await page.getByTestId('wt-validate').click();
-	await expect(page.getByTestId('worktime-preview')).toBeVisible();
+	// "Zurücksetzen auf Empfehlung": defaults again, then commit with the one button
+	await page.getByTestId('wt-reset').click();
+	await expect(page.getByTestId('wt-holiday-discard')).toBeChecked();
+	await expect(page.getByTestId('wt-credit-work')).toBeChecked();
+	await expect(page.getByTestId('wt-warnings')).toBeVisible();
 	await confirmAndCommit(page);
 	await expect(page.getByTestId('result-warnings').locator('[data-code="credit_partial_as_work"]')).toHaveAttribute('data-count', '1');
+
+	// result: ONE next step, the work model from the first content day (the model starts 2026-08-03, before Thursday 8.10.2026)
+	const hint = page.getByTestId('wt-model-start');
+	await expect(hint).toHaveAttribute('data-kind', 'earlier');
+	await expect(page.getByTestId('wt-model-create')).toHaveText('Arbeitsmodell anlegen (ab 08.10.2026)');
+	await expect(page.getByTestId('wt-next-why')).toContainText('Soll');
+	await page.getByTestId('wt-model-create').click();
+	await expect(page.getByTestId('wt-model-done')).toContainText('ab 08.10.2026');
+	await expect(page.getByTestId('wt-compare')).toBeVisible();
+	expect((await api(page, 'GET', '/api/v1/work-models')).body.some((m: any) => m.validFrom === '2026-10-08')).toBe(true);
 	const week = canonical(await segmentsOf(page, 'from=2026-10-07T00:00:00Z&to=2026-10-14T00:00:00Z'));
 	expect(week.filter((x) => x.date === '2026-10-09').every((x) => x.note === 'Freigestellt')).toBe(true);
 	expect(week.some((x) => x.date === '2026-10-09')).toBe(true);

@@ -3,21 +3,25 @@
 	import StatusChip from '#lib/components/app/StatusChip.svelte';
 	import { t, type MessageKey } from '#lib/i18n/index.js';
 
-	/** Aggregated import warnings (code + number of days) with a short "what does that mean" explanation; they never block the commit. */
+	/**
+	 * Aggregated import warnings (code + number of days). Each one is: what happened (one sentence), what follows (one sentence)
+	 * and the answer to "Muss ich etwas tun?". Warnings never block the commit.
+	 */
 	let { warnings, title = t('worktime.warnings_title'), intro = t('worktime.warnings_text'), testid = 'wt-warnings' }: { warnings: ImportWarning[]; title?: string; intro?: string; testid?: string } = $props();
 
-	const items = $derived(warnings.filter((w) => w.count !== undefined && `worktime.warning.${w.code}` in KNOWN));
-	// keys known in the German catalogue; unknown codes are not shown as aggregated entries
-	const KNOWN: Record<string, true> = { 'worktime.warning.holiday_times_discarded': true, 'worktime.warning.school_on_holiday': true, 'worktime.warning.credit_partial_as_work': true, 'worktime.warning.pause_exceeds_day': true };
+	// codes with a German text; other codes are not shown as aggregated entries
+	const KNOWN: Record<string, true> = { holiday_times_discarded: true, school_on_holiday: true, credit_partial_as_work: true, pause_exceeds_day: true };
+	const items = $derived(warnings.filter((w) => w.count !== undefined && w.code in KNOWN));
 	const label = (code: string) => t(`worktime.warning.${code}` as MessageKey);
-	const explain = (code: string) => t(`worktime.warning.${code}_text` as MessageKey);
+	const consequence = (code: string) => t(`worktime.warning.${code}_text` as MessageKey);
+	const todo = (code: string) => t(`worktime.warning.${code}_todo` as MessageKey);
 </script>
 
 {#if items.length > 0}
 	<section class="flex flex-col gap-3 rounded-[10px] border border-amber-500/40 bg-amber-500/10 p-4 text-sm" aria-labelledby="{testid}-heading" data-testid={testid}>
 		<div>
 			<h4 id="{testid}-heading" class="font-medium">{title}</h4>
-			<p class="mt-0.5 text-xs text-muted-foreground">{intro}</p>
+			<p class="mt-0.5 text-[13px] text-muted-foreground">{intro}</p>
 		</div>
 		<ul class="flex flex-col gap-2">
 			{#each items as warning (warning.code)}
@@ -26,10 +30,8 @@
 						<StatusChip tone="warning">{warning.count === 1 ? t('worktime.warning_day_one') : t('worktime.warning_days', { count: warning.count ?? 0 })}</StatusChip>
 						<span class="font-medium">{label(warning.code)}</span>
 					</div>
-					<details class="mt-2">
-						<summary class="cursor-pointer text-xs underline underline-offset-4">{t('worktime.warning_what')}</summary>
-						<p class="mt-1 text-xs text-muted-foreground">{explain(warning.code)}</p>
-					</details>
+					<p class="mt-1.5 text-[13px]">{consequence(warning.code)}</p>
+					<p class="mt-1.5 text-[13px] text-muted-foreground"><span class="font-medium text-foreground">{t('worktime.warning_todo')}</span> {todo(warning.code)}</p>
 				</li>
 			{/each}
 		</ul>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyWorktimeForm, formFromWorktime, isWorktimeTemplate, modelStartHint, worktimeFromForm, worktimeIssues, worktimeMapping } from './worktime-flow';
+import { canCreateModel, emptyWorktimeForm, formFromWorktime, isRecommended, isWorktimeTemplate, modelStartHint, weeksBetween, worktimeFacts, worktimeFromForm, worktimeIssues, worktimeMapping } from './worktime-flow';
 import { DEFAULT_WORKTIME_RULES } from './worktime';
 
 describe('worktime form', () => {
@@ -55,5 +55,36 @@ describe('modelStartHint', () => {
 	it('reports a model that only starts after the first entry; closed models do not count', () => {
 		expect(modelStartHint(first, [{ validFrom: '2026-04-01' }])).toEqual({ kind: 'late', modelFrom: '2026-04-01' });
 		expect(modelStartHint(first, [{ validFrom: '2025-01-01', validTo: '2026-02-28' }, { validFrom: '2026-03-01' }])).toMatchObject({ kind: 'earlier', modelFrom: '2026-03-01', emptyDays: 3 });
+	});
+});
+
+describe('recognition facts and recommendation', () => {
+	it('counts the calendar weeks touched by the range', () => {
+		expect(weeksBetween('2026-03-02', '2026-03-06')).toBe(1);
+		expect(weeksBetween('2026-03-06', '2026-03-09')).toBe(2);
+		expect(weeksBetween('2024-08-01', '2024-08-01')).toBe(1);
+		expect(weeksBetween(null, '2026-03-06')).toBe(0);
+		expect(weeksBetween('2026-03-09', '2026-03-02')).toBe(0);
+	});
+
+	it('derives plain numbers from the preview and falls back to the day count for older servers', () => {
+		const facts = worktimeFacts({ days: 9, firstDate: '2026-03-02', lastDate: '2026-03-13', firstContentDate: '2026-03-02', byAction: { work: 4, school: 2, vacation: 1, sick: 1, excused: 1 } }, 2);
+		expect(facts).toMatchObject({ sheets: 2, weeks: 2, timeDays: 6, workDays: 4, schoolDays: 2, vacationDays: 1, sickDays: 1, excusedDays: 1, holidayDays: 0, firstDay: '2026-03-02' });
+		expect(worktimeFacts({ days: 9 }, 1)).toMatchObject({ timeDays: 9, weeks: 0, firstDay: null });
+	});
+
+	it('knows whether any option differs from the recommendation', () => {
+		const form = emptyWorktimeForm();
+		expect(isRecommended(form, DEFAULT_WORKTIME_RULES)).toBe(true);
+		expect(isRecommended({ ...form, holidayTimes: 'keep' }, DEFAULT_WORKTIME_RULES)).toBe(false);
+		expect(isRecommended({ ...form, rules: [...form.rules, { pattern: 'x', action: 'work' }] }, DEFAULT_WORKTIME_RULES)).toBe(false);
+	});
+
+	it('creates a work model in one step only when no later version blocks it', () => {
+		expect(canCreateModel({ kind: 'none' })).toBe(true);
+		expect(canCreateModel({ kind: 'earlier', modelFrom: '2026-01-01', emptyDays: 0, beforeWeek: true })).toBe(true);
+		expect(canCreateModel({ kind: 'ok', modelFrom: '2026-03-02' })).toBe(false);
+		expect(canCreateModel({ kind: 'late', modelFrom: '2026-04-01' })).toBe(false);
+		expect(canCreateModel(null)).toBe(false);
 	});
 });
