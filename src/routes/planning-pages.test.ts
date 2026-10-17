@@ -64,7 +64,7 @@ describe('VacationBalanceCard', () => {
 		expect(screen.getByTestId('balance-entitlement')).toHaveTextContent('30 Tage');
 		expect(screen.getByTestId('balance-carry')).toHaveTextContent('2,5 Tage');
 		expect(screen.getByTestId('balance-adjustments')).toHaveTextContent('-0,5 Tage');
-		expect(screen.getByTestId('balance-booked')).toHaveTextContent('-8 Tage');
+		expect(screen.getByTestId('balance-booked')).toHaveTextContent('8 Tage');
 		expect(screen.getByTestId('balance-planned')).toHaveTextContent('2,5 Tage');
 		expect(screen.getByText(/Verfügbar = Anspruch \+ Übertrag/)).toBeInTheDocument();
 	});
@@ -75,9 +75,36 @@ describe('VacationBalanceCard', () => {
 		});
 		// shows the server's snapshotRemainingHalfDays instead of deriving it from available/adjustments/booked
 		expect(screen.getByTestId('balance-snapshot')).toHaveTextContent('10 Tage');
-		expect(screen.getByText('Resturlaub zum Stichtag 01.10.2026')).toBeInTheDocument();
-		expect(screen.queryByTestId('balance-entitlement')).toBeNull();
-		expect(screen.getByText(/nicht zusätzlich addiert/)).toBeInTheDocument();
+		expect(screen.getByText('Stichtagsbestand')).toBeInTheDocument();
+		expect(screen.getByText(/Resturlaub am 01.10.2026/)).toBeInTheDocument();
+		// the saved entitlement stays visible but is marked as replaced by the snapshot
+		expect(screen.getByTestId('balance-entitlement')).toHaveTextContent('0 Tage');
+		expect(screen.getAllByText(/durch den Stichtagsbestand ersetzt/).length).toBe(2);
+	});
+
+	it('shows a call to action instead of numbers when nothing is configured and nothing was booked', () => {
+		render(VacationBalanceCard, {
+			balance: balance({ entitlementHalfDays: 0, carryOverHalfDays: 0, adjustmentHalfDays: 0, bookedHalfDays: 0, plannedHalfDays: 0, availableHalfDays: 0, availableAfterPlannedHalfDays: 0 }),
+			settings: { configured: false, region: 'DE-ST', annualEntitlementHalfDays: 60 }
+		});
+		expect(screen.getByTestId('vacation-cta')).toHaveTextContent('noch nicht hinterlegt');
+		expect(screen.getByTestId('vacation-cta')).toHaveTextContent('30 Tage');
+		expect(screen.getByTestId('vacation-cta-action')).toHaveAttribute('href', '#vacation-settings');
+		expect(screen.queryByTestId('vacation-balance')).toBeNull();
+	});
+
+	it('labels the numbers as a suggestion while the settings are unsaved', () => {
+		render(VacationBalanceCard, { balance: balance(), settings: { configured: false, region: 'DE-ST', annualEntitlementHalfDays: 60 } });
+		expect(screen.getByTestId('vacation-cta')).toBeInTheDocument();
+		expect(screen.getByTestId('vacation-balance')).toHaveTextContent('Gerechnet mit dem Vorschlag');
+	});
+
+	it('shows the saved entitlement, carry-over and a settings shortcut for a configured account', () => {
+		render(VacationBalanceCard, { balance: balance(), settings: { configured: true, region: 'DE-ST', annualEntitlementHalfDays: 60 } });
+		expect(screen.queryByTestId('vacation-cta')).toBeNull();
+		expect(screen.getByRole('heading', { name: /Dein Urlaubskonto 2026/ })).toBeInTheDocument();
+		expect(screen.getByTestId('balance-entitlement')).toHaveTextContent('30 Tage');
+		expect(screen.getByTestId('vacation-edit-settings')).toHaveAttribute('href', '#vacation-settings');
 	});
 
 	it('notes an expiring carry-over without deducting it', () => {
@@ -163,10 +190,10 @@ describe('vacation page', () => {
 		setCsrfToken(null);
 		await signIn();
 		render(VacationPage);
-		expect(await screen.findByTestId('settings-missing')).toBeInTheDocument();
+		expect(await screen.findByTestId('vacation-cta')).toBeInTheDocument();
 		expect(screen.getByTestId('settings-suggestion')).toHaveTextContent('30 Tage');
 		expect(screen.getByLabelText('Jahresanspruch (Tage)')).toHaveValue('30');
-		expect(screen.getByTestId('balance-entitlement')).toHaveTextContent('0 Tage');
+		expect(screen.getByTestId('vacation-cta-action')).toHaveTextContent('Jetzt eintragen');
 		expect(mock.calls.some((c) => c.method === 'PUT' && c.path.includes('/vacation/settings'))).toBe(false);
 		await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
 		expect(await screen.findByText('Einstellungen gespeichert.')).toBeInTheDocument();
@@ -363,7 +390,7 @@ describe('contract v0.3.1 in the UI', () => {
 		setCsrfToken(null);
 		await signIn();
 		render(VacationPage);
-		expect(await screen.findByTestId('settings-missing')).toHaveTextContent('noch nicht gespeichert');
+		expect(await screen.findByTestId('vacation-cta')).toHaveTextContent('noch nicht hinterlegt');
 		expect(mock.calls.filter((c) => c.path.includes('/vacation/settings')).length).toBe(1);
 		expect(screen.getByLabelText('Jahresanspruch (Tage)')).toHaveValue('30');
 	});

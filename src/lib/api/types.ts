@@ -159,6 +159,22 @@ export interface WorkModelInput {
 export interface WorkModel extends WorkModelInput {
 	id: string;
 	createdAt: string;
+	/** Correction counter (contract v0.16.0); absent on older backends, which cannot correct a version in place. */
+	version?: number;
+}
+
+/** Effect of a correction on the time account, computed by the server without saving (POST /work-models/{id}/preview). */
+export interface WorkModelPreview {
+	affectedFrom: string | null;
+	/** null = the version is open-ended */
+	affectedTo?: string | null;
+	affectedDays: number;
+	balanceBeforeSeconds: number;
+	balanceAfterSeconds: number;
+	differenceSeconds: number;
+	changedFields: string[];
+	/** New end of the previous version when it has to be adjusted. */
+	previousValidTo?: string | null;
 }
 
 export interface PlaceInput {

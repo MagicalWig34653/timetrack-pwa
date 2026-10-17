@@ -19,6 +19,7 @@ import WorkModelPage from './(app)/settings/work-model/+page.svelte';
 
 // Wednesday 14.10.2026 11:30 Berlin; only Date is faked so timers and promises keep running.
 const NOW = new Date('2026-10-14T09:30:00Z');
+const addDaysIso = (iso: string, days: number) => new Date(Date.parse(iso + 'T12:00:00Z') + days * 86_400_000).toISOString().slice(0, 10);
 let mock: ReturnType<typeof createMockFetch>;
 
 beforeEach(async () => {
@@ -226,6 +227,95 @@ describe('work model settings', () => {
 		} finally {
 			window.history.pushState({}, '', '/');
 		}
+	});
+
+	it('starts the new-version form pre-filled with the values of the newest version', async () => {
+		await api.createWorkModel({ validFrom: '2026-10-10', weeklyTargetSeconds: 36000, workdays: [1, 2, 3, 4], roundingEnabled: false, fixedBreaks: [{ start: '12:00', end: '12:30' }] });
+		render(WorkModelPage);
+		await userEvent.click(await screen.findByRole('button', { name: 'Neue Version anlegen' }));
+		expect(screen.getByLabelText('Wochen-Soll')).toHaveValue('10:00');
+		expect(screen.getByLabelText('Wochen-Soll')).toBeVisible();
+		expect(screen.getByLabelText('Rundung zugunsten der Arbeitszeit')).not.toBeChecked();
+		expect(screen.getByLabelText('Pause von')).toHaveValue('12:00');
+		expect(screen.getByLabelText('Fr')).not.toBeChecked();
+		expect(screen.getByLabelText('Mo')).toBeChecked();
+	});
+
+	it('shows the key values of every version prominently', async () => {
+		render(WorkModelPage);
+		const list = await screen.findByTestId('model-list');
+		expect(within(list).getByTestId('model-summary-weekly')).toHaveTextContent('38:30 h');
+		expect(within(list).getByTestId('model-summary-workdays')).toHaveTextContent('Mo–Fr');
+		expect(within(list).getByTestId('model-summary-daily')).toHaveTextContent('7:42 h');
+		expect(within(list).getByTestId('model-summary-rounding')).toHaveTextContent('15 Minuten');
+	});
+
+	it('corrects a version only after the warning, the live preview and the confirmation', async () => {
+		render(WorkModelPage);
+		await userEvent.click(await screen.findByTestId(/^edit-model-/));
+		// safe mode first: a new version from a date; the correction warning is not shown
+		expect(screen.getByTestId('mode-new')).toBeChecked();
+		expect(screen.queryByTestId('correction-panel')).toBeNull();
+		await userEvent.click(screen.getByTestId('mode-correct'));
+		expect(screen.getByTestId('correction-warning')).toHaveTextContent('Dein Zeitkonto kann sich ändern');
+		expect(screen.getByTestId('correction-warning')).toHaveTextContent('Bereits erfasste Zeiten bleiben unverändert, ihre Auswertung nicht');
+		const weekly = screen.getByLabelText('Wochen-Soll');
+		await userEvent.clear(weekly);
+		await userEvent.type(weekly, '28:00');
+		const line = await screen.findByTestId('preview-line');
+		expect(line).toHaveTextContent(/Zeitkonto heute: vorher [+-]?\d+:\d{2} → nachher [+-]?\d+:\d{2} \(.*\), betroffen: \d+ Tage/);
+		expect(screen.getByTestId('correction-preview')).toHaveTextContent('Geändert: Wochen-Soll');
+		const submit = screen.getByTestId('correct-submit');
+		expect(submit).toBeDisabled();
+		await userEvent.click(screen.getByLabelText('Ich habe verstanden, dass sich Auswertungen ändern'));
+		expect(submit).toBeEnabled();
+		const [model] = await api.listWorkModels();
+		await userEvent.click(submit);
+		expect(await screen.findByText('Version korrigiert. Die betroffenen Tage wurden neu ausgewertet.')).toBeInTheDocument();
+		const corrected = (await api.listWorkModels()).find((m) => m.id === model.id);
+		expect(corrected).toMatchObject({ weeklyTargetSeconds: 100800, version: 2 });
+		expect(mock.calls.filter((c) => c.method === 'PUT' && c.path.includes('/work-models/')).length).toBe(1);
+	});
+
+	it('changing a value after the confirmation asks for the confirmation again', async () => {
+		render(WorkModelPage);
+		await userEvent.click(await screen.findByTestId(/^edit-model-/));
+		await userEvent.click(screen.getByTestId('mode-correct'));
+		await screen.findByTestId('preview-line');
+		await userEvent.click(screen.getByLabelText('Ich habe verstanden, dass sich Auswertungen ändern'));
+		const weekly = screen.getByLabelText('Wochen-Soll');
+		await userEvent.clear(weekly);
+		await userEvent.type(weekly, '30:00');
+		await screen.findByTestId('preview-line');
+		await waitFor(() => expect(screen.getByLabelText('Ich habe verstanden, dass sich Auswertungen ändern')).not.toBeChecked());
+		expect(screen.getByTestId('correct-submit')).toBeDisabled();
+	});
+
+	it('explains an overlapping correction in plain German and changes nothing', async () => {
+		const first = (await api.listWorkModels())[0];
+		await api.createWorkModel({ validFrom: addDaysIso(first.validFrom, 40), weeklyTargetSeconds: 100800, workdays: [1, 2, 3, 4, 5] });
+		render(WorkModelPage);
+		const edit = (await screen.findAllByTestId(/^edit-model-/)).find((b) => b.getAttribute('data-testid') === `edit-model-${first.validFrom}`)!;
+		await userEvent.click(edit);
+		await userEvent.click(screen.getByTestId('mode-correct'));
+		await screen.findByTestId('preview-line');
+		const to = screen.getByLabelText('Gültig bis');
+		await userEvent.clear(to);
+		expect(await screen.findByTestId('preview-error')).toHaveTextContent('überschneidet sich mit einer Nachbarversion');
+		expect(screen.getByTestId('correct-submit')).toBeDisabled();
+		expect((await api.listWorkModels())[0].version).toBe(1);
+	});
+
+	it('hides the correction mode against an older backend without model versions', async () => {
+		const models = await api.listWorkModels();
+		vi.spyOn(api, 'listWorkModels').mockResolvedValue(models.map(({ version: _version, ...rest }) => rest));
+		render(WorkModelPage);
+		await userEvent.click(await screen.findByTestId(/^edit-model-/));
+		expect(screen.getByTestId('mode-new')).toBeChecked();
+		expect(screen.queryByTestId('mode-correct')).toBeNull();
+		expect(screen.getByTestId('mode-unsupported')).toHaveTextContent('noch nicht korrigieren');
+		await userEvent.click(screen.getByRole('button', { name: 'Version anlegen' }));
+		expect(await screen.findByText('Neue Version angelegt.')).toBeInTheDocument();
 	});
 
 	it('shows German validation errors instead of calling the API', async () => {

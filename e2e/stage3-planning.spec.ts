@@ -79,7 +79,7 @@ test('vacation settings: defaults are only suggested, explicit save stores 30 da
 
 	await page.goto('/vacation');
 	await goToYear(page, 'vacation-year', 2026);
-	await expect(page.getByTestId('settings-missing')).toBeVisible();
+	await expect(page.getByTestId('vacation-cta')).toBeVisible();
 	await expect(page.getByTestId('settings-suggestion')).toBeVisible();
 	// Balance of an unconfigured account is computed from the suggestion, nothing is stored yet.
 	expect((await api(page, 'GET', '/api/v1/vacation/settings')).body.configured).toBe(false);
@@ -92,9 +92,14 @@ test('vacation settings: defaults are only suggested, explicit save stores 30 da
 	const after = await api(page, 'GET', '/api/v1/vacation/settings');
 	expect(after.body).toMatchObject({ configured: true, region: 'DE-ST', annualEntitlementHalfDays: 60, carryOverExpiry: '03-31' });
 	await page.reload();
-	await expect(page.getByTestId('settings-missing')).toHaveCount(0);
+	await expect(page.getByTestId('vacation-cta')).toHaveCount(0);
 	await goToYear(page, 'vacation-year', 2026);
 	await expect(page.getByTestId('balance-available')).toHaveText('30 Tage');
+	// M1: the stored numbers are visible in the summary card at the top, the settings are one click away and pre-filled
+	await expect(page.getByTestId('vacation-balance')).toContainText('Dein Urlaubskonto 2026');
+	await expect(page.getByTestId('balance-entitlement')).toHaveText('30 Tage');
+	await page.getByTestId('vacation-edit-settings').click();
+	await expect(page.getByLabel('Jahresanspruch (Tage)')).toHaveValue('30');
 });
 
 test('snapshot "Resturlaub zum Stichtag" replaces the entitlement instead of adding to it', async () => {
@@ -109,7 +114,7 @@ test('snapshot "Resturlaub zum Stichtag" replaces the entitlement instead of add
 	await expect(page.getByText('Stichtagsbestand gespeichert.')).toBeVisible();
 
 	await expect(page.getByTestId('balance-snapshot')).toHaveText('20 Tage');
-	await expect(page.getByTestId('balance-entitlement')).toHaveCount(0);
+	await expect(page.getByTestId('vacation-tiles')).toContainText('durch den Stichtagsbestand ersetzt');
 	await expect(page.getByTestId('balance-available')).toHaveText('20 Tage'); // not 50
 	const bal = await api(page, 'GET', '/api/v1/vacation/balance?year=2026');
 	expect(bal.body).toMatchObject({ snapshotDate: '2026-01-01', snapshotRemainingHalfDays: 40, entitlementHalfDays: 0, carryOverHalfDays: 0, availableHalfDays: 40 });
@@ -188,7 +193,7 @@ test('vacation across Easter: holidays and weekends are not counted; planned -> 
 	await page.goto('/vacation');
 	await goToYear(page, 'vacation-year', 2026);
 	await expect(page.getByTestId('balance-available')).toHaveText('12 Tage');
-	await expect(page.getByTestId('balance-booked')).toHaveText('-8 Tage');
+	await expect(page.getByTestId('balance-booked')).toHaveText('8 Tage');
 	await expect(page.getByTestId('balance-planned')).toHaveText('0 Tage');
 });
 
@@ -587,4 +592,50 @@ test('entries can be deleted: absences from the list, plan day, custom day', asy
 	expect((await api(page, 'DELETE', `/api/v1/plan/days/${PLAN_DAY}`)).status).toBe(204);
 	// the day returns to a normal workday: target 7:42 again
 	expect((await api(page, 'GET', `/api/v1/time/days/${SICK_FROM}`)).body).toMatchObject({ mark: 'none', markSource: 'none', targetSeconds: 27720 });
+});
+
+// M1: pre-filled new-version form and correcting a version with preview and confirmation (real backend, contract v0.16.0).
+// Kept last: the correction changes alice's balance, which the earlier steps do not look at.
+test('work model: pre-filled form, correction with preview changes the balance as announced, overlap is explained', async () => {
+	const { page } = alice;
+	const clock = (seconds: number) => {
+		const sign = seconds < 0 ? '-' : seconds > 0 ? '+' : '';
+		const minutes = Math.floor(Math.abs(seconds) / 60);
+		return `${sign}${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`;
+	};
+	await page.goto('/settings/work-model');
+	await page.getByRole('button', { name: 'Neue Version anlegen' }).click();
+	await expect(page.getByLabel('Wochen-Soll')).toHaveValue('38:30');
+	await expect(page.getByLabel('Mo', { exact: true })).toBeChecked();
+	await page.getByRole('button', { name: 'Abbrechen' }).click();
+
+	const before = (await api(page, 'GET', '/api/v1/time/account')).body.balanceSeconds as number;
+	await page.getByTestId('edit-model-2026-01-05').click();
+	await page.getByTestId('mode-correct').check();
+	await page.getByLabel('Wochen-Soll').fill('30:00');
+	const line = page.getByTestId('preview-line');
+	await expect(line).toContainText(`vorher ${clock(before)}`);
+	await expect(page.getByTestId('correct-submit')).toBeDisabled();
+	const text = (await line.textContent()) ?? '';
+	await page.getByLabel('Ich habe verstanden, dass sich Auswertungen ändern').check();
+	await page.getByTestId('correct-submit').click();
+	await expect(page.getByTestId('toast')).toContainText('Version korrigiert');
+	const after = (await api(page, 'GET', '/api/v1/time/account')).body.balanceSeconds as number;
+	expect(after).toBeGreaterThan(before);
+	expect(text).toContain(`nachher ${clock(after)}`);
+	const models = (await api(page, 'GET', '/api/v1/work-models')).body;
+	expect(models[0]).toMatchObject({ weeklyTargetSeconds: 108000, version: 2 });
+	await expect(page.getByTestId('model-summary-weekly').first()).toContainText('30:00 h');
+
+	// a second version makes the first one a closed neighbour: running it into the successor is rejected in plain German
+	const created = await api(page, 'POST', '/api/v1/work-models', { validFrom: '2026-12-01', weeklyTargetSeconds: 108000, workdays: [1, 2, 3, 4, 5] });
+	expect(created.status).toBe(201);
+	await page.goto('/settings/work-model');
+	await page.getByTestId('edit-model-2026-01-05').click();
+	await page.getByTestId('mode-correct').check();
+	await expect(page.getByTestId('preview-line')).toBeVisible();
+	await page.getByLabel('Gültig bis').fill('');
+	await expect(page.getByTestId('preview-error')).toContainText('überschneidet sich mit einer Nachbarversion');
+	await expect(page.getByTestId('correct-submit')).toBeDisabled();
+	expect((await api(page, 'GET', '/api/v1/work-models')).body[0].validTo).toBe('2026-11-30');
 });

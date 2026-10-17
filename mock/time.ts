@@ -101,7 +101,8 @@ export function createTimeMock(clock: () => number) {
 			schoolFullDayThresholdSeconds: 10800,
 			schoolCreditSeconds: null,
 			dayBoundaryMinutes: 0,
-			fixedBreaks: []
+			fixedBreaks: [],
+			version: 1
 		});
 		const office: Place = { id: uuid(), name: 'Büro', kind: 'office', automationMode: 'direct', latitude: 52.52, longitude: 13.405, radiusMeters: 150, confirmAfterSeconds: 300, defaultSegmentKind: 'work', archived: false };
 		const school: Place = { id: uuid(), name: 'Berufsschule', kind: 'school', automationMode: 'suggest', latitude: null, longitude: null, radiusMeters: null, confirmAfterSeconds: 300, defaultSegmentKind: 'school', archived: false };
@@ -226,6 +227,49 @@ export function createTimeMock(clock: () => number) {
 		);
 	}
 
+	const EDITABLE_MODEL_FIELDS = [
+		'validFrom', 'validTo', 'timezone', 'weeklyTargetSeconds', 'workdays', 'dailyTargetSeconds', 'travelCountsAsWork',
+		'roundingEnabled', 'roundingMinutes', 'schoolFullDayThresholdSeconds', 'schoolCreditSeconds', 'dayBoundaryMinutes', 'fixedBreaks'
+	] as const;
+	const MODEL_DEFAULTS = {
+		timezone: DEFAULT_TIMEZONE,
+		travelCountsAsWork: true,
+		roundingEnabled: true,
+		roundingMinutes: 15,
+		schoolFullDayThresholdSeconds: 10800,
+		schoolCreditSeconds: null,
+		dayBoundaryMinutes: 0,
+		fixedBreaks: [],
+		dailyTargetSeconds: {},
+		validTo: null
+	};
+
+	/** Mirrors the backend plan (contract v0.16.0): validation, neighbour adjustment and the changed fields. */
+	function planCorrection(state: TimeState, id: string, body: WorkModelInput) {
+		const current = state.models.find((x) => x.id === id);
+		if (!current) return { error: fail(404, 'not_found') };
+		if (!validateModel(body) || (body.validTo != null && (!isDate(body.validTo) || body.validTo < body.validFrom))) return { error: fail(400, 'bad_request') };
+		const sorted = [...state.models].sort((a, b) => a.validFrom.localeCompare(b.validFrom));
+		const others = sorted.filter((x) => x.id !== id);
+		const previous = [...others].reverse().find((x) => x.validFrom < current.validFrom);
+		const next = others.find((x) => x.validFrom > current.validFrom);
+		const corrected: WorkModel = { ...MODEL_DEFAULTS, ...body, id, createdAt: current.createdAt, version: (current.version ?? 1) + 1 };
+		corrected.validTo = body.validTo ?? null;
+		let adjusted: WorkModel | null = null;
+		if (previous) {
+			if (corrected.validFrom <= previous.validFrom) return { error: fail(409, 'model_overlap') };
+			const adjacent = !previous.validTo || previous.validTo === addDays(current.validFrom, -1);
+			const end = addDays(corrected.validFrom, -1);
+			if ((adjacent || (previous.validTo ?? '') >= corrected.validFrom) && previous.validTo !== end) {
+				adjusted = { ...previous, validTo: end, version: (previous.version ?? 1) + 1 };
+			}
+		}
+		if (next && (!corrected.validTo || corrected.validTo >= next.validFrom)) return { error: fail(409, 'model_overlap') };
+		const models = sorted.map((x) => (x.id === id ? corrected : adjusted && x.id === adjusted.id ? adjusted : x));
+		const changedFields = EDITABLE_MODEL_FIELDS.filter((f) => JSON.stringify(current[f] ?? MODEL_DEFAULTS[f as keyof typeof MODEL_DEFAULTS] ?? null) !== JSON.stringify(corrected[f] ?? null));
+		return { models, corrected, adjusted, current, changedFields: [...changedFields] as string[] };
+	}
+
 	function validatePlace(input: PlaceInput): boolean {
 		return (
 			typeof input?.name === 'string' &&
@@ -268,6 +312,7 @@ export function createTimeMock(clock: () => number) {
 					fixedBreaks: [],
 					validTo: null,
 					...body,
+					version: 1,
 					id: uuid(),
 					createdAt: new Date(clock()).toISOString()
 				};
@@ -279,6 +324,12 @@ export function createTimeMock(clock: () => number) {
 			const model = state.models.find((x) => x.id === m![1]);
 			if (!model) return fail(404, 'not_found');
 			if (method === 'GET') return ok(model);
+			if (method === 'PUT') {
+				const plan = planCorrection(state, model.id, body);
+				if ('error' in plan) return plan.error as TimeResponse;
+				state.models = plan.models;
+				return ok(plan.corrected);
+			}
 			if (method === 'PATCH') {
 				if (!isDate(body.validTo) || body.validTo < model.validFrom) return fail(400, 'bad_request');
 				if (state.models.some((x) => x.id !== model.id && x.validFrom <= body.validTo && x.validFrom > model.validFrom)) {
@@ -287,6 +338,29 @@ export function createTimeMock(clock: () => number) {
 				model.validTo = body.validTo;
 				return ok(model);
 			}
+		}
+
+		if ((m = route.match(/^work-models\/([^/]+)\/preview$/)) && method === 'POST') {
+			const plan = planCorrection(state, m[1], body);
+			if ('error' in plan) return plan.error as TimeResponse;
+			const today = todayLocal(DEFAULT_TIMEZONE, new Date(clock()));
+			const before = account(state, today).balanceSeconds;
+			const after = account({ ...state, models: plan.models }, today).balanceSeconds;
+			const touched = [plan.current, plan.corrected, ...(plan.adjusted ? [plan.adjusted] : [])];
+			const from = touched.map((x) => x.validFrom).sort()[0];
+			const open = touched.some((x) => !x.validTo);
+			const to = open ? null : touched.map((x) => x.validTo as string).sort().at(-1) ?? null;
+			const last = to && to < today ? to : today;
+			return ok({
+				affectedFrom: from,
+				affectedTo: to,
+				affectedDays: from <= today ? daysBetween(from, last).length : 0,
+				balanceBeforeSeconds: before,
+				balanceAfterSeconds: after,
+				differenceSeconds: after - before,
+				changedFields: plan.changedFields,
+				previousValidTo: plan.adjusted?.validTo ?? null
+			});
 		}
 
 		// --- places ---
