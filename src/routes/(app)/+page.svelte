@@ -29,10 +29,23 @@
 	import { onMount } from 'svelte';
 
 	const name = $derived(sessionStore.current?.account.displayName ?? '');
+	async function dismissSetup() {
+		setupDismissed = true;
+		try {
+			await api.setOnboarding('skipped');
+			if (sessionStore.current) sessionStore.current = { ...sessionStore.current, account: { ...sessionStore.current.account, onboardingState: 'skipped' } };
+		} catch {
+			/* hidden for this visit; it will be offered again next time */
+		}
+	}
 	let load = $state<LoadState>({ status: 'loading' });
 	let now = $state(Date.now());
 	let running = $state<Segment | null>(null);
 	let day = $state<DayEvaluation | null>(null);
+	// The setup hint is only for accounts that have not set anything up: once a work model applies to today the account is
+	// configured (whether through the guided setup or by hand), so the hint stays away; it can also be dismissed for good.
+	let setupDismissed = $state(false);
+	const showSetupBanner = $derived(sessionStore.current?.account.onboardingState === 'pending' && !setupDismissed && !(day && day.modelId));
 	let segments = $state<Segment[]>([]);
 	let places = $state<Place[]>([]);
 	let account = $state<TimeAccount | null>(null);
@@ -101,10 +114,13 @@
 	<Alert variant="destructive">{load.message}</Alert>
 {:else}
 	<div class="flex flex-col gap-4">
-		{#if sessionStore.current?.account.onboardingState === 'pending'}
+		{#if showSetupBanner}
 			<Banner testid="setup-banner">
 				<span>{t('home.setup_banner')}</span>
-				{#snippet action()}<Button size="sm" href="/onboarding">{t('home.setup_start')}</Button>{/snippet}
+				{#snippet action()}
+					<Button size="sm" href="/onboarding">{t('home.setup_start')}</Button>
+					<Button size="sm" variant="outline" onclick={dismissSetup} data-testid="setup-dismiss">{t('home.setup_dismiss')}</Button>
+				{/snippet}
 			</Banner>
 		{/if}
 		{#if suggestions.length > 0 && moduleStore.enabled('automation')}
