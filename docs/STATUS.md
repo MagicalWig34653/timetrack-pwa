@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket K1 (Woche, 17.10.2026, Lead-Prüfung offen)
+Neuer Navigationspunkt „Woche“: `/week` (Übersicht, Kern) mit Wochenwahl, Kennzahlen, Tageskarten, Zusammenfassung mit Icons und Plan-Ist-Karte; `/plan` (Planer, Modul planning) mit Schnellaktionen, Live-Summen, Speichern über `PUT /plan/weeks/{isoWeek}` und Schutz vor Verlassen. Heute zeigt eine Planzeile, der Kalender die geplanten Zeiten. Vertrag v0.17.0; ältere Server zeigen einen Hinweis. Zahlen und Details: `docs/handoffs/K1.md`.
+
 ## Technik
 SvelteKit 3 (SPA, `adapter-static`, kein SSR), Svelte 5, TypeScript, Tailwind 4, shadcn-svelte (Nova/Neutral), Vitest + Testing Library, Playwright. Node nur für Entwicklung/Build.
 API-Client `src/lib/api/client.ts` (getippt von Hand nach `contracts/openapi.yaml`, aktuell v0.14.0 für Darstellung je Konto, v0.13.0 für Profil und Einrichtung, v0.12.0 für Konten und Push-Ersetzen, übrige Teile v0.10.x), Texte `src/lib/i18n/de*.ts`, Mock-API `mock/`.

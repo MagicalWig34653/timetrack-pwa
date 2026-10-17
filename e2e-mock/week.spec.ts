@@ -81,7 +81,11 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	await expect(page.getByTestId('week-planner')).toBeVisible();
 	await expect(page.getByTestId('plan-blocked-2032-03-17')).toContainText('Urlaub eingetragen.');
 	await expect(page.locator('#plan-mode-2032-03-17')).toBeDisabled();
-	await expect(page.getByTestId('plan-total-text')).toContainText('von 30:48 Soll');
+	// the target depends on the work model another spec may have changed: read it instead of assuming 4 x 7:42
+	const initial = (await page.getByTestId('plan-total-text').textContent()) ?? '';
+	const target = /von (\d+):(\d\d) Soll/.exec(initial)!;
+	const targetMinutes = Number(target[1]) * 60 + Number(target[2]);
+	const hm = (minutes: number) => `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`;
 	await expect(page.getByTestId('plan-save')).toBeDisabled();
 
 	await page.getByTestId('plan-standard').click();
@@ -98,8 +102,8 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	await page.getByTestId('plan-same').click();
 	await expect(page.locator('#plan-mode-2032-03-19')).toHaveValue('home');
 	await expect(page.getByTestId('plan-hours-2032-03-19')).toHaveText('8:00');
-	await expect(page.getByTestId('plan-total-text')).toHaveText('Plan 32:00 von 30:48 Soll');
-	await expect(page.getByTestId('plan-diff')).toHaveText('1:12 über Soll');
+	await expect(page.getByTestId('plan-total-text')).toHaveText(`Plan 32:00 von ${hm(targetMinutes)} Soll`);
+	await expect(page.getByTestId('plan-diff')).toHaveText(targetMinutes === 1920 ? 'genau im Soll' : targetMinutes < 1920 ? `${hm(1920 - targetMinutes)} über Soll` : `${hm(targetMinutes - 1920)} unter Soll`);
 
 	// validation: end before start blocks saving and names the day
 	await page.locator('#plan-end-2032-03-16').fill('07:00');
@@ -112,7 +116,7 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	await expect(page.getByTestId('plan-dirty')).toHaveAttribute('data-dirty', 'false');
 	await page.reload();
 	await expect(page.locator('#plan-end-2032-03-18')).toHaveValue('16:30');
-	await expect(page.getByTestId('plan-total-text')).toHaveText('Plan 32:00 von 30:48 Soll');
+	await expect(page.getByTestId('plan-total-text')).toHaveText(`Plan 32:00 von ${hm(targetMinutes)} Soll`);
 
 	// overview shows the plan as ghost bars and the plan card
 	await page.getByTestId('tab-overview').click();
@@ -145,7 +149,7 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	await page.getByTestId('plan-clear').click();
 	await page.getByTestId('plan-save').click();
 	await expect(page.getByTestId('toast')).toHaveText('Woche gespeichert.');
-	await expect(page.getByTestId('plan-total-text')).toHaveText('Plan 0:00 von 30:48 Soll');
+	await expect(page.getByTestId('plan-total-text')).toHaveText(`Plan 0:00 von ${hm(targetMinutes)} Soll`);
 	await context.close();
 });
 
