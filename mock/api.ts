@@ -4,6 +4,7 @@ import { createNotificationsMock } from './notifications.ts';
 import { createPlanningMock } from './planning.ts';
 import { createReportsMock } from './reports.ts';
 import { createTimeMock } from './time.ts';
+import { createWeekMock } from './week.ts';
 import { createTransferMock, type UploadedFile } from './transfer.ts';
 import { writeZip } from './worktime-xlsx.ts';
 
@@ -153,6 +154,12 @@ export function createMockApi(options: MockOptions = {}) {
 		planningEnabled: (accountId) => modules.effective(accountId, 'planning'),
 		absenceExists: (accountId, absenceId) => !!planning.states.get(accountId)?.absences.some((a) => a.id === absenceId),
 		storageSecretKey: options.storageSecretKey ?? true
+	});
+	const week = createWeekMock({
+		clock: options.now ?? Date.now,
+		time: (accountId, method, path, body) => time.handle(accountId, { method, path, body }),
+		planning: (accountId, method, path, body) => planning.handle(accountId, { method, path, body }),
+		planningEnabled: (accountId) => modules.effective(accountId, 'planning')
 	});
 	const reports = createReportsMock({
 		clock: options.now ?? Date.now,
@@ -814,6 +821,9 @@ export function createMockApi(options: MockOptions = {}) {
 
 		const mcpResponse = mcp.handle(account.id, session, { method, path: req.path, body: req.body });
 		if (mcpResponse) return mcpResponse;
+
+		const weekResponse = week.handle(account.id, { method, path: req.path, body: req.body });
+		if (weekResponse) return weekResponse;
 
 		const timeResponse = time.handle(account.id, {
 			method,

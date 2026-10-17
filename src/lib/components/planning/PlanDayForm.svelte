@@ -32,7 +32,15 @@
 		formError = '';
 		pending = true;
 		try {
-			await api.putPlanDay(date, { mode, placeId: placeId || null, note: note.trim() || null });
+			// PUT replaces the whole entry: planned times set in the week planner are carried over (the server drops them for mode off).
+			await api.putPlanDay(date, {
+				mode,
+				placeId: placeId || null,
+				note: note.trim() || null,
+				...(initial?.plannedStart && initial.plannedEnd
+					? { plannedStart: initial.plannedStart, plannedEnd: initial.plannedEnd, plannedBreakMinutes: initial.plannedBreakMinutes ?? null }
+					: {})
+			});
 			onsaved();
 		} catch (e) {
 			formError = errorMessage(e);

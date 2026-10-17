@@ -399,10 +399,107 @@ export interface PlanDayInput {
 	mode: PlanMode;
 	placeId?: string | null;
 	note?: string | null;
+	/** Contract v0.17.0 (K1): rough planned window as local wall-clock "HH:mm"; both or neither, start < end. */
+	plannedStart?: string | null;
+	plannedEnd?: string | null;
+	/** 0..600, only together with times. */
+	plannedBreakMinutes?: number | null;
 }
 
 export interface PlanDay extends PlanDayInput {
 	date: string;
+	/** Derived by the server: end - start - break, never negative; null without times. */
+	plannedSeconds?: number | null;
+}
+
+/** Contract v0.17.0 (K1): why a day cannot take a plan. */
+export type PlanBlock = 'holiday' | 'vacation' | 'sick' | 'excused';
+
+export interface PlanWeekDay {
+	date: string;
+	weekday: number;
+	targetSeconds: number;
+	/** Effective: 0 for a blocked day, null without a plan or times. */
+	plannedSeconds: number | null;
+	blockedBy: PlanBlock | null;
+	plan: PlanDay | null;
+}
+
+export interface PlanWeek {
+	week: string;
+	from: string;
+	to: string;
+	days: PlanWeekDay[];
+	totals: { targetSeconds: number; plannedSeconds: number; differenceSeconds: number };
+}
+
+export interface PlanWeekEntry extends PlanDayInput {
+	date: string;
+}
+
+export interface PlanWeekInput {
+	replace?: boolean;
+	days: PlanWeekEntry[];
+}
+
+export type WeekMark = 'work' | 'school' | 'vacation' | 'sick' | 'holiday' | 'excused' | 'off';
+
+export interface TimeWeekDay {
+	date: string;
+	weekday: number;
+	mark: WeekMark;
+	markSource: DayMarkSource;
+	targetSeconds: number;
+	plannedSeconds: number | null;
+	planMode: PlanMode | null;
+	workSeconds: number;
+	creditSeconds: number;
+	rawWorkSeconds: number;
+	breakSeconds: number;
+	breakDeductionSeconds: number;
+	travelSeconds: number;
+	schoolSeconds: number;
+	/** work + credit - target; null for days after today. */
+	balanceSeconds: number | null;
+	firstStart: string | null;
+	lastEnd: string | null;
+	segmentsCount: number;
+	absences: { kind: AbsenceKind; status: AbsenceStatus; halfDay: boolean }[];
+	provisional: boolean;
+	isToday: boolean;
+	isFuture: boolean;
+}
+
+export interface TimeWeekSummary {
+	targetSeconds: number;
+	targetToDateSeconds: number;
+	workSeconds: number;
+	creditSeconds: number;
+	balanceSeconds: number;
+	plannedSeconds: number | null;
+	accountBalanceBeforeSeconds: number;
+	accountBalanceAfterSeconds: number;
+	accountBalanceAsOf: string;
+	/** Half days count 0.5. */
+	vacationDays: number;
+	sickDays: number;
+	schoolDays: number;
+	holidayDays: number;
+	workDays: number;
+	travelSeconds: number;
+	breakSeconds: number;
+	averageStart: string | null;
+	averageEnd: string | null;
+	longestDay: { date: string; seconds: number } | null;
+	provisional: boolean;
+}
+
+export interface TimeWeek {
+	week: string;
+	from: string;
+	to: string;
+	days: TimeWeekDay[];
+	summary: TimeWeekSummary;
 }
 
 export interface ShareScopes {
@@ -425,7 +522,7 @@ export interface IncomingShare {
 }
 
 export interface SharedView {
-	plan?: { date: string; mode: PlanMode }[];
+	plan?: { date: string; mode: PlanMode; plannedStart?: string; plannedEnd?: string; plannedBreakMinutes?: number; plannedSeconds?: number }[];
 	actual?: { date: string; evaluatedStart?: string | null; evaluatedEnd?: string | null; evaluatedWorkSeconds: number }[];
 	vacation?: { startDate: string; endDate: string }[];
 }

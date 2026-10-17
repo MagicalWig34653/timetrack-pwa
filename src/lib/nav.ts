@@ -4,6 +4,7 @@ import type { MessageKey } from '#lib/i18n/index.js';
 export const MAIN_LINKS: { href: string; label: MessageKey; prefix: boolean; section?: string }[] = [
 	{ href: '/', label: 'nav.home', prefix: false },
 	{ href: '/time', label: 'nav.time', prefix: true },
+	{ href: '/week', label: 'nav.week', prefix: true },
 	{ href: '/suggestions', label: 'nav.suggestions', prefix: true },
 	{ href: '/reports', label: 'nav.reports', prefix: true },
 	{ href: '/calendar', label: 'nav.calendar', prefix: true },
@@ -70,7 +71,9 @@ export interface NavItem {
 	href: string;
 	label: MessageKey;
 	prefix: boolean;
-	icon: 'house' | 'clock' | 'calendar' | 'book' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'users' | 'modules' | 'storage';
+	icon: 'house' | 'clock' | 'week' | 'calendar' | 'book' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'users' | 'modules' | 'storage';
+	/** further path prefixes that keep the entry highlighted (the planner tab of "Woche" lives at /plan) */
+	alsoActive?: string[];
 	/** badge source rendered by the sidebar */
 	badge?: 'suggestions';
 }
@@ -90,6 +93,7 @@ export const NAV_GROUPS: NavGroup[] = [
 		items: [
 			{ href: '/', label: 'nav.home', prefix: false, icon: 'house' },
 			{ href: '/time', label: 'nav.time', prefix: true, icon: 'clock' },
+			{ href: '/week', label: 'nav.week', prefix: true, icon: 'week', alsoActive: ['/plan'] },
 			{ href: '/calendar', label: 'nav.calendar', prefix: true, icon: 'calendar' },
 			{ href: '/reports', label: 'nav.reports', prefix: true, icon: 'book' }
 		]
@@ -157,6 +161,7 @@ const ALL_LABELS = new Map<string, MessageKey>();
 for (const group of NAV_GROUPS) for (const item of group.items) ALL_LABELS.set(item.href, item.label);
 for (const link of [...SETTINGS_LINKS, ...SETTINGS_ADMIN_LINKS]) ALL_LABELS.set(link.href, link.label);
 ALL_LABELS.set('/notifications', 'nav.notifications');
+ALL_LABELS.set('/plan', 'nav.week');
 
 /** Breadcrumb trail for a pathname: section, then page; unknown tails are shown as text. */
 export function breadcrumbs(pathname: string): Crumb[] {

@@ -146,7 +146,7 @@ describe('mock calendar and plan', () => {
 
 	it('stores plan days per date', async () => {
 		await api.putPlanDay('2026-11-02', { mode: 'customer', note: 'Kunde A' });
-		expect((await api.listPlanDays('2026-11-01', '2026-11-07'))).toEqual([{ date: '2026-11-02', mode: 'customer', placeId: null, note: 'Kunde A' }]);
+		expect((await api.listPlanDays('2026-11-01', '2026-11-07'))).toEqual([{ date: '2026-11-02', mode: 'customer', placeId: null, note: 'Kunde A', plannedStart: null, plannedEnd: null, plannedBreakMinutes: null, plannedSeconds: null }]);
 		await api.deletePlanDay('2026-11-02');
 		expect(await api.listPlanDays('2026-11-01', '2026-11-07')).toEqual([]);
 		expect(await code(api.putPlanDay('2026-11-02', { mode: 'sick' as never }))).toBe('400:bad_request');

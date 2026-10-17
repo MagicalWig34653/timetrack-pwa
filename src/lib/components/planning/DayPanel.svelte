@@ -98,7 +98,7 @@
 			{/each}
 			<dt class="text-muted-foreground">{t('calendar.plan')}</dt>
 			<dd data-testid="panel-plan">
-				{#if info.plan}{planModeLabel(info.plan.mode)}{#if info.plan.note} · {info.plan.note}{/if}{:else}{t('calendar.no_plan')}{/if}
+				{#if info.plan}{planModeLabel(info.plan.mode)}{#if info.plan.plannedStart && info.plan.plannedEnd} · <span class="tabular-nums" data-testid="panel-plan-times">{t('calendar.plan_times', { start: info.plan.plannedStart, end: info.plan.plannedEnd })}{#if info.plan.plannedBreakMinutes}, {t('calendar.plan_break', { minutes: info.plan.plannedBreakMinutes })}{/if}</span>{/if}{#if info.plan.note} · {info.plan.note}{/if}{:else}{t('calendar.no_plan')}{/if}
 			</dd>
 			{#if evaluation}
 				<dt class="text-muted-foreground">{t('calendar.evaluation')}</dt>

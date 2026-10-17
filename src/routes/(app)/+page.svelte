@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '#lib/api/client.js';
-	import type { DayEvaluation, Place, Segment, Suggestion, TimeAccount } from '#lib/api/types.js';
+	import type { DayEvaluation, Place, PlanDay, Segment, Suggestion, TimeAccount } from '#lib/api/types.js';
 	import Banner from '#lib/components/app/Banner.svelte';
 	import KpiCard from '#lib/components/app/KpiCard.svelte';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
@@ -18,6 +18,8 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
 	import { t } from '#lib/i18n/index.js';
+	import { planModeLabel } from '#lib/planning/labels.js';
+	import CalendarClock from '@lucide/svelte/icons/calendar-clock';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { sessionStore } from '#lib/session.svelte.js';
 	import { dayBounds, formatDateLong, todayLocal } from '#lib/time/dates.js';
@@ -48,6 +50,7 @@
 	let places = $state<Place[]>([]);
 	let account = $state<TimeAccount | null>(null);
 	let suggestions = $state<Suggestion[]>([]);
+	let todayPlan = $state<PlanDay | null>(null);
 
 	const timeZone = $derived(zoneStore.value);
 	const today = $derived(todayLocal(timeZone, new Date(now)));
@@ -66,6 +69,8 @@
 				// Non-critical calls start immediately but are applied independently of the critical ones.
 				void api.getTimeAccount().then((balance) => (account = balance), () => {});
 				void api.listPlaces().then((list) => (places = list), () => {});
+				// K1: a plan with times for today is shown as one quiet line; failures (older server, module off) just hide it.
+				if (moduleStore.enabled('planning')) void api.listPlanDays(date, date).then((plans) => (todayPlan = plans[0] ?? null), () => (todayPlan = null));
 				if (moduleStore.enabled('automation')) void api.listSuggestions().then((open) => (suggestions = open), () => {});
 			}
 			const [timer, evaluation, daySegments] = await Promise.all([
@@ -142,6 +147,19 @@
 				/>
 			{/if}
 		</div>
+
+		{#if todayPlan}
+			<p class="flex items-center gap-2 text-sm text-muted-foreground" data-testid="today-plan">
+				<CalendarClock class="size-4 shrink-0" aria-hidden="true" />
+				<span>
+					{#if todayPlan.plannedStart && todayPlan.plannedEnd}
+						{t('home.plan_today', { time: `${todayPlan.plannedStart}–${todayPlan.plannedEnd}`, mode: planModeLabel(todayPlan.mode) })}
+					{:else}
+						{t('home.plan_today_no_time', { mode: planModeLabel(todayPlan.mode) })}
+					{/if}
+				</span>
+			</p>
+		{/if}
 
 		<TimerCard {running} {places} {now} {timeZone} onchange={onTimerChange} />
 

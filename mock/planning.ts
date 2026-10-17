@@ -62,6 +62,35 @@ interface StoredShare extends Share {
 }
 
 const uuid = () => crypto.randomUUID();
+/** K1: server-side derivation of the planned seconds (end - start - break, never negative). */
+export function plannedSecondsOf(start?: string | null, end?: string | null, breakMinutes?: number | null): number | null {
+	const clock = (value?: string | null) => {
+		const match = value ? /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value) : null;
+		return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+	};
+	const from = clock(start);
+	const to = clock(end);
+	if (from === null || to === null || to <= from) return null;
+	return Math.max(0, (to - from - (breakMinutes ?? 0)) * 60);
+}
+
+/** Validates and normalizes one plan day body (contract v0.17.0): both or neither time, start < end, break 0..600, off ignores times. */
+export function normalizePlanBody(body: any): { day: Omit<PlanDay, 'date'> } | { error: string } {
+	if (!body || !PLAN_MODES.includes(body.mode) || (body.note != null && (typeof body.note !== 'string' || body.note.length > 200))) return { error: 'bad_request' };
+	const base = { mode: body.mode as PlanMode, placeId: body.placeId ?? null, note: body.note ?? null };
+	const start = body.plannedStart ?? null;
+	const end = body.plannedEnd ?? null;
+	const breakMinutes = body.plannedBreakMinutes ?? null;
+	if (body.mode === 'off') return { day: { ...base, plannedStart: null, plannedEnd: null, plannedBreakMinutes: null, plannedSeconds: null } };
+	if (start === null && end === null) {
+		if (breakMinutes !== null) return { error: 'plan_break_invalid' };
+		return { day: { ...base, plannedStart: null, plannedEnd: null, plannedBreakMinutes: null, plannedSeconds: null } };
+	}
+	if (typeof start !== 'string' || typeof end !== 'string' || plannedSecondsOf(start, end, 0) === null) return { error: 'plan_time_invalid' };
+	if (breakMinutes !== null && !(Number.isInteger(breakMinutes) && breakMinutes >= 0 && breakMinutes <= 600)) return { error: 'plan_break_invalid' };
+	return { day: { ...base, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes, plannedSeconds: plannedSecondsOf(start, end, breakMinutes) } };
+}
+
 const fail = (status: number, code: string, message = code): PlanningResponse => ({ status, body: { error: { code, message } } });
 const ok = (body: unknown, status = 200): PlanningResponse => ({ status, body });
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && addDays(v, 0) === v;
@@ -229,7 +258,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const state = stateOf(share.ownerId);
 		const view: SharedView = {};
 		if (share.scopes.plan) {
-			view.plan = [...state.plan.values()].filter((p) => p.date >= from && p.date <= to).sort((a, b) => a.date.localeCompare(b.date)).map((p) => ({ date: p.date, mode: p.mode }));
+			view.plan = [...state.plan.values()].filter((p) => p.date >= from && p.date <= to).sort((a, b) => a.date.localeCompare(b.date)).map((p) => ({ date: p.date, mode: p.mode, ...(p.plannedStart ? { plannedStart: p.plannedStart, plannedEnd: p.plannedEnd!, ...(p.plannedBreakMinutes != null ? { plannedBreakMinutes: p.plannedBreakMinutes } : {}), plannedSeconds: p.plannedSeconds ?? 0 } : {}) }));
 		}
 		if (share.scopes.actual) {
 			view.actual = daysBetween(from, to)
@@ -260,9 +289,18 @@ export function createPlanningMock(deps: PlanningDeps) {
 		add({ kind: 'vacation', startDate: addDays(monday, 14), endDate: addDays(monday, 18), status: 'approved' });
 		add({ kind: 'vacation', startDate: addDays(monday, 42), endDate: addDays(monday, 44), halfDayEnd: true, status: 'planned' });
 		state.customDays.push({ id: uuid(), kind: 'school_holiday', startDate: addDays(monday, 21), endDate: addDays(monday, 25), name: 'Berufsschulferien', source: 'custom' });
-		const modes: PlanMode[] = ['office', 'office', 'home', 'school', 'home'];
-		modes.forEach((mode, i) => state.plan.set(addDays(monday, i), { date: addDays(monday, i), mode, placeId: null, note: i === 3 ? 'Blockwoche' : null }));
-		['office', 'customer', 'home', 'office', 'off'].forEach((mode, i) => state.plan.set(addDays(monday, 7 + i), { date: addDays(monday, 7 + i), mode: mode as PlanMode, placeId: null, note: null }));
+		const put = (date: string, mode: PlanMode, start: string | null, end: string | null, breakMinutes: number | null, note: string | null = null) =>
+			state.plan.set(date, { date, mode, placeId: null, note, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes, plannedSeconds: plannedSecondsOf(start, end, breakMinutes) });
+		put(addDays(monday, 0), 'office', '08:00', '16:30', 30);
+		put(addDays(monday, 1), 'office', '08:00', '16:30', 30);
+		put(addDays(monday, 2), 'home', '08:30', '17:00', 30);
+		put(addDays(monday, 3), 'school', '08:00', '13:30', null, 'Blockwoche');
+		put(addDays(monday, 4), 'home', '08:00', '14:30', 30);
+		put(addDays(monday, 7), 'office', '08:00', '16:30', 30);
+		put(addDays(monday, 8), 'customer', '07:30', '16:00', 30);
+		put(addDays(monday, 9), 'home', '08:00', '16:30', 30);
+		put(addDays(monday, 10), 'office', '08:00', '16:30', 30);
+		put(addDays(monday, 11), 'off', null, null, null);
 	}
 
 	function seedShare(ownerId: string, recipientId: string, recipientHandle: string, scopes: ShareScopes): void {
@@ -423,8 +461,9 @@ export function createPlanningMock(deps: PlanningDeps) {
 			const date = m[1];
 			if (!isDate(date)) return fail(400, 'bad_request');
 			if (method === 'PUT') {
-				if (!PLAN_MODES.includes(body.mode) || (body.note != null && (typeof body.note !== 'string' || body.note.length > 200))) return fail(400, 'bad_request');
-				const day: PlanDay = { date, mode: body.mode, placeId: body.placeId ?? null, note: body.note ?? null };
+				const normalized = normalizePlanBody(body);
+				if ('error' in normalized) return fail(400, normalized.error);
+				const day: PlanDay = { date, ...normalized.day };
 				state.plan.set(date, day);
 				return ok(day);
 			}
