@@ -1,4 +1,5 @@
 import { createMcpMock } from './mcp.ts';
+import { createMailMock } from './mail.ts';
 import { createModulesMock, type ModuleKey } from './modules.ts';
 import { createNotificationsMock } from './notifications.ts';
 import { createPlanningMock } from './planning.ts';
@@ -143,6 +144,7 @@ export function createMockApi(options: MockOptions = {}) {
 		findByHandle: (handle) => [...accounts.values()].find((a) => a.handle === handle),
 		displayNameOf: (id) => accounts.get(id)?.displayName ?? ''
 	});
+	const mail = createMailMock({ configured: options.mailAvailable ?? true });
 	const modules = createModulesMock({ disabledByOperator: options.modulesDisabled });
 	// With planning switched off, absences and holidays do not act on the day evaluation (ADR-0012).
 	time.setDayContext((accountId, date) => (modules.effective(accountId, 'planning') ? planning.dayContext(accountId, date) : null));
@@ -446,6 +448,7 @@ export function createMockApi(options: MockOptions = {}) {
 			if (body.staleSessions === true) for (const other of sessions.values()) other.stale = true;
 			return { status: 200, body: { enabled: oidc.enabled, name: oidc.name } };
 		}
+		if (path === '/api/v1/mock/mail' && method === 'POST') return mail.hook(body);
 		if (path === '/api/v1/mock/accounts' && method === 'POST') {
 			// test hook, not part of the contract: add accounts, fail the next deletion, age sessions (reauth_required)
 			if (typeof body.failDeletion === 'boolean') failDeletion = body.failDeletion;
@@ -810,6 +813,12 @@ export function createMockApi(options: MockOptions = {}) {
 			account.emailRecovery = { active: true, verified: true };
 			return { status: 204 };
 		}
+
+		const mailResponse = mail.handle(
+			{ admin: account.role === 'admin', stale: !!session.stale, email: account.emailVerified ? account.email : undefined },
+			{ method, path, body: req.body }
+		);
+		if (mailResponse) return mailResponse;
 
 		const modulesResponse = modules.handle(account.id, account.role, { method, path, body: req.body });
 		if (modulesResponse) return modulesResponse;

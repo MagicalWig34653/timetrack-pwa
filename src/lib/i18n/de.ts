@@ -1,5 +1,6 @@
 import { deAccounts } from './de-accounts';
 import { deDesign } from './de-design';
+import { deMail } from './de-mail';
 import { deMcp } from './de-mcp';
 import { deModules } from './de-modules';
 import { deOidc } from './de-oidc';
@@ -16,6 +17,7 @@ import { deWorktime } from './de-worktime';
 export const de = {
 	...deAccounts,
 	...deDesign,
+	...deMail,
 	...deMcp,
 	...deModules,
 	...deOidc,

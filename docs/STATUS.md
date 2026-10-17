@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket MAIL1 (E-Mail-Prüfung, 17.10.2026, Lead-Prüfung offen)
+Neue Adminseite `/admin/mail` („E-Mail“, Seitenleiste Verwaltung nach Module und Einstellungen, Gruppe Verwaltung; Link auch im Profilhinweis für Admins): Statuskarte (Server, Port, Verschlüsselung mit Erklärung, Absender, Hinweise), Checkliste mit kopierbaren Umgebungszeilen bei fehlender Einrichtung, „Verbindung prüfen“ als senkrechte Schrittanzeige (Zeiten und Erklärungen vom Server), „Testmail senden“ (frische Sitzung, sonst Hinweis zur erneuten Anmeldung), Erklärung der Nutzung. Vertrag v0.18.0; ältere Server (404): „Dieser Server unterstützt die Prüfung noch nicht“. Details: `docs/handoffs/MAIL1.md`.
+
 ## Paket K1 (Woche, 17.10.2026, Lead-Prüfung offen)
 Neuer Navigationspunkt „Woche“: `/week` (Übersicht, Kern) mit Wochenwahl, Kennzahlen, Tageskarten, Zusammenfassung mit Icons und Plan-Ist-Karte; `/plan` (Planer, Modul planning) mit Schnellaktionen, Live-Summen, Speichern über `PUT /plan/weeks/{isoWeek}` und Schutz vor Verlassen. Heute zeigt eine Planzeile, der Kalender die geplanten Zeiten. Vertrag v0.17.0; ältere Server zeigen einen Hinweis. Zahlen und Details: `docs/handoffs/K1.md`.
 

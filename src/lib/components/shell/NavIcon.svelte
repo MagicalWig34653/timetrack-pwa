@@ -6,6 +6,7 @@
 	import Download from '@lucide/svelte/icons/download';
 	import House from '@lucide/svelte/icons/house';
 	import Invite from '@lucide/svelte/icons/user-plus';
+	import Mail from '@lucide/svelte/icons/mail';
 	import Modules from '@lucide/svelte/icons/layout-dashboard';
 	import Absence from '@lucide/svelte/icons/calendar-off';
 	import Plane from '@lucide/svelte/icons/plane';
@@ -17,7 +18,7 @@
 	import type { NavItem } from '#lib/nav.js';
 
 	let { name }: { name: NavItem['icon'] } = $props();
-	const icons = { house: House, clock: Clock, week: Week, calendar: Calendar, book: Book, plane: Plane, absence: Absence, share: Share, bulb: Bulb, download: Download, upload: Upload, invite: Invite, users: Users, modules: Modules, storage: Storage };
+	const icons = { house: House, clock: Clock, week: Week, calendar: Calendar, book: Book, plane: Plane, absence: Absence, share: Share, bulb: Bulb, download: Download, upload: Upload, invite: Invite, users: Users, modules: Modules, storage: Storage, mail: Mail };
 	const Icon = $derived(icons[name]);
 </script>
 
