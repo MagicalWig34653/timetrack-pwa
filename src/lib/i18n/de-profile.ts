@@ -50,6 +50,7 @@ export const deProfile = {
 
 	'home.setup_banner': 'Richte dein Konto in wenigen Schritten ein: Arbeitszeit, Pausen, Berufsschule und Urlaub.',
 	'home.setup_start': 'Einrichtung starten',
+	'home.setup_dismiss': 'Nicht mehr anzeigen',
 	'home.setup_later': 'Nicht jetzt',
 
 	'onboarding.title': 'Einrichtung',

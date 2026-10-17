@@ -48,6 +48,17 @@ test('a new account is offered the setup, the demo admin is not; the settings na
 	await context.close();
 });
 
+test('setup banner can be dismissed for good', async ({ browser }) => {
+	const { page, context } = await newAccount(browser, 'e2e-dora', 'Dora E2E');
+	await expect(page.getByTestId('setup-banner')).toBeVisible();
+	await page.getByTestId('setup-dismiss').click();
+	await expect(page.getByTestId('setup-banner')).toHaveCount(0);
+	await page.reload();
+	await expect(page.getByTestId('setup-banner')).toHaveCount(0);
+	expect(await profileState(page)).toBe('skipped');
+	await context.close();
+});
+
 test('profile: rename, e-mail change with code, wrong code, removal', async ({ browser }) => {
 	const { page, context } = await newAccount(browser, 'e2e-paul', 'Paul E2E');
 	await page.goto('/settings/profile');
