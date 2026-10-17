@@ -120,6 +120,32 @@ export function startOfWeek(date: string): string {
 	return addDays(date, 1 - isoWeekday(date));
 }
 
+/** ISO 8601 week of a local day as "2026-W44" (the ISO year can differ from the calendar year around New Year). */
+export function isoWeekLabel(date: string): string {
+	const thursday = addDays(date, 4 - isoWeekday(date));
+	const year = Number(thursday.slice(0, 4));
+	const firstThursday = addDays(`${year}-01-04`, 4 - isoWeekday(`${year}-01-04`));
+	const week = 1 + Math.round((Date.parse(thursday) - Date.parse(firstThursday)) / (7 * 86_400_000));
+	return `${year}-W${pad(week)}`;
+}
+
+/** Calendar week number (1..53) of a local day. */
+export function isoWeekNumber(date: string): number {
+	return Number(isoWeekLabel(date).slice(6));
+}
+
+/** Monday of an ISO week label like "2026-W44"; null if invalid. */
+export function mondayOfIsoWeek(label: string): string | null {
+	const match = /^(\d{4})-W(\d{2})$/.exec(label);
+	if (!match) return null;
+	const year = Number(match[1]);
+	const week = Number(match[2]);
+	if (week < 1 || week > 53) return null;
+	const january4 = `${year}-01-04`;
+	const monday = addDays(startOfWeek(january4), (week - 1) * 7);
+	return isoWeekLabel(monday) === label ? monday : null;
+}
+
 /** Instants bounding a local day: [start, end). */
 export function dayBounds(date: string, timeZone = DEFAULT_TIMEZONE): { start: Date; end: Date } {
 	return { start: zonedTimeToInstant(date, '00:00', timeZone), end: zonedTimeToInstant(addDays(date, 1), '00:00', timeZone) };

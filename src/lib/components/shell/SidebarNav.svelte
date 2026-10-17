@@ -34,9 +34,10 @@
 	let query = $state('');
 	const results = $derived(searchSettings(settingsLinks, query, (key) => t(key)));
 
-	function isActive(item: { href: string; prefix: boolean }): boolean {
+	function isActive(item: { href: string; prefix: boolean; alsoActive?: string[] }): boolean {
 		const path = page.url.pathname;
-		return item.prefix ? path === item.href || path.startsWith(item.href + '/') : path === item.href;
+		const on = (href: string) => path === href || path.startsWith(href + '/');
+		return item.prefix ? on(item.href) || (item.alsoActive?.some(on) ?? false) : path === item.href;
 	}
 	const settingsActive = $derived(page.url.pathname.startsWith('/settings'));
 	const accountActive = $derived(['/settings/passkeys', '/settings/identities', '/settings/recovery', '/settings/sessions'].includes(page.url.pathname));

@@ -39,6 +39,9 @@ import type {
 	IncomingShare,
 	PlanDay,
 	PlanDayInput,
+	PlanWeek,
+	PlanWeekInput,
+	TimeWeek,
 	Share,
 	ShareScopes,
 	SharedView,
@@ -478,6 +481,10 @@ export const api = {
 		(await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<PlanDay[]>('GET', `/plan/days?from=${r.from}&to=${r.to}`)))).flat(),
 	putPlanDay: (date: string, input: PlanDayInput) => request<PlanDay>('PUT', `/plan/days/${date}`, input),
 	deletePlanDay: (date: string) => request<void>('DELETE', `/plan/days/${date}`),
+	/** Contract v0.17.0 (K1): `isoWeek` like 2026-W44. */
+	getPlanWeek: (isoWeek: string) => request<PlanWeek>('GET', `/plan/weeks/${isoWeek}`),
+	putPlanWeek: (isoWeek: string, input: PlanWeekInput) => request<PlanWeek>('PUT', `/plan/weeks/${isoWeek}`, input),
+	getTimeWeek: (isoWeek: string) => cachedRead(`week:${isoWeek}`, () => request<TimeWeek>('GET', `/time/weeks/${isoWeek}`)),
 
 	// shares
 	listShares: () => request<Share[]>('GET', '/shares'),

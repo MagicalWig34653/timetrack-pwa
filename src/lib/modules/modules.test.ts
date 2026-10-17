@@ -55,6 +55,7 @@ describe('module route classification (ADR-0012)', () => {
 			'/settings/learning-fields': 'reports',
 			'/vacation': 'planning',
 			'/calendar': 'planning',
+			'/plan': 'planning',
 			'/absences': 'planning',
 			'/shared': 'planning',
 			'/settings/sharing': 'planning',

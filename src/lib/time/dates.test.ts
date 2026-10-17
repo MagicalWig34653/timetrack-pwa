@@ -71,3 +71,20 @@ describe('datetime-local conversion', () => {
 		expect(fromLocalInputValue('2026-02-30T10:00')).toBeNull();
 	});
 });
+
+describe('ISO weeks', () => {
+	it('labels days with the ISO year and week', async () => {
+		const { isoWeekLabel, isoWeekNumber, mondayOfIsoWeek } = await import('./dates.js');
+		expect(isoWeekLabel('2026-10-20')).toBe('2026-W43');
+		expect(isoWeekLabel('2026-12-31')).toBe('2026-W53');
+		expect(isoWeekLabel('2027-01-01')).toBe('2026-W53');
+		expect(isoWeekLabel('2024-12-30')).toBe('2025-W01');
+		expect(isoWeekLabel('2026-01-01')).toBe('2026-W01');
+		expect(isoWeekNumber('2026-10-17')).toBe(42);
+		expect(mondayOfIsoWeek('2026-W43')).toBe('2026-10-19');
+		expect(mondayOfIsoWeek('2025-W01')).toBe('2024-12-30');
+		expect(mondayOfIsoWeek('2027-W53')).toBeNull();
+		expect(mondayOfIsoWeek('2026-W00')).toBeNull();
+		expect(mondayOfIsoWeek('nonsense')).toBeNull();
+	});
+});

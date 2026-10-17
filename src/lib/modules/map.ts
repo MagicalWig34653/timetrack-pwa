@@ -8,6 +8,7 @@ import type { ModuleKey } from '../api/types';
 export const CORE_ROUTES = [
 	'/',
 	'/time',
+	'/week',
 	'/notifications',
 	'/login',
 	'/invite',
@@ -36,7 +37,7 @@ export const CORE_ROUTES = [
 
 export const MODULE_ROUTES: Record<ModuleKey, readonly string[]> = {
 	reports: ['/reports', '/settings/learning-fields'],
-	planning: ['/vacation', '/calendar', '/absences', '/shared', '/settings/sharing'],
+	planning: ['/vacation', '/calendar', '/plan', '/absences', '/shared', '/settings/sharing'],
 	transfer: ['/export', '/import', '/settings/storage'],
 	automation: ['/settings/devices', '/suggestions'],
 	mcp: ['/settings/api-tokens', '/settings/connections', '/settings/mcp-help', '/oauth/consent']

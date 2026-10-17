@@ -8,6 +8,7 @@ import { deProfile } from './de-profile';
 import { dePwa } from './de-pwa';
 import { deReports } from './de-reports';
 import { deTransfer } from './de-transfer';
+import { deWeek } from './de-week';
 import { deWorktime } from './de-worktime';
 
 // German UI texts. Keys are English; values are the only user-visible strings.
@@ -24,6 +25,7 @@ export const de = {
 	...deReports,
 	...deTransfer,
 	...deWorktime,
+	...deWeek,
 	'app.name': 'Timetrack',
 
 	'common.loading': 'Wird geladen …',
