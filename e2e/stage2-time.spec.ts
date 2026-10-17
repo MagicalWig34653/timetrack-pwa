@@ -92,7 +92,7 @@ test('work model: 38:30 h Mon-Fri, rounding on, fixed break', async () => {
 	const list = page.getByTestId('model-list');
 	await expect(list).toContainText('38:30');
 	await expect(list).toContainText('7:42');
-	await expect(list).toContainText('Mo, Di, Mi, Do, Fr');
+	await expect(list).toContainText('Mo–Fr');
 
 	const res = await api(page, 'GET', '/api/v1/work-models');
 	expect(res.status).toBe(200);

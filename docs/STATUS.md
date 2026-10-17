@@ -27,6 +27,9 @@ Akzentfarbe (Voreinstellungen `blue|teal|violet|green|orange|pink|graphite` oder
 Abgleich in `ThemeStore.reconcile` (`src/lib/theme/theme.svelte.ts`, aufgerufen von `sessionStore`): eine ungesendete lokale Änderung desselben Kontos (`tt.prefsPending` = Konto-ID) gewinnt und wird gesendet; sonst überschreiben die Kontowerte den Cache. Hat das Konto nie Werte und weicht der Cache von den Standardwerten ab, wird die lokale Wahl einmal übertragen (nicht, wenn der Cache `tt.prefsOwner` einem anderen Konto gehört). Anmeldeseite nutzt nur den Cache. Statuszeile `appearance-sync` auf `/settings/appearance`. Ältere Server ohne `account.preferences`: rein lokal wie zuvor.
 Details und Tests: `docs/handoffs/P2.md`.
 
+## Arbeitsmodell korrigieren, Urlaubskonto (M1, Vertrag v0.16.0; Lead-Prüfung offen)
+Arbeitsmodell-Seite: Formular startet mit den Werten der neuesten Version; „Bearbeiten“ je Version mit den Modi „Ab einem Datum ändern“ (neue Version) und „Diese Version korrigieren“ (`PUT`, nur wenn der Server `version` liefert) mit Warnbanner, Live-Vorschau (`POST .../preview`) und Bestätigung. Urlaub: Karte „Dein Urlaubskonto“ mit Anspruch, Übertrag, Korrekturen, Stichtag, genommen, geplant; ohne Anspruch eine Handlungsaufforderung. Übergabe: `docs/handoffs/M1.md`.
+
 ## Modulschalter (L17)
 `moduleStore` (`src/lib/modules/store.svelte.ts`) lädt `GET /modules` nach dem Login (Routenwächter), cached es und aktualisiert sich nach Änderungen und bei jeder Antwort `404 module_disabled`.
 404/501 (älteres Backend) = alle Module an. Ausgeblendet werden Navigation, Einstellungs-Unternavigation, Dashboard-Karten/-Hinweise, Anhänge, Kalender-Link im Import; Direktaufruf zeigt „Dieses Modul ist deaktiviert“ mit Link zu `/settings/modules`.

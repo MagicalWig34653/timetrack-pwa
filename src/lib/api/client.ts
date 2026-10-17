@@ -64,6 +64,7 @@ import type {
 	TimeAccount,
 	WorkModel,
 	WorkModelInput,
+	WorkModelPreview,
 	Invitation,
 	ModuleKey,
 	ModuleStatus,
@@ -395,6 +396,10 @@ export const api = {
 	// work models
 	listWorkModels: () => request<WorkModel[]>('GET', '/work-models'),
 	createWorkModel: (input: WorkModelInput) => request<WorkModel>('POST', '/work-models', input),
+	/** Contract v0.16.0: replaces every editable field of one version (the evaluation of its days changes). */
+	correctWorkModel: (id: string, input: WorkModelInput, version?: number) =>
+		request<WorkModel>('PUT', `/work-models/${id}`, input, version === undefined ? undefined : { 'If-Match': String(version) }),
+	previewWorkModel: (id: string, input: WorkModelInput) => request<WorkModelPreview>('POST', `/work-models/${id}/preview`, input),
 	endWorkModel: (id: string, validTo: string) => request<WorkModel>('PATCH', `/work-models/${id}`, { validTo }),
 
 	// places

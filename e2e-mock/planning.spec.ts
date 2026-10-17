@@ -23,7 +23,7 @@ test('calendar: create an approved vacation from a day, see it in the grid and i
 	await page.goto('/vacation');
 	for (let i = new Date().getFullYear(); i < 2031; i++) await page.getByRole('button', { name: 'Folgejahr' }).click();
 	await expect(page.getByTestId('vacation-year')).toHaveText('2031');
-	await expect(page.getByTestId('balance-booked')).toHaveText('-5 Tage');
+	await expect(page.getByTestId('balance-booked')).toHaveText('5 Tage');
 	await expect(page.getByTestId('balance-available')).toHaveText('25 Tage');
 	await context.close();
 });
@@ -88,7 +88,7 @@ test('absences list: filter by status and edit approved to taken without changin
 	await expect(page.getByTestId('absence-row')).toHaveCount(1);
 	await page.goto('/vacation');
 	for (let i = new Date().getFullYear(); i < 2031; i++) await page.getByRole('button', { name: 'Folgejahr' }).click();
-	await expect(page.getByTestId('balance-booked')).toHaveText('-5 Tage');
+	await expect(page.getByTestId('balance-booked')).toHaveText('5 Tage');
 	await context.close();
 });
 

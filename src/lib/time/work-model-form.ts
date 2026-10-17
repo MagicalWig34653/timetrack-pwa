@@ -5,6 +5,8 @@ import { formatDuration, parseDuration } from './format.js';
 
 export interface WorkModelFormValues {
 	validFrom: string;
+	/** '' = open-ended; only sent when correcting a version */
+	validTo: string;
 	timezone: string;
 	weeklyTarget: string;
 	workdays: number[];
@@ -15,13 +17,16 @@ export interface WorkModelFormValues {
 	schoolCredit: string;
 	dayBoundaryMinutes: string;
 	fixedBreaks: FixedBreak[];
+	/** Per-weekday targets are not editable here; they are carried over unchanged so a correction does not drop them. */
+	dailyTargetSeconds?: Record<string, number>;
 }
 
-export type WorkModelFormErrors = Partial<Record<'validFrom' | 'timezone' | 'weeklyTarget' | 'workdays' | 'roundingMinutes' | 'schoolThreshold' | 'schoolCredit' | 'dayBoundaryMinutes' | 'fixedBreaks', string>>;
+export type WorkModelFormErrors = Partial<Record<'validFrom' | 'validTo' | 'timezone' | 'weeklyTarget' | 'workdays' | 'roundingMinutes' | 'schoolThreshold' | 'schoolCredit' | 'dayBoundaryMinutes' | 'fixedBreaks', string>>;
 
 export function defaultWorkModelForm(today: string, timezone: string): WorkModelFormValues {
 	return {
 		validFrom: today,
+		validTo: '',
 		timezone,
 		weeklyTarget: '38:30',
 		workdays: [1, 2, 3, 4, 5],
@@ -36,9 +41,11 @@ export function defaultWorkModelForm(today: string, timezone: string): WorkModel
 }
 
 /** Prefills a new version from an existing one (validFrom stays editable and defaults to `validFrom`). */
-export function formFromModel(model: WorkModel, validFrom: string): WorkModelFormValues {
+export function formFromModel(model: WorkModel, validFrom: string, validTo: string = ''): WorkModelFormValues {
 	return {
 		validFrom,
+		validTo,
+		...(model.dailyTargetSeconds && Object.keys(model.dailyTargetSeconds).length > 0 ? { dailyTargetSeconds: { ...model.dailyTargetSeconds } } : {}),
 		timezone: model.timezone ?? 'Europe/Berlin',
 		weeklyTarget: formatDuration(model.weeklyTargetSeconds),
 		workdays: [...model.workdays],
@@ -64,9 +71,16 @@ function validZone(zone: string): boolean {
 }
 
 /** Validates the form and builds the API payload; errors are German user texts keyed by field. */
-export function buildWorkModelInput(values: WorkModelFormValues): { input: WorkModelInput } | { errors: WorkModelFormErrors } {
+export function buildWorkModelInput(
+	values: WorkModelFormValues,
+	options: { withValidTo?: boolean } = {}
+): { input: WorkModelInput } | { errors: WorkModelFormErrors } {
 	const errors: WorkModelFormErrors = {};
 	if (!isValidDate(values.validFrom)) errors.validFrom = t('work_model.error_valid_from');
+	if (options.withValidTo && values.validTo) {
+		if (!isValidDate(values.validTo)) errors.validTo = t('work_model.error_valid_from');
+		else if (isValidDate(values.validFrom) && values.validTo < values.validFrom) errors.validTo = t('work_model.error_valid_to');
+	}
 	if (!values.timezone.trim() || !validZone(values.timezone.trim())) errors.timezone = t('work_model.error_timezone');
 
 	const weekly = parseDuration(values.weeklyTarget);
@@ -97,6 +111,8 @@ export function buildWorkModelInput(values: WorkModelFormValues): { input: WorkM
 	return {
 		input: {
 			validFrom: values.validFrom,
+			...(options.withValidTo ? { validTo: values.validTo || null } : {}),
+			...(values.dailyTargetSeconds ? { dailyTargetSeconds: { ...values.dailyTargetSeconds } } : {}),
 			timezone: values.timezone.trim(),
 			weeklyTargetSeconds: weekly!,
 			workdays: [...values.workdays].sort((a, b) => a - b),
@@ -109,4 +125,29 @@ export function buildWorkModelInput(values: WorkModelFormValues): { input: WorkM
 			fixedBreaks: values.fixedBreaks.map((b) => ({ ...b }))
 		}
 	};
+}
+
+/** Older backends (before contract v0.16.0) send no `version`; they can only create new versions. */
+export function correctionSupported(models: WorkModel[]): boolean {
+	return models.length > 0 && models.every((m) => typeof m.version === 'number');
+}
+
+/** Plain-German names of the changed fields reported by the preview (unknown names are skipped). */
+const FIELD_LABELS: Record<string, string> = {
+	validFrom: 'Gültig ab',
+	validTo: 'Gültig bis',
+	timezone: 'Zeitzone',
+	weeklyTargetSeconds: 'Wochen-Soll',
+	workdays: 'Arbeitstage',
+	dailyTargetSeconds: 'Tages-Soll',
+	travelCountsAsWork: 'Fahrtzeiten',
+	roundingEnabled: 'Rundung',
+	roundingMinutes: 'Rundung in Minuten',
+	schoolFullDayThresholdSeconds: 'Schulschwelle',
+	schoolCreditSeconds: 'Schulgutschrift',
+	dayBoundaryMinutes: 'Tagesgrenze',
+	fixedBreaks: 'Feste Pausen'
+};
+export function changedFieldLabels(fields: string[]): string[] {
+	return fields.map((f) => FIELD_LABELS[f]).filter((x): x is string => Boolean(x));
 }

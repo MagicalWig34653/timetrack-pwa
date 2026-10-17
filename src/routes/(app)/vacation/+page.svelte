@@ -70,16 +70,15 @@
 				<a class="underline underline-offset-4" href="/calendar">{t('nav.calendar')}</a>
 			</span>
 		</nav>
-		{#if settings && settings.configured === false}
-			<Alert variant="warning" data-testid="settings-missing">{t('vacation.not_configured')}</Alert>
-		{/if}
 		<VacationBalanceCard {balance} {settings} />
 		<VacationEntryForms {today} onsaved={saved} />
 		<VacationEntryList {year} {entries} ondeleted={refresh} />
 		{#if settings}
-			{#key year}
-				<VacationSettingsForm {settings} {year} onsaved={(next) => { settings = next; void refresh(); }} />
-			{/key}
+			<div id="vacation-settings" class="scroll-mt-20">
+				{#key year}
+					<VacationSettingsForm {settings} {year} onsaved={(next) => { settings = next; void refresh(); }} />
+				{/key}
+			</div>
 		{/if}
 	</div>
 {/if}

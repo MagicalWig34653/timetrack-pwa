@@ -68,6 +68,39 @@ describe('mock time API', () => {
 		expect(all.find((s) => s.id === created.id)?.voided).toBe(true);
 	});
 
+	it('corrects a version in place with a server-computed preview that equals the real change (contract v0.16.0)', async () => {
+		const [model] = await api.listWorkModels();
+		expect(model.version).toBe(1);
+		const input = { ...model, weeklyTargetSeconds: 100800 };
+		const preview = await api.previewWorkModel(model.id, input);
+		expect(preview.changedFields).toEqual(['weeklyTargetSeconds']);
+		expect(preview.differenceSeconds).toBeGreaterThan(0);
+		expect(preview.affectedFrom).toBe(model.validFrom);
+		expect(preview.affectedTo).toBeNull();
+		const before = (await api.getTimeAccount()).balanceSeconds;
+		expect(before).toBe(preview.balanceBeforeSeconds);
+		const corrected = await api.correctWorkModel(model.id, input, 1);
+		expect(corrected.version).toBe(2);
+		expect((await api.getTimeAccount()).balanceSeconds).toBe(preview.balanceAfterSeconds);
+		// identical values: neutral preview
+		const neutral = await api.previewWorkModel(model.id, corrected);
+		expect(neutral.differenceSeconds).toBe(0);
+		expect(neutral.changedFields).toEqual([]);
+	});
+
+	it('adjusts the previous version when a correction moves validFrom and rejects overlaps', async () => {
+		const [first] = await api.listWorkModels();
+		const second = await api.createWorkModel({ ...first, validFrom: '2026-10-01', validTo: null });
+		const moved = await api.previewWorkModel(second.id, { ...second, validFrom: '2026-09-20' });
+		expect(moved.previousValidTo).toBe('2026-09-19');
+		await api.correctWorkModel(second.id, { ...second, validFrom: '2026-09-20' });
+		expect((await api.listWorkModels()).find((m) => m.id === first.id)?.validTo).toBe('2026-09-19');
+		expect(await code(api.correctWorkModel(first.id, { ...first, validTo: null }))).toBe('409:model_overlap');
+		expect(await code(api.correctWorkModel(second.id, { ...second, validFrom: first.validFrom }))).toBe('409:model_overlap');
+		expect(await code(api.correctWorkModel(second.id, { ...second, weeklyTargetSeconds: -1 }))).toBe('400:bad_request');
+		expect(await code(api.previewWorkModel('00000000-0000-0000-0000-000000000000', second))).toBe('404:not_found');
+	});
+
 	it('creates a new work model version, ending the previous one the day before, and rejects overlaps', async () => {
 		const [old] = await api.listWorkModels();
 		const next = await api.createWorkModel({ validFrom: '2026-11-01', weeklyTargetSeconds: 144000, workdays: [1, 2, 3, 4, 5] });
