@@ -143,7 +143,8 @@ test('dark mode follows the system and can be overridden', async ({ browser }) =
 
 test('reduced transparency and reduced motion fall back to opaque surfaces without animation', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
-	const blur = () => page.evaluate(() => getComputedStyle(document.querySelector('[data-testid="topbar"]')!).backdropFilter);
+	// the header paints its glass on a ::before layer (G1), so that popovers inside it can blur the page behind them
+	const blur = () => page.evaluate(() => getComputedStyle(document.querySelector('[data-testid="topbar"]')!, '::before').backdropFilter);
 	expect(await blur()).toContain('blur');
 	await page.goto('/settings/appearance');
 	await page.getByTestId('transparency-toggle').check();

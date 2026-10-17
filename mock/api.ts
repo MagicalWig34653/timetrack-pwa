@@ -49,7 +49,7 @@ interface MockAccount {
 	/** guided setup flag; pre-existing demo accounts are `skipped`, new ones `pending` */
 	onboarding?: { state: 'pending' | 'completed' | 'skipped'; updatedAt: string | null };
 	/** appearance preferences (P2, ADR-0020); undefined = never set = defaults */
-	preferences?: { accent: string; accentCustomHex: string | null; colorScheme: string; updatedAt: string };
+	preferences?: { accent: string; accentCustomHex: string | null; colorScheme: string; glow: string; updatedAt: string };
 	recoveryCodes: string[] | null;
 	fallbackPassword: string | null;
 	emailRecovery: { active: boolean; verified: boolean };
@@ -236,7 +236,7 @@ export function createMockApi(options: MockOptions = {}) {
 	});
 
 	function preferencesBody(account: MockAccount) {
-		return account.preferences ?? { accent: 'blue', colorScheme: 'system' };
+		return account.preferences ?? { accent: 'blue', colorScheme: 'system', glow: 'subtle' };
 	}
 
 	function sessionBody(session: MockSession) {
@@ -711,12 +711,13 @@ export function createMockApi(options: MockOptions = {}) {
 		if (path === '/api/v1/me/preferences' && method === 'GET') return { status: 200, body: preferencesBody(account) };
 		if (path === '/api/v1/me/preferences' && method === 'PATCH') {
 			// same rules as the backend (ADR-0020): merge patch, whitelist of keys, strict values
-			const accents = ['blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite', 'custom'];
+			const accents = ['blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite', 'indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze', 'custom'];
+			const glows = ['off', 'subtle', 'medium', 'strong'];
 			const schemes = ['system', 'light', 'dark'];
 			if (!body || typeof body !== 'object' || Array.isArray(body) || JSON.stringify(body).length > 1024) return error(400, 'bad_request');
 			const keys = Object.keys(body);
-			if (keys.length === 0 || keys.some((key) => !['accent', 'accentCustomHex', 'colorScheme'].includes(key))) return error(400, 'bad_request');
-			const next = { accent: 'blue', accentCustomHex: null as string | null, colorScheme: 'system', ...account.preferences };
+			if (keys.length === 0 || keys.some((key) => !['accent', 'accentCustomHex', 'colorScheme', 'glow'].includes(key))) return error(400, 'bad_request');
+			const next = { accent: 'blue', accentCustomHex: null as string | null, colorScheme: 'system', glow: 'subtle', ...account.preferences };
 			if ('accent' in body) {
 				if (!accents.includes(body.accent)) return error(400, 'bad_request');
 				next.accent = body.accent;
@@ -725,6 +726,10 @@ export function createMockApi(options: MockOptions = {}) {
 			if ('colorScheme' in body) {
 				if (!schemes.includes(body.colorScheme)) return error(400, 'bad_request');
 				next.colorScheme = body.colorScheme;
+			}
+			if ('glow' in body) {
+				if (!glows.includes(body.glow)) return error(400, 'bad_request');
+				next.glow = body.glow;
 			}
 			if ('accentCustomHex' in body) {
 				if (body.accentCustomHex === null) next.accentCustomHex = null;

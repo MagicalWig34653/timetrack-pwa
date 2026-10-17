@@ -7,7 +7,7 @@
 
 <div
 	data-slot="card"
-	class={cn("flex flex-col gap-4 rounded-[10px] border bg-card py-6 text-card-foreground shadow-[var(--shadow-card)]", className)}
+	class={cn("ui-card flex flex-col gap-4 rounded-[10px] border bg-card py-6 text-card-foreground shadow-[var(--shadow-card)]", className)}
 	{...restProps}
 >
 	{@render children?.()}

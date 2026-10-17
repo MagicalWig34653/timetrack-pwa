@@ -42,7 +42,7 @@
 	const accountActive = $derived(['/settings/passkeys', '/settings/identities', '/settings/recovery', '/settings/sessions'].includes(page.url.pathname));
 
 	const itemClass =
-		'flex h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground aria-[current=page]:bg-ui-accent-soft aria-[current=page]:text-ui-accent-ink';
+		'flex h-9 items-center gap-3 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground aria-[current=page]:bg-ui-accent-soft aria-[current=page]:text-ui-accent-ink aria-[current=page]:shadow-[var(--glow-nav)]';
 </script>
 
 <div class="flex h-full min-h-0 flex-col">

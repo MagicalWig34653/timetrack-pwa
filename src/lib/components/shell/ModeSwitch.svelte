@@ -12,14 +12,14 @@
 	];
 </script>
 
-<div class="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1" role="radiogroup" aria-label={t('appearance.mode')} data-testid="mode-switch">
+<div class="grid grid-cols-3 gap-1 rounded-lg glass-soft p-1" role="radiogroup" aria-label={t('appearance.mode')} data-testid="mode-switch">
 	{#each modes as mode (mode.id)}
 		<button
 			type="button"
 			role="radio"
 			aria-checked={theme.mode === mode.id}
 			data-testid="mode-{mode.id}"
-			class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm"
+			class="inline-flex h-8 items-center justify-center gap-1.5 rounded-md text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm aria-checked:glow-accent"
 			onclick={() => theme.setMode(mode.id)}
 		>
 			<mode.icon class="size-4" aria-hidden="true" />

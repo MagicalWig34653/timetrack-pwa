@@ -103,7 +103,7 @@
 					{/each}
 					{#each evaluated as e (e.s.id)}
 						<div
-							class="absolute inset-y-1 rounded-sm bg-current {kindColor[e.s.kind]}"
+							class="absolute inset-y-1 rounded-sm bg-current glow-filter {kindColor[e.s.kind]}"
 							style={box(e.start, e.end)}
 							title="{kindLabel(e.s.kind)} {localTimeOf(e.start, timeZone)}–{e.s.endedAt ? localTimeOf(e.end, timeZone) : t('timeline.running')}"
 						></div>

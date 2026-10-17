@@ -10,10 +10,10 @@
 
 	const tones = {
 		neutral: 'bg-muted text-foreground',
-		accent: 'bg-ui-accent-soft text-ui-accent-ink',
-		success: 'bg-emerald-500/10 text-emerald-900 dark:text-emerald-200',
-		warning: 'bg-amber-500/10 text-amber-900 dark:text-amber-200',
-		danger: 'bg-destructive/10 text-destructive'
+		accent: 'bg-ui-accent-soft text-ui-accent-ink glow-status',
+		success: 'bg-emerald-500/10 text-emerald-900 dark:text-emerald-200 glow-status [--glow-tone:var(--color-emerald-500)]',
+		warning: 'bg-amber-500/10 text-amber-900 dark:text-amber-200 glow-status [--glow-tone:var(--color-amber-500)]',
+		danger: 'bg-destructive/10 text-destructive glow-status [--glow-tone:var(--destructive)]'
 	} as const;
 	const dots = {
 		neutral: 'bg-muted-foreground',

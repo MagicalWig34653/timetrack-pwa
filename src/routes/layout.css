@@ -168,21 +168,78 @@
 	}
 }
 
-/* Glass surfaces (frames only, never data). Text stays opaque; fallbacks below make the surfaces opaque. */
-.glass-sidebar {
-	background: var(--glass-sidebar);
-	-webkit-backdrop-filter: blur(22px) saturate(1.15);
-	backdrop-filter: blur(22px) saturate(1.15);
+/*
+ * Glass (docs/DESIGN.md "Glas und Leuchteffekt", ADR-0014). Frames only, never data; text stays opaque.
+ * Every blurred surface takes its filter from a --bf-* token and its fill from a --glass-* token, so the three
+ * fallbacks (reduced transparency by the system, the in-app switch, no backdrop-filter support) are one block each.
+ *
+ * Sidebar and header paint their glass on a ::before layer instead of on the element itself: an element with its
+ * own backdrop-filter is a "backdrop root", and popovers inside it could not blur the page behind them.
+ */
+:root {
+	--bf-sidebar: blur(22px) saturate(1.15);
+	--bf-header: blur(18px) saturate(1.1);
+	--bf-pop: blur(24px) saturate(1.25);
+	--bf-soft: blur(10px) saturate(1.1);
+	--bf-scrim: blur(4px);
+	--bf-sheet: blur(18px) saturate(1.15);
+	--glass-soft: color-mix(in srgb, var(--muted) 78%, transparent);
+	--glass-edge: rgb(255 255 255 / 0.55);
+	--glass-scrim: rgb(0 0 0 / 0.1);
+	--glass-sheet: color-mix(in srgb, var(--background) 66%, transparent);
+	--glass-card: color-mix(in srgb, var(--card) 72%, transparent);
+	--glass-pop: color-mix(in srgb, var(--popover) 84%, transparent);
+	--shadow-pop-glass: var(--shadow-pop), inset 0 1px 0 var(--glass-edge);
 }
+.dark {
+	--glass-edge: rgb(255 255 255 / 0.09);
+	--glass-scrim: rgb(0 0 0 / 0.3);
+	--glass-sheet: color-mix(in srgb, var(--background) 58%, transparent);
+	--glass-card: color-mix(in srgb, var(--card) 62%, transparent);
+	--glass-pop: color-mix(in srgb, var(--popover) 80%, transparent);
+}
+
+.glass-sidebar,
 .glass-header {
-	background: var(--glass-header);
-	-webkit-backdrop-filter: blur(18px);
-	backdrop-filter: blur(18px);
+	isolation: isolate;
 }
+.glass-sidebar::before,
+.glass-header::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+}
+.glass-sidebar::before {
+	background: var(--glass-sidebar);
+	-webkit-backdrop-filter: var(--bf-sidebar);
+	backdrop-filter: var(--bf-sidebar);
+}
+.glass-header::before {
+	background: var(--glass-header);
+	-webkit-backdrop-filter: var(--bf-header);
+	backdrop-filter: var(--bf-header);
+}
+/* floating surfaces: popovers, dialogs, toasts */
 .glass-pop {
 	background: var(--glass-pop);
-	-webkit-backdrop-filter: blur(22px) saturate(1.15);
-	backdrop-filter: blur(22px) saturate(1.15);
+	-webkit-backdrop-filter: var(--bf-pop);
+	backdrop-filter: var(--bf-pop);
+	border-color: color-mix(in srgb, var(--border) 70%, var(--glass-edge));
+	box-shadow: var(--shadow-pop-glass);
+}
+/* sticky table heads, segmented controls: light blur over scrolling content */
+.glass-soft {
+	background: var(--glass-soft);
+	-webkit-backdrop-filter: var(--bf-soft);
+	backdrop-filter: var(--bf-soft);
+}
+/* scrim behind off-canvas menus (native dialogs use ::backdrop below) */
+.glass-scrim {
+	background: var(--glass-scrim);
+	-webkit-backdrop-filter: var(--bf-scrim);
+	backdrop-filter: var(--bf-scrim);
 }
 
 .ui-accent-bg {
@@ -197,36 +254,219 @@
 	color: var(--ui-accent-ink);
 }
 
+/*
+ * Glow ("Leuchteffekt", off | subtle | medium | strong on <html data-glow>). --glow-color is the accent, moved away from
+ * the page background when it would not be visible (theme/glow.ts). Halos never touch text colour or contrast: they are
+ * box-shadows and drop-shadows around fills, not a change of the fills.
+ */
+:root {
+	--glow-color: var(--ui-accent);
+	--glow-r: 0px;
+	--glow-a: 0%;
+	--glow-shadow: none;
+	--glow-nav: none;
+	--glow-status-a: 0%;
+	--glow-focus: 0 0 #0000;
+	--glow-filter: none;
+	--glow-wash: transparent;
+	--glow-edge: transparent;
+}
+:root[data-glow='subtle'] {
+	--glow-r: 10px;
+	--glow-a: 24%;
+}
+:root[data-glow='medium'] {
+	--glow-r: 16px;
+	--glow-a: 36%;
+	--glow-status-a: 34%;
+	--glow-wash: color-mix(in srgb, var(--glow-color) 6%, transparent);
+	--glow-edge: color-mix(in srgb, var(--glow-color) 38%, transparent);
+}
+:root[data-glow='strong'] {
+	--glow-r: 20px;
+	--glow-a: 44%;
+	--glow-status-a: 44%;
+	--glow-wash: color-mix(in srgb, var(--glow-color) 8%, transparent);
+	--glow-edge: color-mix(in srgb, var(--glow-color) 48%, transparent);
+}
+:root[data-glow='subtle'],
+:root[data-glow='medium'],
+:root[data-glow='strong'] {
+	--glow-shadow: 0 0 var(--glow-r) color-mix(in srgb, var(--glow-color) var(--glow-a), transparent);
+	--glow-focus: 0 0 0 3px color-mix(in srgb, var(--glow-color) calc(var(--glow-a) * 0.6), transparent), 0 0 calc(var(--glow-r) * 1.2) color-mix(in srgb, var(--glow-color) var(--glow-a), transparent);
+	--glow-nav: inset 2px 0 0 color-mix(in srgb, var(--glow-color) 70%, transparent), 0 0 calc(var(--glow-r) * 0.9) -2px color-mix(in srgb, var(--glow-color) var(--glow-a), transparent);
+	--glow-filter: drop-shadow(0 0 calc(var(--glow-r) / 3) color-mix(in srgb, var(--glow-color) calc(var(--glow-a) * 1.3), transparent));
+}
+
+/* accent fills and selected controls; utilities, so that focus rings (ring utilities) still win */
+@utility glow-accent {
+	box-shadow: var(--glow-shadow);
+}
+/* indicators and bars (running timer, timeline) */
+@utility glow-filter {
+	filter: var(--glow-filter);
+}
+/* status colours (chips, badges), from medium up; --glow-tone is set by the component */
+@utility glow-status {
+	box-shadow: 0 0 12px color-mix(in srgb, var(--glow-tone, var(--glow-color)) var(--glow-status-a), transparent);
+}
+@layer base {
+	/* the focus halo rides on Tailwind's shadow composite, so it adds to the ring utilities instead of replacing them */
+	:focus-visible {
+		--tw-shadow: var(--glow-focus);
+	}
+}
+
+/* cards: hairline accent edge from medium up (mask-composite keeps the card fill untouched) */
+.ui-card {
+	position: relative;
+}
+:root[data-glow='medium'] .ui-card::after,
+:root[data-glow='strong'] .ui-card::after {
+	content: '';
+	position: absolute;
+	inset: -1px;
+	border-radius: inherit;
+	padding: 1px;
+	pointer-events: none;
+	background: linear-gradient(135deg, var(--glow-edge), transparent 45%, color-mix(in srgb, var(--glow-edge) 50%, transparent));
+	-webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+	mask-composite: exclude;
+}
+/* page header wash */
+.page-head {
+	position: relative;
+}
+:root[data-glow='medium'] .page-head::before,
+:root[data-glow='strong'] .page-head::before {
+	content: '';
+	position: absolute;
+	inset: -1.5rem 0 -0.75rem;
+	z-index: -1;
+	pointer-events: none;
+	border-radius: var(--radius-xl);
+	background: radial-gradient(closest-side at 30% 45%, var(--glow-wash), transparent);
+}
+
+/* strong: static aurora behind the page and the main content as a glass sheet above it */
+:root[data-glow='strong'] body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background:
+		radial-gradient(52rem 34rem at 88% -8%, color-mix(in srgb, var(--glow-color) 20%, transparent), transparent 70%),
+		radial-gradient(44rem 30rem at 6% 104%, color-mix(in srgb, var(--glow-color) 15%, transparent), transparent 70%),
+		radial-gradient(30rem 22rem at 58% 46%, color-mix(in srgb, var(--glow-color) 8%, transparent), transparent 70%);
+}
+:root[data-glow='strong'] .dark body::before,
+:root[data-glow='strong'].dark body::before {
+	background:
+		radial-gradient(52rem 34rem at 88% -8%, color-mix(in srgb, var(--glow-color) 34%, transparent), transparent 70%),
+		radial-gradient(44rem 30rem at 6% 104%, color-mix(in srgb, var(--glow-color) 26%, transparent), transparent 70%),
+		radial-gradient(30rem 22rem at 58% 46%, color-mix(in srgb, var(--glow-color) 14%, transparent), transparent 70%);
+}
+:root[data-glow='strong'] .app-sheet {
+	background: var(--glass-sheet);
+	-webkit-backdrop-filter: var(--bf-sheet);
+	backdrop-filter: var(--bf-sheet);
+	border: 1px solid color-mix(in srgb, var(--border) 60%, var(--glass-edge));
+	border-radius: var(--radius-3xl);
+	box-shadow: inset 0 1px 0 var(--glass-edge), 0 24px 70px -28px color-mix(in srgb, var(--glow-color) 28%, #0006);
+	max-width: min(1240px, calc(100% - 1.5rem));
+	margin-top: 0.75rem;
+	margin-bottom: 1.5rem;
+}
+/* cards inside the sheet are a little more transparent */
+:root[data-glow='strong'] .app-sheet .ui-card {
+	background-color: var(--glass-card);
+}
+
+/* fallbacks: opaque surfaces, no blur; glows shrink to hairline accent borders */
 @media (prefers-reduced-transparency: reduce) {
 	:root {
+		--bf-sidebar: none;
+		--bf-header: none;
+		--bf-pop: none;
+		--bf-soft: none;
+		--bf-scrim: none;
+		--bf-sheet: none;
 		--glass-sidebar: var(--sidebar);
 		--glass-header: var(--background);
 		--glass-pop: var(--popover);
-	}
-	.glass-sidebar,
-	.glass-header,
-	.glass-pop {
-		-webkit-backdrop-filter: none;
-		backdrop-filter: none;
+		--glass-soft: var(--muted);
+		--glass-scrim: rgb(0 0 0 / 0.4);
+		--glass-sheet: var(--background);
+		--glass-card: var(--card);
 	}
 }
 /* class override used by the in-app setting and by tests */
 :root[data-transparency='reduced'] {
+	--bf-sidebar: none;
+	--bf-header: none;
+	--bf-pop: none;
+	--bf-soft: none;
+	--bf-scrim: none;
+	--bf-sheet: none;
 	--glass-sidebar: var(--sidebar);
 	--glass-header: var(--background);
 	--glass-pop: var(--popover);
-}
-:root[data-transparency='reduced'] .glass-sidebar,
-:root[data-transparency='reduced'] .glass-header,
-:root[data-transparency='reduced'] .glass-pop {
-	-webkit-backdrop-filter: none;
-	backdrop-filter: none;
+	--glass-soft: var(--muted);
+	--glass-scrim: rgb(0 0 0 / 0.4);
+	--glass-sheet: var(--background);
+	--glass-card: var(--card);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
 	:root {
 		--glass-sidebar: var(--sidebar);
 		--glass-header: var(--background);
 		--glass-pop: var(--popover);
+		--glass-soft: var(--muted);
+		--glass-scrim: rgb(0 0 0 / 0.4);
+		--glass-sheet: var(--background);
+		--glass-card: var(--card);
+	}
+}
+/* reduced transparency: no halos, the accent shows only as hairlines; no aurora */
+@media (prefers-reduced-transparency: reduce) {
+	:root[data-glow] {
+		--glow-shadow: none;
+		--glow-nav: inset 2px 0 0 var(--ui-accent);
+		--glow-focus: 0 0 #0000;
+		--glow-filter: none;
+		--glow-status-a: 0%;
+		--glow-wash: transparent;
+	}
+	:root[data-glow] body::before {
+		display: none;
+	}
+}
+:root[data-transparency='reduced'][data-glow] {
+	--glow-shadow: none;
+	--glow-nav: inset 2px 0 0 var(--ui-accent);
+	--glow-focus: 0 0 #0000;
+	--glow-filter: none;
+	--glow-status-a: 0%;
+	--glow-wash: transparent;
+}
+:root[data-transparency='reduced'][data-glow] body::before {
+	display: none;
+}
+@media (forced-colors: active) {
+	:root[data-glow] {
+		--glow-shadow: none;
+		--glow-nav: none;
+		--glow-focus: 0 0 #0000;
+		--glow-filter: none;
+		--glow-status-a: 0%;
+		--glow-wash: transparent;
+		--glow-edge: CanvasText;
+	}
+	:root[data-glow] body::before {
+		display: none;
 	}
 }
 
@@ -241,21 +481,9 @@
 	}
 }
 
-/* native dialogs: overlay black/10 with a light blur (DESIGN.md "Dialoge") */
+/* native dialogs: overlay with a light blur (DESIGN.md "Dialoge") */
 dialog::backdrop {
-	background: rgb(0 0 0 / 0.1);
-	-webkit-backdrop-filter: blur(4px);
-	backdrop-filter: blur(4px);
-}
-@media (prefers-reduced-transparency: reduce) {
-	dialog::backdrop {
-		-webkit-backdrop-filter: none;
-		backdrop-filter: none;
-		background: rgb(0 0 0 / 0.4);
-	}
-}
-:root[data-transparency='reduced'] dialog::backdrop {
-	-webkit-backdrop-filter: none;
-	backdrop-filter: none;
-	background: rgb(0 0 0 / 0.4);
+	background: var(--glass-scrim);
+	-webkit-backdrop-filter: var(--bf-scrim);
+	backdrop-filter: var(--bf-scrim);
 }

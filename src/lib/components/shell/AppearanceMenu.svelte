@@ -2,6 +2,7 @@
 	import Palette from '@lucide/svelte/icons/palette';
 	import { t } from '#lib/i18n/index.js';
 	import AccentPicker from './AccentPicker.svelte';
+	import GlowSwitch from './GlowSwitch.svelte';
 	import ModeSwitch from './ModeSwitch.svelte';
 	import Popover from './Popover.svelte';
 </script>
@@ -11,7 +12,8 @@
 	{#snippet children(close)}
 		<div class="flex flex-col gap-4">
 			<ModeSwitch />
-			<AccentPicker idPrefix="menu-accent" />
+			<AccentPicker idPrefix="menu-accent" compact />
+			<GlowSwitch compact />
 			<a href="/settings/appearance" class="text-[13px] font-medium text-ui-accent-ink hover:underline" onclick={close}>{t('appearance.title')}</a>
 		</div>
 	{/snippet}

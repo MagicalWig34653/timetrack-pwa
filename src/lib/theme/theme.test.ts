@@ -157,4 +157,76 @@ describe('theme store with account preferences', () => {
 		expect(theme.accentId).toBe('graphite');
 		expect(theme.mode).toBe('light');
 	});
+
+	describe('glow (contract v0.15.0)', () => {
+		const withGlow = (accent: Preferences['accent'], glow: NonNullable<Preferences['glow']>, hex: string | null = null): Preferences => ({ ...stored(accent, 'system', hex), glow });
+		const rootGlow = () => document.documentElement.dataset.glow;
+
+		it('defaults to subtle and writes data-glow and the glow colour on <html>', async () => {
+			const theme = await freshTheme();
+			expect(theme.glow).toBe('subtle');
+			expect(rootGlow()).toBe('subtle');
+			expect(document.documentElement.style.getPropertyValue('--glow-color')).toBe('#2563eb');
+			theme.setPreset('orange');
+			expect(document.documentElement.style.getPropertyValue('--glow-color')).toBe('#d97706');
+		});
+
+		it('applies the cached level at startup and ignores a garbage cache', async () => {
+			localStorage.setItem('tt.glow', 'strong');
+			expect((await freshTheme()).glow).toBe('strong');
+			localStorage.setItem('tt.glow', 'blinding');
+			expect((await freshTheme()).glow).toBe('subtle');
+		});
+
+		it('adopts the account level and sends it with the patch', async () => {
+			const theme = await freshTheme();
+			theme.reconcile('a1', withGlow('blue', 'medium'));
+			expect(theme.glow).toBe('medium');
+			expect(localStorage.getItem('tt.glow')).toBe('medium');
+			theme.setGlow('strong');
+			await vi.waitFor(() => expect(theme.sync).toBe('saved'));
+			expect(rootGlow()).toBe('strong');
+			expect(update).toHaveBeenLastCalledWith({ accent: 'blue', colorScheme: 'system', glow: 'strong' });
+			theme.setGlow('off');
+			await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+			expect(localStorage.getItem('tt.glow')).toBe('off');
+		});
+
+		it('keeps working against a server without glow: local only, new accents stored as custom', async () => {
+			const theme = await freshTheme();
+			theme.reconcile('a1', stored('blue'));
+			theme.setGlow('strong');
+			await vi.waitFor(() => expect(update).toHaveBeenCalled());
+			expect(update).toHaveBeenLastCalledWith({ accent: 'blue', colorScheme: 'system' });
+			expect(theme.glow).toBe('strong');
+			theme.setPreset('navy');
+			await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+			expect(update).toHaveBeenLastCalledWith({ accent: 'custom', accentCustomHex: '#1e3a8a', colorScheme: 'system' });
+			// a reload keeps the local level because the server does not know it
+			const reloaded = await freshTheme();
+			reloaded.reconcile('a1', stored('custom', 'system', '#1E3A8A'));
+			expect(reloaded.glow).toBe('strong');
+		});
+
+		it('falls back to the old request shape when a server rejects glow or a new accent id', async () => {
+			const { ApiError } = await import('#lib/api/client.js');
+			const theme = await freshTheme();
+			theme.reconcile('a1', withGlow('blue', 'subtle'));
+			update.mockRejectedValueOnce(new ApiError(400, 'bad_request', 'x'));
+			theme.setPreset('forest');
+			await vi.waitFor(() => expect(theme.sync).toBe('saved'));
+			expect(update).toHaveBeenNthCalledWith(1, { accent: 'forest', colorScheme: 'system', glow: 'subtle' });
+			expect(update).toHaveBeenNthCalledWith(2, { accent: 'custom', accentCustomHex: '#166534', colorScheme: 'system' });
+			expect(theme.accentId).toBe('forest');
+		});
+
+		it('uploads a pre-account glow choice once', async () => {
+			localStorage.setItem('tt.glow', 'off');
+			localStorage.setItem('tt.accent', '#2563eb');
+			const theme = await freshTheme();
+			theme.reconcile('a1', { ...defaults, glow: 'subtle' });
+			await vi.waitFor(() => expect(theme.sync).toBe('saved'));
+			expect(update).toHaveBeenCalledWith({ accent: 'blue', colorScheme: 'system', glow: 'off' });
+		});
+	});
 });

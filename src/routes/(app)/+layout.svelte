@@ -69,7 +69,7 @@
 
 	{#if menuOpen}
 		<div class="fixed inset-0 z-50 menu:hidden" data-testid="mobile-menu">
-			<button type="button" class="absolute inset-0 bg-black/10 backdrop-blur-xs" aria-label={t('nav.menu_close')} tabindex="-1" onclick={() => (menuOpen = false)}></button>
+			<button type="button" class="glass-scrim absolute inset-0" aria-label={t('nav.menu_close')} tabindex="-1" onclick={() => (menuOpen = false)}></button>
 			<div
 				role="dialog"
 				aria-modal="true"
@@ -98,7 +98,7 @@
 
 	<div class="menu:pl-64">
 		<TopBar {polling} {menuOpen} onmenu={() => (menuOpen = true)} onsignout={signOut} />
-		<main class="mx-auto w-full max-w-[1240px] px-4 py-[22px] menu:px-6 menu:py-6 wide:px-10 wide:py-9">
+		<main class="app-sheet mx-auto w-full max-w-[1240px] px-4 py-[22px] menu:px-6 menu:py-6 wide:px-10 wide:py-9">
 			{#if blockedBy}
 				<ModuleDisabled module={blockedBy} />
 			{:else}

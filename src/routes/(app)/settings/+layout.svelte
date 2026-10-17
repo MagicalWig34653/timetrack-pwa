@@ -52,7 +52,7 @@
 									<a
 										href={link.href}
 										aria-current={page.url.pathname === link.href ? 'page' : undefined}
-										class="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground aria-[current=page]:bg-ui-accent/10 aria-[current=page]:text-ui-accent-ink"
+										class="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground aria-[current=page]:bg-ui-accent/10 aria-[current=page]:text-ui-accent-ink aria-[current=page]:shadow-[var(--glow-nav)]"
 									>
 										{t(link.label)}
 									</a>

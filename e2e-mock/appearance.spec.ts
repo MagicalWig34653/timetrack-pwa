@@ -12,7 +12,7 @@ test('a change is saved to the account, reaches a second browser and survives a 
 	const first = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
 	await first.page.goto('/settings/appearance');
 	await expect(syncState(first.page)).toHaveAttribute('data-state', 'saved');
-	expect(await preferences(first.page)).toEqual({ accent: 'blue', colorScheme: 'system' });
+	expect(await preferences(first.page)).toEqual({ accent: 'blue', colorScheme: 'system', glow: 'subtle' });
 
 	await first.page.getByTestId('accent-pink').click();
 	await expect(syncState(first.page)).toHaveAttribute('data-state', 'saved');
@@ -82,7 +82,7 @@ test('an unsent change keeps applying locally and is sent once the connection is
 	await page.getByTestId('accent-blue').click();
 	await page.getByTestId('mode-system').click();
 	await expect(syncState(page)).toHaveAttribute('data-state', 'saved');
-	expect(await preferences(page)).toMatchObject({ accent: 'blue', colorScheme: 'system' });
+	expect(await preferences(page)).toMatchObject({ accent: 'blue', colorScheme: 'system', glow: 'subtle' });
 	await context.close();
 });
 

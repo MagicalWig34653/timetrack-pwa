@@ -33,8 +33,8 @@ test('setup: new accounts have the defaults, in the preferences endpoint and in 
 	const invite = await api(alice.page, 'POST', '/api/v1/admin/invitations', { note: 'Bob' });
 	bob = await register(browser, `/invite/${invite.body.token}`, 'bob.look', 'Bob Look');
 	for (const actor of [alice, bob]) {
-		expect(await preferences(actor.page)).toEqual({ accent: 'blue', colorScheme: 'system' });
-		expect((await api(actor.page, 'GET', '/api/v1/auth/session')).body.account.preferences).toEqual({ accent: 'blue', colorScheme: 'system' });
+		expect(await preferences(actor.page)).toEqual({ accent: 'blue', colorScheme: 'system', glow: 'subtle' });
+		expect((await api(actor.page, 'GET', '/api/v1/auth/session')).body.account.preferences).toEqual({ accent: 'blue', colorScheme: 'system', glow: 'subtle' });
 	}
 });
 
@@ -63,7 +63,7 @@ test('Darstellung saves accent and scheme to the account; the API enforces the r
 	expect((await api(page, 'PATCH', '/api/v1/me/preferences', { accent: 'blue', pad: 'x'.repeat(2000) })).status).toBe(413);
 	expect(await preferences(page)).toMatchObject({ accent: 'custom', accentCustomHex: '#12AB9F', colorScheme: 'dark' });
 	// the other account is untouched
-	expect(await preferences(bob.page)).toEqual({ accent: 'blue', colorScheme: 'system' });
+	expect(await preferences(bob.page)).toEqual({ accent: 'blue', colorScheme: 'system', glow: 'subtle' });
 	expect(await cssVar(bob.page, '--ui-accent')).toBe('#2563eb');
 });
 
@@ -109,4 +109,37 @@ test('the preferences are part of the account export', async () => {
 	expect(response.status).toBe(200);
 	// ZIP entries are stored with their names in clear text in the headers
 	expect(response.text).toContain('preferences.json');
+});
+
+test('G1: the glow level and the new white-text presets are stored in the account and survive an empty cache', async () => {
+	const page = alice.page;
+	await page.goto('/settings/appearance');
+	await syncSaved(page);
+	await page.getByTestId('glow-strong').click();
+	await syncSaved(page);
+	await expect.poll(async () => (await preferences(page)).glow).toBe('strong');
+	await page.getByTestId('accent-crimson').click();
+	await syncSaved(page);
+	expect(await preferences(page)).toMatchObject({ accent: 'crimson', glow: 'strong' });
+	expect((await preferences(page)).accentCustomHex ?? null).toBeNull();
+	await expect.poll(() => cssVar(page, '--ui-accent-foreground')).toBe('#ffffff');
+
+	// the blur is applied to the floating surfaces in the real app as well
+	await page.getByTestId('appearance-menu').click();
+	expect(await page.evaluate(() => getComputedStyle(document.querySelector('[role=dialog][aria-label="Darstellung und Akzentfarbe"]')!).backdropFilter)).toContain('blur');
+	expect(await page.evaluate(() => getComputedStyle(document.querySelector('.app-sheet')!).backdropFilter)).toContain('blur');
+	await page.keyboard.press('Escape');
+
+	// strict validation of the new key
+	for (const body of [{ glow: 'bright' }, { glow: 2 }, { glow: null }, { glow: 'STRONG' }]) {
+		expect((await api(page, 'PATCH', '/api/v1/me/preferences', body)).status, JSON.stringify(body)).toBe(400);
+	}
+	expect((await preferences(page)).glow).toBe('strong');
+
+	// an empty cache (new device, cleared storage): the next session load brings the values back from the account
+	await page.evaluate(() => localStorage.clear());
+	await page.reload();
+	await expect.poll(() => page.evaluate(() => document.documentElement.dataset.glow)).toBe('strong');
+	await expect.poll(() => cssVar(page, '--ui-accent')).toBe('#b91c1c');
+	expect((await preferences(bob.page)).glow).toBe('subtle');
 });

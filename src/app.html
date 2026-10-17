@@ -20,8 +20,11 @@
 				var m = localStorage.getItem("tt.theme");
 				var dark = m === "dark" || ((m === null || m === "system") && matchMedia("(prefers-color-scheme: dark)").matches);
 				if (dark) document.documentElement.classList.add("dark");
+				var g = localStorage.getItem("tt.glow");
+				document.documentElement.dataset.glow = g === "off" || g === "subtle" || g === "medium" || g === "strong" ? g : "subtle";
 				if (localStorage.getItem("tt.transparency") === "reduced") document.documentElement.dataset.transparency = "reduced";
 			} catch (e) {
+				document.documentElement.dataset.glow = "subtle";
 				if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.classList.add("dark");
 			}
 		</script>
