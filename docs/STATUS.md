@@ -1,4 +1,6 @@
-# Stand der PWA – 16.10.2026 (Pakete P1 und P2 auf L23)
+# Stand der PWA – 17.10.2026 (Pakete bis P2, W1; Dokumentationsabgleich D3)
+
+Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-only). Die PWA läuft im Stand P2 auf der privaten Live-Testinstanz des Betreibers (ausgerollt 16.10. abends); eine Produktionsinstanz wird eingerichtet. Seit P2 gab es nur CI-/Dokumentationsänderungen (W1, D3), keine Änderungen an `src/`.
 
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
@@ -61,11 +63,11 @@ Manifest, Icons (`npm run icons`), `src/service-worker.ts` (Precache, Navigation
 | Befehl | Inhalt |
 | --- | --- |
 | `npm run check` | svelte-check + tsc des Service Workers (0 Fehler/Warnungen) |
-| `npm test` | vitest, 575 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung) |
+| `npm test` | vitest, 587 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung; Lead, Paket P2) |
 | `npm run build` | statisches Build nach `build/` |
-| `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 176 Specs (inkl. 10 Modul-, 20 Arbeitszeit-, 10 Konten- und 8 Profil-Specs) |
-| `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), inkl. `modules.spec.ts` und `worktime.spec.ts` |
-| `npm run test:e2e:pwa` | Produktionsbuild mit Mock-API: Manifest, Service Worker, Offline, Push |
+| `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 180 Specs (inkl. Modul-, Arbeitszeit-, Konten-, Profil- und Darstellungs-Specs; Lead gegen frisch gebautes Backend, Paket P2) |
+| `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), 84 Specs (Lead, P2), inkl. `modules.spec.ts` und `worktime.spec.ts` |
+| `npm run test:e2e:pwa` | Produktionsbuild mit Mock-API: Manifest, Service Worker, Offline, Push; 6 Specs |
 
 Umgebungsvariablen: `E2E_BACKEND_DIR` (Backend-Checkout, Standard `../timetrack-backend`), `E2E_PORT` (Basisport, Standard 18090; weitere Instanzen +1 bis +10, Arbeitszeit-Tabelle +9, Konten +10, Profil +11 und +12, Profil-SMTP +13), `E2E_SKIP_BUILD=1` (vorhandenes Backend-Binary/Build nutzen), `E2E_MOCK_PORT` (Standard 5199).
 Mock-Modus: `npm run dev:mock`; Demo-Konto `admin` (virtueller Passkey), Einladung `demo-invite`, Recovery-Code `AAAA-BBBB-CCCC`. `MOCK_OIDC=0`, `MOCK_MODULES_DISABLED=reports,mcp` (Betreiber-Sperre). Test-Hooks (nicht im Vertrag): `POST /api/v1/mock/notify|push|oidc|modules|accounts`.
@@ -77,3 +79,12 @@ Screenshots: `SCREENSHOT_DIR=<dir>` aktiviert die Screenshot-Specs (390 px und D
 - Mock-Guard bildet die Routengruppen aus ADR-0012 nach; die automation-Events werden nur serverweit geprüft (Token-Konto unbekannt).
 - Nicht geprüft: Firefox/WebKit, Screenreader, MariaDB-Modus, echte ChatGPT-/Claude-Connectoren, echte Push-Zustellung (iOS/Android), echter Shortcuts-Durchlauf, native Apps.
 - Bekannter Backend-Befund (L16): `.webmanifest` ohne Content-Type; Icon-Dateinamen können `immutable` erhalten.
+
+## CI auf GitHub (W1, Stand 17.10.2026)
+Workflows unter `.github/workflows/` (CI mit Check, Vitest, Build, Playwright Mock und Produktionsbuild; optional Echt-E2E gegen selbst gebautes Backend; CodeQL; Dependency Review; Dependabot). Beim Abgleich am 17.10.: PWA-CI und CodeQL auf `main` grün. Dependency Review schlägt fehl, solange „Dependency graph“ im Repository nicht aktiviert ist; drei Dependabot-Pull-Requests offen (nicht gemergt, große Sprünge wie TypeScript 7 prüfen). Gesamtübersicht: Backend-Repo `docs/CI.md`.
+
+## Handoffs (docs/handoffs/)
+Je Paket ein Handoff mit Befehlen, Zahlen und Grenzen: L1, L3b, L4–L7b, L9, L11–L19, L21–L23 (Oberflächen, Echt-E2E, Designsprache, Konten), P1 (Profil/Einrichtung), P2 (Darstellung je Konto; enthält den Vertrag für die nativen Apps), X1 (MCP-Gesamt-E2E), W1 (CI). L2/L3a/L10 liegen im Backend-Repo, L20 wurde nur als Diagnose im Backend-Arbeitsplan geführt. Commit-Hashes in Handoffs sind seit der Historienbereinigung (17.10.2026) ungültig; Paket-ID und `git log --grep` verwenden.
+
+## Nächste Schritte
+Echtgeräte: Passkey auf Plattform-Authenticator, Installation als PWA (iOS/Android/Desktop), Push-Zustellung, Shortcuts-Durchlauf, ChatGPT-/Claude-Connector; Firefox/WebKit und Screenreader prüfen; Anschluss an die Produktionsinstanz (Build mit `npm run build`, Auslieferung durch das Backend über `PWA_STATIC_DIR`).
