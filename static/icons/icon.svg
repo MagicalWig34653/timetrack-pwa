@@ -1,8 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
 	<title>Timetrack</title>
-	<rect width="512" height="512" rx="112" fill="#171717"/>
-	<circle cx="256" cy="236" r="132" fill="none" stroke="#fafafa" stroke-width="36"/>
-	<path d="M256 156v82l56 36" fill="none" stroke="#fafafa" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-	<rect x="136" y="410" width="240" height="28" rx="14" fill="#fafafa" opacity="0.55"/>
-	<rect x="136" y="410" width="120" height="28" rx="14" fill="#fafafa"/>
+	<defs>
+		<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1F2A4D"/><stop offset="1" stop-color="#0A0F22"/></linearGradient>
+		<linearGradient id="ring" gradientUnits="userSpaceOnUse" x1="0" y1="102" x2="0" y2="410"><stop offset="0" stop-color="#5E93FC"/><stop offset="1" stop-color="#2563EB"/></linearGradient>
+	</defs>
+	<rect width="512" height="512" rx="112" fill="url(#bg)"/>
+	<circle cx="256" cy="256" r="131" fill="none" stroke="url(#ring)" stroke-width="46"/>
+	<path d="M244 169V271H308" fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
