@@ -47,9 +47,9 @@ export const deTransfer = {
 
 	// import: steps
 	'import.title': 'Import',
-	'import.description': 'Übernimm Arbeitszeiten aus einer CSV- oder Excel-Datei. Vor der Übernahme siehst du eine Vorschau; bis dahin wird nichts gespeichert.',
+	'import.description': 'Übernimm deine Arbeitszeit-Tabelle oder eine andere CSV- oder Excel-Datei. Vor der Übernahme siehst du eine Vorschau; bis dahin wird nichts gespeichert.',
 	'import.steps': 'Schritte des Imports',
-	'import.step.upload': 'Datei',
+	'import.step.upload': 'Datei wählen',
 	'import.step.sheet': 'Blatt und Kopfzeile',
 	'import.step.mapping': 'Spalten',
 	'import.step.preview': 'Vorschau',

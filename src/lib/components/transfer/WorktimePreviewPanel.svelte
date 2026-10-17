@@ -1,8 +1,7 @@
 <script lang="ts">
-	import type { WorkModel, WorktimeAction, WorktimePreview } from '#lib/api/types.js';
-	import Banner from '#lib/components/app/Banner.svelte';
-	import KpiCard from '#lib/components/app/KpiCard.svelte';
+	import type { WorktimeAction, WorktimePreview } from '#lib/api/types.js';
 	import Panel from '#lib/components/app/Panel.svelte';
+	import type { Snippet } from 'svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent } from '#lib/components/ui/card/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
@@ -10,13 +9,47 @@
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { formatDuration } from '#lib/time/format.js';
 	import { WORKTIME_ACTIONS } from '#lib/transfer/worktime.js';
-	import { modelStartHint } from '#lib/transfer/worktime-flow.js';
+	import type { WorktimeFacts } from '#lib/transfer/worktime-flow.js';
 
-	let { worktime, busy, oncreaterule, models = null }: { worktime: WorktimePreview; busy: boolean; oncreaterule: (text: string, action: WorktimeAction) => void; models?: WorkModel[] | null } = $props();
+	/** Plain-language summary of a work-time preview: what will be imported, the table balance, details on demand. */
+	let {
+		worktime,
+		facts,
+		duplicates,
+		refreshing,
+		busy,
+		oncreaterule,
+		modelPending = false,
+		warnings,
+		actions
+	}: {
+		worktime: WorktimePreview;
+		facts: WorktimeFacts;
+		duplicates: number;
+		refreshing: boolean;
+		busy: boolean;
+		oncreaterule: (text: string, action: WorktimeAction) => void;
+		/** the work model still has to be created after the import */
+		modelPending?: boolean;
+		/** shown right below the summary */
+		warnings?: Snippet;
+		/** primary action, shown before the details */
+		actions?: Snippet;
+	} = $props();
 
 	const picks = $state<Record<string, WorktimeAction>>({});
 	const unmapped = $derived(worktime.unmappedRemarks ?? []);
 	const byAction = $derived(Object.entries(worktime.byAction ?? {}).filter(([, count]) => count > 0));
+	const parts = $derived(
+		[
+			facts.workDays > 0 ? (facts.workDays === 1 ? t('worktime.summary_work_one') : t('worktime.summary_work', { count: facts.workDays })) : '',
+			facts.vacationDays > 0 ? (facts.vacationDays === 1 ? t('worktime.summary_vacation_one') : t('worktime.summary_vacation', { count: facts.vacationDays })) : '',
+			facts.sickDays > 0 ? (facts.sickDays === 1 ? t('worktime.summary_sick_one') : t('worktime.summary_sick', { count: facts.sickDays })) : '',
+			facts.schoolDays > 0 ? (facts.schoolDays === 1 ? t('worktime.summary_school_one') : t('worktime.summary_school', { count: facts.schoolDays })) : '',
+			facts.excusedDays > 0 ? (facts.excusedDays === 1 ? t('worktime.summary_excused_one') : t('worktime.summary_excused', { count: facts.excusedDays })) : '',
+			facts.holidayDays > 0 ? (facts.holidayDays === 1 ? t('worktime.summary_holiday_one') : t('worktime.summary_holiday', { count: facts.holidayDays })) : ''
+		].filter(Boolean)
+	);
 	const counts = $derived([
 		{ id: 'days', label: t('worktime.count_days'), value: worktime.days ?? 0 },
 		{ id: 'segments', label: t('worktime.count_segments'), value: worktime.segments ?? 0 },
@@ -31,65 +64,28 @@
 	const split = $derived(worktime.sheetBalanceUpToTodaySeconds != null);
 	const upToToday = $derived(signed(split ? worktime.sheetBalanceUpToTodaySeconds : worktime.sheetBalanceSeconds));
 	const future = $derived(signed(worktime.sheetBalanceFutureSeconds));
-	const hint = $derived(models ? modelStartHint(worktime.firstContentDate, models) : null);
-	const firstDate = $derived(worktime.firstContentDate ?? '');
+	const nothingNew = $derived((worktime.segments ?? 0) + (worktime.absences ?? 0) + (worktime.customDays ?? 0) === 0);
 </script>
 
-<section class="flex flex-col gap-4" aria-labelledby="wt-preview-heading" data-testid="worktime-preview">
-	<h3 id="wt-preview-heading" class="font-medium">{t('worktime.preview_title')}</h3>
-	<dl class="grid grid-cols-2 gap-3 sm:grid-cols-5">
-		{#each counts as count (count.id)}
-			<Card class="py-3"><CardContent><dt class="text-xs text-muted-foreground">{count.label}</dt><dd class="text-xl font-semibold tabular-nums" data-testid="wt-count-{count.id}">{count.value}</dd></CardContent></Card>
-		{/each}
-	</dl>
-	<dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-		{#if worktime.firstDate && worktime.lastDate}
-			<div><dt class="text-muted-foreground">{t('worktime.range')}</dt><dd data-testid="wt-range">{t('worktime.range_value', { from: formatDateNumeric(worktime.firstDate), to: formatDateNumeric(worktime.lastDate) })}</dd></div>
-		{/if}
-		{#if worktime.dateSystem}
-			<div><dt class="text-muted-foreground">{t('worktime.date_system')}</dt><dd data-testid="wt-date-system">{t(`worktime.date_system_${worktime.dateSystem}` as MessageKey)}</dd></div>
-		{/if}
-		{#if byAction.length > 0}
-			<div class="sm:col-span-2">
-				<dt class="text-muted-foreground">{t('worktime.by_action')}</dt>
-				<dd class="flex flex-wrap gap-x-4 gap-y-1" data-testid="wt-by-action">
-					{#each byAction as [action, count] (action)}<span data-action={action}>{t('worktime.by_action_item', { action: actionLabel(action), count })}</span>{/each}
-				</dd>
-			</div>
-		{/if}
-	</dl>
-
-	<Panel title={t('worktime.balance_title')} description={t('worktime.balance_intro')} data-testid="wt-balance">
-		{#if upToToday}
-			<div class="grid gap-3 sm:grid-cols-2">
-				<KpiCard title={t('worktime.balance_upto')} value={upToToday} hint={t('worktime.balance_upto_hint')} testid="wt-balance-value" />
-				{#if split && future}<KpiCard title={t('worktime.balance_future')} value={future} hint={t('worktime.balance_future_hint')} testid="wt-balance-future" />{/if}
-			</div>
-			{#if split && total}<p class="mt-3 text-xs text-muted-foreground" data-testid="wt-balance-total">{t('worktime.balance_total', { balance: total })}</p>{/if}
-		{/if}
-		<p class="mt-3 text-xs text-muted-foreground">{t('worktime.balance_rounding')}</p>
+<section class="flex flex-col gap-4" aria-labelledby="wt-preview-heading" data-testid="worktime-preview" aria-busy={refreshing}>
+	<Panel>
+		<div class="flex flex-col gap-2 text-sm" aria-live="polite">
+			{#if refreshing}
+				<p class="text-muted-foreground" data-testid="wt-refreshing">{t('worktime.summary_refreshing')}</p>
+			{:else if nothingNew || parts.length === 0}
+				<p class="text-lg leading-snug font-semibold" data-testid="wt-summary">{duplicates > 0 ? t('worktime.summary_all_known') : t('worktime.summary_nothing')}</p>
+			{:else}
+				<p class="text-lg leading-snug font-semibold" data-testid="wt-summary">{t('worktime.summary_lead', { parts: parts.join(', ') })}</p>
+			{/if}
+			{#if worktime.firstDate && worktime.lastDate}
+				<p class="text-muted-foreground" data-testid="wt-range-line">{t('worktime.summary_range', { from: formatDateNumeric(worktime.firstDate), to: formatDateNumeric(worktime.lastDate) })}</p>
+			{/if}
+			{#if duplicates > 0 && !nothingNew}<p class="text-muted-foreground">{t('worktime.summary_duplicates', { count: duplicates })}</p>{/if}
+			{#if modelPending}<p class="text-muted-foreground" data-testid="wt-model-pending">{t('worktime.summary_model_note')}</p>{/if}
+		</div>
 	</Panel>
 
-	{#if hint}
-		<div data-testid="wt-model-start" data-kind={hint.kind}>
-			<Banner tone={hint.kind === 'ok' ? 'success' : 'warning'}>
-				<p class="font-medium">{t('worktime.model_start_title')}</p>
-				<p class="mt-0.5">{t('worktime.model_start_first', { date: formatDateNumeric(firstDate) })}</p>
-				<p class="mt-0.5 text-xs">
-					{#if hint.kind === 'none'}{t('worktime.model_start_none', { date: formatDateNumeric(firstDate) })}
-					{:else if hint.kind === 'ok'}{t('worktime.model_start_ok', { modelFrom: formatDateNumeric(hint.modelFrom) })}
-					{:else if hint.kind === 'late'}{t('worktime.model_start_late', { modelFrom: formatDateNumeric(hint.modelFrom) })}
-					{:else if hint.beforeWeek}{t('worktime.model_start_text', { modelFrom: formatDateNumeric(hint.modelFrom), date: formatDateNumeric(firstDate) })}
-					{:else}{t('worktime.model_start_midweek', { days: hint.emptyDays, date: formatDateNumeric(firstDate) })}{/if}
-				</p>
-				
-					{#if hint && hint.kind !== 'ok'}
-						<a class="mt-2 inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-medium hover:bg-muted" href="/settings/work-model?validFrom={firstDate}" target="_blank" rel="noopener" data-testid="wt-model-start-link">{t('worktime.model_start_link', { date: formatDateNumeric(firstDate) })}</a>
-					{/if}
-				
-			</Banner>
-		</div>
-	{/if}
+	{@render warnings?.()}
 
 	{#if unmapped.length > 0}
 		<section aria-labelledby="wt-unmapped-heading" data-testid="wt-unmapped">
@@ -111,4 +107,45 @@
 			</ul>
 		</section>
 	{/if}
+
+	{@render actions?.()}
+
+	<Panel title={t('worktime.balance_title')} description={t('worktime.balance_intro')} data-testid="wt-balance">
+		{#if upToToday}
+			<dl class="grid gap-3 sm:grid-cols-2">
+				<div data-testid="kpi-wt-balance-value"><dt class="text-[13px] font-medium text-muted-foreground">{t('worktime.balance_upto')}</dt><dd class="text-2xl font-semibold tabular-nums" data-testid="wt-balance-value">{upToToday}</dd><dd class="text-[13px] text-muted-foreground">{t('worktime.balance_upto_hint')}</dd></div>
+				{#if split && future}<div><dt class="text-[13px] font-medium text-muted-foreground">{t('worktime.balance_future')}</dt><dd class="text-2xl font-semibold tabular-nums" data-testid="wt-balance-future">{future}</dd><dd class="text-[13px] text-muted-foreground">{t('worktime.balance_future_hint')}</dd></div>{/if}
+			</dl>
+			{#if split && total}<p class="mt-3 text-[13px] text-muted-foreground" data-testid="wt-balance-total">{t('worktime.balance_total', { balance: total })}</p>{/if}
+		{/if}
+		<p class="mt-3 text-[13px] text-muted-foreground">{t('worktime.balance_compare')}</p>
+	</Panel>
+
+	<details class="rounded-lg border" data-testid="wt-details">
+		<summary class="min-h-11 cursor-pointer rounded-lg px-3 py-2.5 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">{t('worktime.details_title')}</summary>
+		<div class="flex flex-col gap-3 border-t p-3">
+			<p class="text-[13px] text-muted-foreground">{t('worktime.details_help')}</p>
+			<dl class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+				{#each counts as count (count.id)}
+					<Card class="py-3"><CardContent><dt class="text-xs text-muted-foreground">{count.label}</dt><dd class="text-xl font-semibold tabular-nums" data-testid="wt-count-{count.id}">{count.value}</dd></CardContent></Card>
+				{/each}
+			</dl>
+			<dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+				{#if worktime.firstDate && worktime.lastDate}
+					<div><dt class="text-muted-foreground">{t('worktime.range')}</dt><dd data-testid="wt-range">{t('worktime.range_value', { from: formatDateNumeric(worktime.firstDate), to: formatDateNumeric(worktime.lastDate) })}</dd></div>
+				{/if}
+				{#if worktime.dateSystem}
+					<div><dt class="text-muted-foreground">{t('worktime.date_system')}</dt><dd data-testid="wt-date-system">{t(`worktime.date_system_${worktime.dateSystem}` as MessageKey)}</dd></div>
+				{/if}
+				{#if byAction.length > 0}
+					<div class="sm:col-span-2">
+						<dt class="text-muted-foreground">{t('worktime.by_action')}</dt>
+						<dd class="flex flex-wrap gap-x-4 gap-y-1" data-testid="wt-by-action">
+							{#each byAction as [action, count] (action)}<span data-action={action}>{t('worktime.by_action_item', { action: actionLabel(action), count })}</span>{/each}
+						</dd>
+					</div>
+				{/if}
+			</dl>
+		</div>
+	</details>
 </section>

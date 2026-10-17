@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildSimpleWorkbook, buildWorktimeWorkbook } from '../../mock/worktime-xlsx.ts';
 import { createMockFetch } from '../../mock/fetch.ts';
-import { api, setCsrfToken } from '#lib/api/client.js';
+import { api, ApiError, setCsrfToken } from '#lib/api/client.js';
 import ImportWizard from '#lib/components/transfer/ImportWizard.svelte';
 import { sessionStore } from '#lib/session.svelte.js';
 import { zoneStore } from '#lib/time/zone.svelte.js';
@@ -77,104 +77,170 @@ const c23Workbook = () =>
 		'Arbeitszeit.xlsx'
 	);
 
-async function openProfileStep(file: File = workbook()) {
+/** Upload -> the recognition card of step 1 (the table is analysed, the template is preselected). */
+async function openRecognition(file: File = workbook()) {
 	const u = user();
 	await u.upload(screen.getByTestId('import-file'), file);
 	await u.click(screen.getByRole('button', { name: 'Weiter' }));
-	await screen.findByRole('heading', { name: 'Blatt und Kopfzeile' });
+	await screen.findByTestId('profile-banner');
+	await waitFor(() => expect(screen.queryByTestId('profile-counting')).toBeNull());
 	return u;
 }
 
-describe('worktime import wizard', () => {
-	it('shows the profile banner, replaces the column step by the profile step and can switch to the generic wizard', async () => {
+async function openPreview(file: File = workbook()) {
+	const u = await openRecognition(file);
+	await u.click(screen.getByTestId('profile-next'));
+	await screen.findByTestId('worktime-preview');
+	return u;
+}
+
+const commitNow = (u: ReturnType<typeof user>) => u.click(screen.getByTestId('commit'));
+const putCalls = () => mock.calls.filter((c) => c.method === 'PUT' && c.path.includes('/mapping'));
+
+describe('worktime import wizard: recognition, template and preview', () => {
+	it('recognises the table in step 1: the card is the template choice with plain numbers and a way to map the columns instead', async () => {
 		render(ImportWizard);
-		const u = await openProfileStep();
-		expect(screen.getByTestId('profile-banner')).toHaveTextContent('Arbeitszeit-Tabelle erkannt');
+		await openRecognition();
+		expect(screen.getByTestId('step-heading')).toHaveTextContent('Datei wählen');
+		const card = screen.getByTestId('profile-banner');
+		expect(card).toHaveTextContent('Das ist deine Arbeitszeit-Tabelle (Excel mit Jahresblättern und Wochenblöcken).');
+		expect(screen.getByTestId('profile-template')).toHaveTextContent('Vorlage: Meine Arbeitszeit-Tabelle (empfohlen)');
+		expect(screen.getByTestId('profile-template')).toHaveTextContent('Alles ist passend voreingestellt.');
+		expect(screen.getByTestId('profile-fact-sheets')).toHaveTextContent('1');
+		expect(screen.getByTestId('profile-fact-weeks')).toHaveTextContent('1');
+		expect(screen.getByTestId('profile-fact-time-days')).toHaveTextContent('3');
+		expect(screen.getByTestId('profile-fact-vacation-days')).toHaveTextContent('1');
+		expect(screen.getByTestId('profile-fact-first-day')).toHaveTextContent('02.03.2026');
+		// recognition has applied the template: a preview with the recommended options already exists, nothing is written
+		expect(putCalls()).toHaveLength(1);
+		expect(mock.calls.some((c) => c.method === 'POST' && c.path.endsWith('/commit'))).toBe(false);
+		expect(screen.getByTestId('profile-switch-generic')).toHaveTextContent('Stattdessen Spalten selbst zuordnen');
 		expect(screen.queryByTestId('no-header')).toBeNull();
-		await u.click(screen.getByRole('button', { name: 'Weiter' }));
-		await screen.findByRole('heading', { name: 'Arbeitszeit-Tabelle' });
-		expect(screen.getByTestId('worktime-step')).toBeInTheDocument();
-		await u.click(screen.getByRole('button', { name: 'Zurück' }));
+	});
+
+	it('maps the columns instead (generic wizard) and can return to the table template', async () => {
+		render(ImportWizard);
+		const u = await openRecognition();
 		await u.click(screen.getByTestId('profile-switch-generic'));
+		await screen.findByRole('heading', { name: 'Blatt und Kopfzeile' });
 		expect(screen.getByTestId('profile-banner-generic')).toBeInTheDocument();
 		expect(screen.getByTestId('no-header')).toBeInTheDocument();
 		await u.click(screen.getByRole('button', { name: 'Weiter' }));
 		await screen.findByRole('heading', { name: 'Spalten' });
+		await u.click(screen.getByRole('button', { name: 'Zurück' }));
+		await u.click(screen.getByTestId('profile-switch-worktime'));
+		await screen.findByTestId('worktime-preview');
+		expect(screen.getByTestId('step-heading')).toHaveTextContent('Vorschau');
 	});
 
-	it('does not show the banner for a generic workbook', async () => {
+	it('does not show the recognition card for a generic workbook', async () => {
 		render(ImportWizard);
 		const u = user();
 		await u.upload(screen.getByTestId('import-file'), new File([buildSimpleWorkbook('Tabelle1', [['Datum', 'Beginn', 'Ende'], ['03.03.2026', '8:00', '9:00']]) as BlobPart], 'z.xlsx'));
 		await u.click(screen.getByRole('button', { name: 'Weiter' }));
 		await screen.findByRole('heading', { name: 'Blatt und Kopfzeile' });
 		expect(screen.queryByTestId('profile-banner')).toBeNull();
+		expect(screen.queryByTestId('profile-banner-generic')).toBeNull();
 	});
 
-	it('edits the rule table (add, reorder, remove, reset) and validates the rules', async () => {
+	it('preview: plain summary, one primary button, collapsed customisation, table balance in plain words', async () => {
 		render(ImportWizard);
-		const u = await openProfileStep();
-		await u.click(screen.getByRole('button', { name: 'Weiter' }));
-		await screen.findByTestId('worktime-step');
-		expect(screen.getByTestId('wt-rules-intro')).toHaveTextContent('die erste passende Regel gilt');
-		expect(screen.getByTestId('wt-rules-absence-note')).toHaveTextContent('nicht als Arbeitszeit');
-		const rows = () => screen.getAllByTestId('wt-rule');
-		expect(rows()).toHaveLength(6);
-		expect((within(rows()[1]).getByLabelText('Text') as HTMLInputElement).value).toBe('freigestellt');
-		await u.click(screen.getByRole('button', { name: 'Regel 2 nach oben' }));
-		expect((within(rows()[0]).getByLabelText('Text') as HTMLInputElement).value).toBe('freigestellt');
-		await u.click(screen.getByRole('button', { name: 'Regel 1 entfernen' }));
-		expect(rows()).toHaveLength(5);
-		await u.click(screen.getByTestId('wt-rule-add'));
-		expect(rows()).toHaveLength(6);
-		await u.click(screen.getByTestId('wt-validate'));
-		expect(screen.getByTestId('mapping-issues')).toHaveTextContent('Regel 6: Der Text fehlt.');
-		await u.click(screen.getByTestId('wt-rules-reset'));
-		await waitFor(() => expect(rows()).toHaveLength(6));
-		expect((within(rows()[0]).getByLabelText('Text') as HTMLInputElement).value).toBe('krank');
-		expect(mock.calls.some((c) => c.path.endsWith('/import-profiles/worktime/default-rules'))).toBe(true);
-	});
-
-	it('validates, explains the preview, creates a rule for an unmapped remark and commits with absences', async () => {
-		render(ImportWizard);
-		const u = await openProfileStep();
-		await u.click(screen.getByRole('button', { name: 'Weiter' }));
-		await screen.findByTestId('worktime-step');
-		await u.click(screen.getByTestId('wt-validate'));
-		await screen.findByTestId('worktime-preview');
+		await openPreview();
+		expect(screen.getByTestId('step-heading')).toHaveTextContent('Vorschau');
+		expect(screen.getByTestId('wt-summary')).toHaveTextContent('Das wird importiert: 3 Arbeitstage, 1 Urlaubstag');
+		expect(screen.getAllByRole('button', { name: 'Jetzt importieren' })).toHaveLength(1);
+		expect((screen.getByTestId('wt-customize') as HTMLDetailsElement).open).toBe(false);
+		expect((screen.getByTestId('wt-expert') as HTMLDetailsElement).open).toBe(false);
+		expect(screen.getByTestId('wt-customize')).toHaveTextContent('Anpassen (nur wenn nötig)');
+		expect(screen.getByTestId('wt-balance')).toHaveTextContent('Zeitkonto: Tabelle gegen App');
 		expect(screen.getByTestId('wt-count-segments')).toHaveTextContent('5');
 		expect(screen.getByTestId('wt-count-absences')).toHaveTextContent('2');
 		expect(screen.getByTestId('wt-date-system')).toHaveTextContent('1900');
-		expect(screen.getByTestId('wt-balance')).toHaveTextContent('Zeitkonto laut Tabelle');
-		expect(screen.getByTestId('wt-balance')).toHaveTextContent('rundet nicht');
 		expect(screen.getByTestId('wt-by-action')).toHaveTextContent('Freigestellt (bezahlt frei): 1');
 		// pause_exceeds_day is a warning: it does not count as error
-		expect(screen.getByTestId('count-errors')).toHaveTextContent('0');
 		expect(screen.getByTestId('error-table').querySelector('[data-warning="true"]')).not.toBeNull();
+		expect(screen.getByTestId('commit')).toBeEnabled();
+	});
+
+	it('every option states a plain sentence, an example and the recommendation; the remark table sits in the expert options', async () => {
+		render(ImportWizard);
+		await openPreview();
+		const options = screen.getByTestId('wt-customize');
+		expect(options).toHaveTextContent('Tag um die Pause herum teilen (empfohlen)');
+		expect(options).toHaveTextContent('Beispiel: 08:00 bis 16:12 Uhr mit 30 Minuten Pause');
+		expect(options).toHaveTextContent('Nicht übernehmen (empfohlen)');
+		expect(options).toHaveTextContent('Beispiel: Steht am 25.12. eine Arbeitszeit');
+		expect(options).toHaveTextContent('Als gearbeitete Zeit (empfohlen)');
+		expect(options).toHaveTextContent('Sekunden abschneiden (empfohlen)');
+		expect(screen.getByTestId('wt-expert')).toContainElement(screen.getByTestId('wt-rules'));
+		expect(screen.getByTestId('wt-expert')).toHaveTextContent('Sehr alte Mac-Excel-Dateien');
+		expect(screen.getByTestId('wt-pause-split')).toBeChecked();
+		expect(screen.getByTestId('wt-holiday-discard')).toBeChecked();
+		expect(screen.getByTestId('wt-credit-work')).toBeChecked();
+		expect(screen.getByTestId('wt-day-options')).toHaveTextContent('Mehrarbeit');
+	});
+
+	it('an option change refreshes the preview by itself, "Zurücksetzen auf Empfehlung" restores everything', async () => {
+		render(ImportWizard);
+		const u = await openPreview(c23Workbook());
+		expect(screen.getByTestId('wt-warnings').querySelector('[data-code="school_on_holiday"]')).not.toBeNull();
+		const before = putCalls().length;
+		expect(screen.getByTestId('wt-reset')).toBeDisabled();
+		await u.click(screen.getByTestId('wt-holiday-keep'));
+		expect(screen.getByTestId('commit')).toBeDisabled();
+		await waitFor(() => expect(screen.queryByTestId('wt-warnings')?.querySelector('[data-code="school_on_holiday"]') ?? null).toBeNull());
+		expect(putCalls().length).toBeGreaterThan(before);
+		expect(screen.getByTestId('commit')).toBeEnabled();
+		expect(screen.getByTestId('wt-customize')).toHaveTextContent('Geändert');
+		await u.click(screen.getByTestId('wt-reset'));
+		expect(screen.getByTestId('wt-holiday-discard')).toBeChecked();
+		await waitFor(() => expect(screen.getByTestId('wt-warnings').querySelector('[data-code="school_on_holiday"]')).not.toBeNull());
+		expect(screen.getByTestId('wt-reset')).toBeDisabled();
+	});
+
+	it('edits the remark table (add, reorder, remove, reset), blocks the import on a faulty entry and shows the problem', async () => {
+		render(ImportWizard);
+		const u = await openPreview();
+		expect(screen.getByTestId('wt-rules-intro')).toHaveTextContent('die erste passende Zeile von oben');
+		expect(screen.getByTestId('wt-rules-absence-note')).toHaveTextContent('keine Arbeitszeit');
+		const rows = () => screen.getAllByTestId('wt-rule');
+		expect(rows()).toHaveLength(6);
+		expect((within(rows()[1]).getByLabelText('Wenn die Bemerkung enthält') as HTMLInputElement).value).toBe('freigestellt');
+		await u.click(screen.getByRole('button', { name: 'Zeile 2 nach oben' }));
+		expect((within(rows()[0]).getByLabelText('Wenn die Bemerkung enthält') as HTMLInputElement).value).toBe('freigestellt');
+		await u.click(screen.getByRole('button', { name: 'Zeile 1 entfernen' }));
+		expect(rows()).toHaveLength(5);
+		await u.click(screen.getByTestId('wt-rule-add'));
+		expect(rows()).toHaveLength(6);
+		expect(screen.getByTestId('mapping-issues')).toHaveTextContent('Zeile 6: Der Text fehlt.');
+		expect((screen.getByTestId('wt-customize') as HTMLDetailsElement).open).toBe(true);
+		expect(screen.getByTestId('commit')).toBeDisabled();
+		await u.click(screen.getByTestId('wt-rules-reset'));
+		await waitFor(() => expect(rows()).toHaveLength(6));
+		expect((within(rows()[0]).getByLabelText('Wenn die Bemerkung enthält') as HTMLInputElement).value).toBe('krank');
+		expect(mock.calls.some((c) => c.path.endsWith('/import-profiles/worktime/default-rules'))).toBe(true);
+		await waitFor(() => expect(screen.getByTestId('commit')).toBeEnabled());
+	});
+
+	it('lists unknown remarks, remembers a meaning with one click and imports with one button', async () => {
+		render(ImportWizard);
+		const u = await openPreview();
 		const unmapped = screen.getByTestId('wt-unmapped');
 		expect(unmapped).toHaveTextContent('Arzttermin');
-		await u.click(within(unmapped).getByRole('button', { name: 'Regel für „Arzttermin“ anlegen' }));
+		await u.click(within(unmapped).getByRole('button', { name: 'Bedeutung für „Arzttermin“ merken' }));
 		await waitFor(() => expect(screen.queryByTestId('wt-unmapped')).toBeNull());
-		expect(screen.getByTestId('import-notice')).toHaveTextContent('Regel angelegt');
-
-		await u.click(screen.getByRole('button', { name: 'Weiter zur Bestätigung' }));
-		expect(await screen.findByTestId('confirm-summary')).toHaveTextContent('2 Abwesenheiten');
-		await u.click(screen.getByLabelText(/Ich habe die Vorschau/));
-		await u.click(screen.getByTestId('commit'));
+		expect(screen.getByTestId('import-notice')).toHaveTextContent('Gemerkt');
+		await commitNow(u);
 		expect(await screen.findByTestId('result-absences')).toHaveTextContent('2 Abwesenheiten angelegt');
 		expect(await api.listAbsences('2026-03-01', '2026-03-31')).toHaveLength(2);
+		// there is no separate confirmation step in the template flow
+		expect(screen.queryByTestId('confirm-summary')).toBeNull();
 	});
 
 	it('shows a typed conflict list when the rollback is refused', async () => {
 		render(ImportWizard);
-		const u = await openProfileStep();
-		await u.click(screen.getByRole('button', { name: 'Weiter' }));
-		await screen.findByTestId('worktime-step');
-		await u.click(screen.getByTestId('wt-validate'));
-		await screen.findByTestId('worktime-preview');
-		await u.click(screen.getByRole('button', { name: 'Weiter zur Bestätigung' }));
-		await u.click(screen.getByLabelText(/Ich habe die Vorschau/));
-		await u.click(screen.getByTestId('commit'));
+		const u = await openPreview();
+		await commitNow(u);
 		await screen.findByTestId('result-created');
 		const [first] = await api.listAbsences('2026-03-01', '2026-03-31');
 		await api.updateAbsence(first.id, { kind: first.kind, startDate: first.startDate, endDate: first.endDate, status: first.status, note: 'x' }, first.version);
@@ -185,11 +251,9 @@ describe('worktime import wizard', () => {
 		expect(list.querySelector('[data-conflict-type="absence"]')).not.toBeNull();
 	});
 
-	it('stores and re-applies the worktime options as a template', async () => {
+	it('stores and re-applies the worktime options as an own template (expert options)', async () => {
 		render(ImportWizard);
-		const u = await openProfileStep();
-		await u.click(screen.getByRole('button', { name: 'Weiter' }));
-		await screen.findByTestId('worktime-step');
+		const u = await openPreview();
 		await u.click(screen.getByTestId('wt-pause-none'));
 		await u.type(screen.getByLabelText('Name der neuen Vorlage'), 'Meine Tabelle');
 		await u.click(screen.getByRole('button', { name: 'Als Vorlage speichern' }));
@@ -200,75 +264,96 @@ describe('worktime import wizard', () => {
 		await u.selectOptions(screen.getByLabelText('Gespeicherte Vorlage'), 'Meine Tabelle');
 		await u.click(screen.getByRole('button', { name: 'Anwenden' }));
 		expect((screen.getByTestId('wt-pause-none') as HTMLInputElement).checked).toBe(true);
+		expect(screen.getByTestId('import-notice')).toHaveTextContent('Die Vorschau wurde aktualisiert');
 	});
 });
 
-describe('worktime import wizard: holiday times, partial credit, balance split and model start (C23)', () => {
-	async function toPreview(u: ReturnType<typeof user>) {
-		await u.click(screen.getByRole('button', { name: 'Weiter' }));
-		await screen.findByTestId('worktime-step');
-		await u.click(screen.getByTestId('wt-validate'));
-		await screen.findByTestId('worktime-preview');
-	}
+describe('worktime import wizard: warnings in plain words, result and the one next step (work model)', () => {
 	const warning = (code: string) => screen.queryByTestId('wt-warnings')?.querySelector(`[data-code="${code}"]`) ?? null;
 
-	it('defaults to discarding holiday times and importing partial credits as work', async () => {
+	it('each warning says what happens and answers "Muss ich etwas tun?"', async () => {
 		render(ImportWizard);
-		const u = await openProfileStep(c23Workbook());
-		await u.click(screen.getByRole('button', { name: 'Weiter' }));
-		await screen.findByTestId('worktime-step');
-		expect(screen.getByTestId('wt-holiday-discard')).toBeChecked();
-		expect(screen.getByTestId('wt-credit-work')).toBeChecked();
-		expect(screen.getByTestId('wt-day-options')).toHaveTextContent('Mehrarbeit');
-		expect(screen.getByTestId('wt-day-options')).toHaveTextContent('Freigestellt mit wenigen Stunden');
-	});
-
-	it('lists the warnings with day counts and a short explanation, splits the balance and points to the model start', async () => {
-		render(ImportWizard);
-		const u = await openProfileStep(c23Workbook());
-		await toPreview(u);
+		await openPreview(c23Workbook());
 		expect(warning('holiday_times_discarded')).toHaveTextContent('1 Tag');
-		expect(warning('school_on_holiday')).toHaveTextContent('Schulzeiten an Feiertagen nicht übernommen');
+		expect(warning('school_on_holiday')).toHaveTextContent('An Feiertagen steht in der Tabelle eine Schulzeit.');
 		expect(warning('credit_partial_as_work')).toHaveAttribute('data-count', '1');
-		expect(warning('credit_partial_as_work')).toHaveTextContent('Was bedeutet das?');
+		expect(warning('credit_partial_as_work')).toHaveTextContent('Muss ich etwas tun?');
+		expect(warning('credit_partial_as_work')).toHaveTextContent('Als ganzer freier Tag');
+		expect(screen.getByTestId('wt-warnings')).not.toHaveTextContent(/Profil|Mapping|Regeln/);
 		expect(screen.getByTestId('wt-count-segments')).toHaveTextContent(/^[1-9]/);
 		expect(screen.getByTestId('wt-balance-value')).toHaveTextContent('-5:12');
 		expect(screen.getByTestId('wt-balance-future')).toHaveTextContent('-4:12');
 		expect(screen.getByTestId('wt-balance-total')).toHaveTextContent('-9:24');
-		const hint = screen.getByTestId('wt-model-start');
-		await waitFor(() => expect(hint).toBeInTheDocument());
-		expect(hint).toHaveAttribute('data-kind', 'earlier');
-		expect(hint).toHaveTextContent('17.09.2026');
-		expect(screen.getByTestId('wt-model-start-link')).toHaveAttribute('href', '/settings/work-model?validFrom=2026-09-17');
+		expect(screen.getByTestId('wt-model-pending')).toHaveTextContent('legst du noch dein Arbeitsmodell an');
 	});
 
-	it('switching to "keep" and "as absence" removes the warnings and is stored in a template', async () => {
+	it('"keep" and "as full day" remove the warnings', async () => {
 		render(ImportWizard);
-		const u = await openProfileStep(c23Workbook());
-		await u.click(screen.getByRole('button', { name: 'Weiter' }));
-		await screen.findByTestId('worktime-step');
+		const u = await openPreview(c23Workbook());
 		await u.click(screen.getByTestId('wt-holiday-keep'));
 		await u.click(screen.getByTestId('wt-credit-absence'));
-		await u.type(screen.getByLabelText('Name der neuen Vorlage'), 'C23');
-		await u.click(screen.getByRole('button', { name: 'Als Vorlage speichern' }));
-		await screen.findByTestId('import-notice');
-		expect((await api.listImportTemplates())[0].mapping.worktime).toMatchObject({ holidayTimes: 'keep', partialCredit: 'absence' });
-		await u.click(screen.getByTestId('wt-validate'));
-		await screen.findByTestId('worktime-preview');
-		expect(screen.queryByTestId('wt-warnings')).toBeNull();
+		await waitFor(() => expect(screen.queryByTestId('wt-warnings')).toBeNull());
 		expect(screen.getByTestId('wt-count-absences')).toHaveTextContent('2');
 	});
 
-	it('shows the aggregated warnings again in the confirmation and in the result', async () => {
+	it('result: one next step "Arbeitsmodell anlegen (ab ...)" with the reason, creates the model, then the account comparison and a single way on', async () => {
 		render(ImportWizard);
-		const u = await openProfileStep(c23Workbook());
-		await toPreview(u);
-		await u.click(screen.getByRole('button', { name: 'Weiter zur Bestätigung' }));
-		expect(screen.getByTestId('confirm-warnings').querySelector('[data-code="school_on_holiday"]')).not.toBeNull();
-		await u.click(screen.getByLabelText(/Ich habe die Vorschau/));
-		await u.click(screen.getByTestId('commit'));
-		const result = await screen.findByTestId('result-warnings');
-		expect(result.querySelector('[data-code="holiday_times_discarded"]')).toHaveAttribute('data-count', '1');
+		const u = await openPreview(c23Workbook());
+		await commitNow(u);
+		const warnings = await screen.findByTestId('result-warnings');
+		expect(warnings.querySelector('[data-code="holiday_times_discarded"]')).toHaveAttribute('data-count', '1');
+		const next = screen.getByTestId('wt-next-step');
+		expect(screen.getByTestId('wt-model-start')).toHaveAttribute('data-kind', 'earlier');
+		expect(within(next).getByTestId('wt-next-why')).toHaveTextContent('Soll');
+		expect(within(next).getByTestId('wt-model-create')).toHaveTextContent('Arbeitsmodell anlegen (ab 17.09.2026)');
+		expect(screen.queryByTestId('wt-continue')).toBeNull();
+		await u.click(within(next).getByTestId('wt-model-create'));
+		await screen.findByTestId('wt-model-done');
+		expect(screen.getByTestId('wt-model-done')).toHaveTextContent('ab 17.09.2026');
+		expect(screen.getByTestId('wt-continue')).toHaveAttribute('href', '/time/2026-09-17');
+		await screen.findByTestId('wt-compare');
+		expect(screen.getByTestId('wt-compare')).toHaveTextContent('Die Tabelle rechnet bis heute');
+		const models = await api.listWorkModels();
+		expect(models.some((m) => m.validFrom === '2026-09-17')).toBe(true);
+	});
+
+	it('a failed model creation shows the server reason in plain German, keeps the screen and offers "Erneut versuchen"', async () => {
+		render(ImportWizard);
+		const u = await openPreview(c23Workbook());
+		await commitNow(u);
+		await screen.findByTestId('wt-next-step');
+		const spy = vi.spyOn(api, 'createWorkModel').mockRejectedValueOnce(new ApiError(409, 'model_overlap', 'x'));
+		await u.click(screen.getByTestId('wt-model-create'));
+		const error = await screen.findByTestId('wt-model-error');
+		expect(error).toHaveTextContent('überschneidet sich mit einer späteren Arbeitsmodell-Version');
+		expect(error).not.toHaveTextContent('model_overlap');
+		expect(screen.getByTestId('result-created')).toBeInTheDocument();
+		expect(screen.getByTestId('wt-model-create')).toHaveTextContent('Erneut versuchen');
+		await u.click(screen.getByTestId('wt-model-create'));
+		await screen.findByTestId('wt-model-done');
+		expect(spy).toHaveBeenCalledTimes(2);
+		expect(screen.queryByTestId('wt-model-error')).toBeNull();
+	});
+});
+
+describe('empty template file', () => {
+	it('step 1 offers the empty work-time table; it downloads next year\'s sheet through the existing export', async () => {
+		const saved: string[] = [];
+		vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => undefined }));
+		const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+			saved.push(this.download);
+		});
+		render(ImportWizard);
+		const u = user();
+		await u.click(screen.getByTestId('template-file-download'));
+		await screen.findByTestId('import-notice');
+		const call = mock.calls.find((c) => c.path.includes('/export/time'))!;
+		expect(call.path).toContain('format=worktime-xlsx');
+		expect(call.path).toContain('from=2027-01-01');
+		expect(call.path).toContain('to=2027-12-31');
+		expect(screen.getByTestId('import-notice')).toHaveTextContent('Vorlage für 2027');
+		expect(saved[0]).toMatch(/\.xlsx$/);
+		click.mockRestore();
 	});
 });
 

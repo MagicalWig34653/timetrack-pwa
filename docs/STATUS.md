@@ -89,3 +89,6 @@ Je Paket ein Handoff mit Befehlen, Zahlen und Grenzen: L1, L3b, L4–L7b, L9, L1
 
 ## Nächste Schritte
 Echtgeräte: Passkey auf Plattform-Authenticator, Installation als PWA (iOS/Android/Desktop), Push-Zustellung, Shortcuts-Durchlauf, ChatGPT-/Claude-Connector; Firefox/WebKit und Screenreader prüfen; Anschluss an die Produktionsinstanz (Build mit `npm run build`, Auslieferung durch das Backend über `PWA_STATIC_DIR`).
+
+## Y1 (Import der Arbeitszeit-Tabelle als geführter Ablauf)
+Erkennungskarte mit Vorlage, Vorschau mit einem Hauptknopf, „Anpassen“ eingeklappt, Ergebnis mit Schritt „Arbeitsmodell anlegen“, leere Vorlage. Details und Zahlen: docs/handoffs/Y1.md (Branch `y1-import-ux`, nicht integriert).

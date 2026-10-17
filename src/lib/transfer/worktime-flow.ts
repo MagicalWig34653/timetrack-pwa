@@ -102,3 +102,54 @@ export function modelStartHint(firstContentDate: string | null | undefined, mode
 	if (!beforeWeek && emptyDays === 0) return { kind: 'ok', modelFrom: valid.validFrom };
 	return { kind: 'earlier', modelFrom: valid.validFrom, emptyDays, beforeWeek };
 }
+
+/** True when all options (including the remark rules) equal the recommendation. */
+export function isRecommended(form: WorktimeForm, defaults: WorktimeRemarkRule[]): boolean {
+	return JSON.stringify(worktimeFromForm(form)) === JSON.stringify(worktimeFromForm(emptyWorktimeForm(defaults)));
+}
+
+export interface WorktimeFacts {
+	sheets: number;
+	weeks: number;
+	/** days with working or school times */
+	timeDays: number;
+	workDays: number;
+	schoolDays: number;
+	vacationDays: number;
+	sickDays: number;
+	excusedDays: number;
+	holidayDays: number;
+	firstDay: string | null;
+}
+
+/** Whole calendar weeks (Monday to Sunday) touched by the range first..last. */
+export function weeksBetween(first: string | null | undefined, last: string | null | undefined): number {
+	if (!first || !last || last < first) return 0;
+	const monday = (d: string) => addDays(d, -(isoWeekday(d) - 1));
+	const days = Math.round((Date.parse(monday(last) + 'T00:00:00Z') - Date.parse(monday(first) + 'T00:00:00Z')) / 86_400_000);
+	return days / 7 + 1;
+}
+
+/** Plain numbers of a worktime preview for the recognition card and the summary. `byAction` counts days by meaning. */
+export function worktimeFacts(worktime: { days?: number; firstDate?: string | null; lastDate?: string | null; firstContentDate?: string | null; byAction?: Record<string, number> } | undefined, sheetCount: number): WorktimeFacts {
+	const by = worktime?.byAction ?? {};
+	const workDays = by.work ?? 0;
+	const schoolDays = by.school ?? 0;
+	return {
+		sheets: sheetCount,
+		weeks: weeksBetween(worktime?.firstDate, worktime?.lastDate),
+		timeDays: by.work !== undefined || by.school !== undefined ? workDays + schoolDays : (worktime?.days ?? 0),
+		workDays,
+		schoolDays,
+		vacationDays: by.vacation ?? 0,
+		sickDays: by.sick ?? 0,
+		excusedDays: by.excused ?? 0,
+		holidayDays: by.holiday ?? 0,
+		firstDay: worktime?.firstContentDate ?? worktime?.firstDate ?? null
+	};
+}
+
+/** Whether a new model version starting at the first content day can be created in one step (see `modelStartHint`). */
+export function canCreateModel(hint: ModelStartHint | null): boolean {
+	return hint !== null && (hint.kind === 'none' || hint.kind === 'earlier');
+}

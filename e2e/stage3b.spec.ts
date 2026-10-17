@@ -197,7 +197,7 @@ const CSV_DECIMAL = csvBuffer(['Datum;Beginn;Dauer', '10.08.2026;8,5;7,7', '11.0
 
 async function importUpTo(page: Page, name: string, buffer: Buffer, mimeType: string, step: 'sheet' | 'mapping') {
 	await page.goto('/import');
-	await expect(page.getByTestId('step-heading')).toHaveText('Datei');
+	await expect(page.getByTestId('step-heading')).toHaveText('Datei wählen');
 	await page.getByTestId('import-file').setInputFiles({ name, mimeType, buffer });
 	await expect(page.getByTestId('picked-file')).toContainText(name);
 	await page.getByRole('button', { name: 'Weiter' }).click();
@@ -406,7 +406,7 @@ test('import wizard: decimal hours 7,7 are 7:42 (not 7:07); templates can be app
 	const left = await api(page, 'GET', '/api/v1/import-templates');
 	expect(left.body.map((x: any) => x.name)).toEqual(['Dezimalstunden']);
 	await page.getByRole('button', { name: 'Import verwerfen' }).first().click();
-	await expect(page.getByTestId('step-heading')).toHaveText('Datei');
+	await expect(page.getByTestId('step-heading')).toHaveText('Datei wählen');
 });
 
 test('import rollback conflict: editing an imported segment blocks the rollback and lists it', async () => {
@@ -451,7 +451,7 @@ test('import: unreadable, unsuitable and oversize uploads give German messages',
 	] as [string, Buffer][]) {
 		await (await upload(name, bytes)).click();
 		await expect(page.getByTestId('import-error')).toHaveText('Dieser Dateityp wird nicht angenommen.');
-		await expect(page.getByTestId('step-heading')).toHaveText('Datei');
+		await expect(page.getByTestId('step-heading')).toHaveText('Datei wählen');
 	}
 	// a ZIP that is no workbook
 	const probe = await apiUpload(page, '/api/v1/imports', 'leer.xlsx', Buffer.from(zip({ 'readme.txt': 'hallo' })));
