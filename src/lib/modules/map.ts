@@ -32,7 +32,8 @@ export const CORE_ROUTES = [
 	'/settings/privacy',
 	'/admin/invitations',
 	'/admin/accounts',
-	'/admin/modules'
+	'/admin/modules',
+	'/admin/mail'
 ] as const;
 
 export const MODULE_ROUTES: Record<ModuleKey, readonly string[]> = {

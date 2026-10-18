@@ -951,6 +951,60 @@ export interface ServerModule {
 	lockedByOperator: boolean;
 }
 
+/** E-mail diagnosis (contract v0.18.0, ADR-0022). The settings come from the server environment and are read-only. */
+export interface MailHint {
+	severity: 'info' | 'warning';
+	code: string;
+	message: string;
+}
+
+export interface MailStatus {
+	configured: boolean;
+	host?: string;
+	port?: number;
+	tls?: 'starttls' | 'implicit' | 'off';
+	fromAddress?: string;
+	fromName?: string;
+	/** user name and password are set; the values are never returned */
+	authConfigured: boolean;
+	source: 'environment';
+	hints: MailHint[];
+}
+
+export interface MailCheckCertificate {
+	subject?: string;
+	issuer?: string;
+	validFrom: string;
+	validUntil: string;
+	daysLeft: number;
+	hostnameMatches: boolean;
+}
+
+export type MailStepId = 'dns' | 'tcp' | 'tls' | 'ehlo' | 'auth' | 'mailFrom';
+
+export interface MailCheckStep {
+	id: MailStepId;
+	title: string;
+	status: 'ok' | 'failed' | 'skipped';
+	durationMs: number;
+	details: string[];
+	warnings: string[];
+	certificate?: MailCheckCertificate;
+	problem?: { code: string; message: string; advice: string };
+}
+
+export interface MailCheckResult {
+	ok: boolean;
+	summary: string;
+	checkedAt: string;
+	totalMs: number;
+	steps: MailCheckStep[];
+}
+
+export interface MailTestResult {
+	sent: boolean;
+	to: string;
+	durationMs: number;
 /** GET /system/info (contract v0.19.0, ADR-0023): version and build data of server and the PWA it serves. */
 export interface SystemInfo {
 	backend: {

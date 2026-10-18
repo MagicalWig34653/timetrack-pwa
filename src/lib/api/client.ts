@@ -2,6 +2,9 @@ import { splitRange } from '../time/dates';
 import { pwa } from '../pwa/pwa.svelte';
 import { ApiError } from './errors';
 import type {
+	MailCheckResult,
+	MailStatus,
+	MailTestResult,
 	AdminAccount,
 	SystemInfo,
 	AdminAccountPage,
@@ -523,6 +526,11 @@ export const api = {
 	listImportTemplates: () => request<ImportTemplate[]>('GET', '/import-templates'),
 	createImportTemplate: (name: string, mapping: ImportMapping) => request<ImportTemplate>('POST', '/import-templates', { name, mapping }),
 	deleteImportTemplate: (id: string) => request<void>('DELETE', `/import-templates/${id}`),
+
+	// e-mail diagnosis (admin, contract v0.18.0)
+	getMailStatus: () => request<MailStatus>('GET', '/admin/mail'),
+	checkMail: () => request<MailCheckResult>('POST', '/admin/mail/check'),
+	sendMailTest: (to?: string) => request<MailTestResult>('POST', '/admin/mail/test', to ? { to } : {}),
 
 	// file storage (admin) and files
 	getStorageSettings: () => request<StorageSettings>('GET', '/admin/storage'),
