@@ -203,6 +203,7 @@ export const de = {
 	'error.status_429': 'Zu viele Versuche. Bitte warte einen Moment.',
 	'error.status_500': 'Auf dem Server ist ein Fehler aufgetreten.',
 	'error.status_501': 'Diese Funktion ist auf diesem Server nicht eingerichtet.',
+	'error.database_unavailable': 'Die Datenbank ist gerade nicht erreichbar. Deine Eingabe wurde nicht gespeichert; bitte versuche es in einigen Sekunden noch einmal.',
 	'error.status_503': 'Der Server ist gerade nicht bereit.',
 	'error.bad_request': 'Die Eingaben sind ungültig.',
 	'error.unauthorized': 'Du bist nicht angemeldet oder der Nachweis ist ungültig.',

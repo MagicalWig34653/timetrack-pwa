@@ -56,6 +56,25 @@ test('older servers without the endpoint still show the interface version', asyn
 	await context.close();
 });
 
+test('a 503 database_unavailable on a GET is retried transparently (Retry-After honoured)', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser);
+	let calls = 0;
+	await page.route('**/api/v1/system/info', async (route) => {
+		calls += 1;
+		if (calls === 1) {
+			await route.fulfill({
+				status: 503,
+				headers: { 'Retry-After': '1' },
+				json: { error: { code: 'database_unavailable', message: 'Datenbank nicht erreichbar' } }
+			});
+		} else await route.fallback();
+	});
+	await page.getByRole('button', { name: 'Hilfe' }).first().click();
+	await expect(page.getByTestId('version-backend-number')).toBeVisible();
+	expect(calls).toBe(2);
+	await context.close();
+});
+
 for (const [name, viewport, scheme] of [
 	['desktop-light', { width: 1280, height: 900 }, 'light'],
 	['desktop-dark', { width: 1280, height: 900 }, 'dark'],

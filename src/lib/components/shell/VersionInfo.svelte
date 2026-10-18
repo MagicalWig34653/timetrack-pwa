@@ -6,6 +6,7 @@
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
+	import { hardReset } from '#lib/pwa/pwa.svelte.js';
 	import { formatBuildDate, formatUptime, ownBuild, revisionMismatch, shortRevision, supportText } from '#lib/version/info.js';
 	import RefreshIcon from '@lucide/svelte/icons/refresh-cw';
 
@@ -31,14 +32,7 @@
 	/** Drops the service worker and its caches, then reloads, so the page comes from the server again. */
 	async function refresh() {
 		refreshing = true;
-		try {
-			const registrations = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
-			await Promise.all(registrations.map((registration) => registration.unregister()));
-			if (typeof caches !== 'undefined') await Promise.all((await caches.keys()).map((key) => caches.delete(key)));
-		} catch {
-			// a failing cleanup must not block the reload
-		}
-		window.location.reload();
+		await hardReset();
 	}
 </script>
 

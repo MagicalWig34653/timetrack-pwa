@@ -207,6 +207,22 @@ export function setRetryDelays(delays: number[]): void {
 }
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const isTransientStatus = (status: number) => status === 502 || status === 503 || status === 504;
+/** Longest wait honoured from a Retry-After header (seconds or HTTP date). */
+export const MAX_RETRY_AFTER_MS = 5000;
+
+/** Delay from a Retry-After header, capped at MAX_RETRY_AFTER_MS; null if absent or unparsable. */
+export function retryAfterMs(header: string | null, now = Date.now()): number | null {
+	if (!header) return null;
+	const trimmed = header.trim();
+	let ms: number;
+	if (/^\d+$/.test(trimmed)) ms = Number(trimmed) * 1000;
+	else {
+		const date = Date.parse(trimmed);
+		if (Number.isNaN(date)) return null;
+		ms = date - now;
+	}
+	return Math.min(Math.max(ms, 0), MAX_RETRY_AFTER_MS);
+}
 
 /** Short-lived cache for expensive, rarely changing reads (time account); any successful write clears it. */
 const readCache = new Map<string, { at: number; value: Promise<unknown> }>();
@@ -252,7 +268,9 @@ async function request<T>(
 			continue;
 		}
 		if (!last && isTransientStatus(response.status)) {
-			await sleep(RETRY_DELAYS_MS[attempt]);
+			// a Retry-After from the server (503 database_unavailable) wins over the default backoff, capped at 5 s
+			const wait = retryAfterMs(response.headers.get('Retry-After'));
+			await sleep(wait ?? RETRY_DELAYS_MS[attempt]);
 			continue;
 		}
 		break;

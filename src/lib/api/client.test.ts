@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockFetch } from '../../../mock/fetch.ts';
 import { splitRange } from '../time/dates.js';
-import { api, ApiError, invalidateReadCache, mergeSharedViews, setCsrfToken, setRetryDelays } from './client.js';
+import { api, ApiError, invalidateReadCache, mergeSharedViews, retryAfterMs, setCsrfToken, setRetryDelays } from './client.js';
 
 describe('api client', () => {
 	let mock: ReturnType<typeof createMockFetch>;
@@ -132,6 +132,67 @@ describe('range helpers', () => {
 			vi.stubGlobal('fetch', notFound);
 			await expect(api.listPlaces()).rejects.toMatchObject({ status: 404 });
 			expect(notFound).toHaveBeenCalledTimes(1);
+		});
+
+		describe('database_unavailable with Retry-After (contract 0.20.0)', () => {
+			const unavailable = (retryAfter: string) =>
+				new Response(JSON.stringify({ error: { code: 'database_unavailable', message: 'Datenbank nicht erreichbar' } }), {
+					status: 503,
+					headers: { 'Content-Type': 'application/json', 'Retry-After': retryAfter }
+				});
+			beforeEach(() => {
+				vi.useFakeTimers();
+				setRetryDelays([400, 1200]);
+			});
+			afterEach(() => vi.useRealTimers());
+
+			it('parses Retry-After seconds and dates and caps at 5 seconds', () => {
+				expect(retryAfterMs('2')).toBe(2000);
+				expect(retryAfterMs('60')).toBe(5000);
+				expect(retryAfterMs(null)).toBeNull();
+				expect(retryAfterMs('soon')).toBeNull();
+				const now = Date.parse('2026-10-18T10:00:00Z');
+				expect(retryAfterMs('Sun, 18 Oct 2026 10:00:03 GMT', now)).toBe(3000);
+				expect(retryAfterMs('Sun, 18 Oct 2026 09:00:00 GMT', now)).toBe(0);
+			});
+
+			it('retries a GET twice, waiting for Retry-After (capped), then succeeds', async () => {
+				const fetchMock = vi
+					.fn()
+					.mockResolvedValueOnce(unavailable('2'))
+					.mockResolvedValueOnce(unavailable('9'))
+					.mockResolvedValueOnce(json(200, []));
+				vi.stubGlobal('fetch', fetchMock);
+				const result = api.listPlaces();
+				await vi.advanceTimersByTimeAsync(1999);
+				expect(fetchMock).toHaveBeenCalledTimes(1);
+				await vi.advanceTimersByTimeAsync(1);
+				expect(fetchMock).toHaveBeenCalledTimes(2);
+				await vi.advanceTimersByTimeAsync(4999);
+				expect(fetchMock).toHaveBeenCalledTimes(2);
+				await vi.advanceTimersByTimeAsync(1);
+				await expect(result).resolves.toEqual([]);
+				expect(fetchMock).toHaveBeenCalledTimes(3);
+			});
+
+			it('gives up after two retries with database_unavailable', async () => {
+				const fetchMock = vi.fn(async () => unavailable('1'));
+				vi.stubGlobal('fetch', fetchMock);
+				const result = api.listPlaces().catch((e) => e);
+				await vi.advanceTimersByTimeAsync(5000);
+				expect(await result).toMatchObject({ status: 503, code: 'database_unavailable' });
+				expect(fetchMock).toHaveBeenCalledTimes(3);
+			});
+
+			it('never retries a write and maps the code to a German message', async () => {
+				const fetchMock = vi.fn(async () => unavailable('2'));
+				vi.stubGlobal('fetch', fetchMock);
+				const error = await api.revokeOtherSessions().catch((e) => e);
+				expect(fetchMock).toHaveBeenCalledTimes(1);
+				expect(error).toMatchObject({ status: 503, code: 'database_unavailable' });
+				const { errorMessage } = await import('../i18n/index.js');
+				expect(errorMessage(error)).toContain('Datenbank');
+			});
 		});
 
 		it('serves the time account from a short cache until a write succeeds', async () => {
