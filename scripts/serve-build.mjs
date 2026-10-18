@@ -60,7 +60,16 @@ http
 			res.statusCode = 404;
 			return res.end();
 		}
-		if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(root, 'index.html');
+		if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+			// Like the backend: a missing asset is a real 404, only extension-less routes fall back to the SPA shell.
+			if (url.pathname.startsWith('/_app/') || /\.(js|mjs|css|map|json|webmanifest|txt|xml|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf)$/i.test(url.pathname)) {
+				res.statusCode = 404;
+				res.setHeader('Cache-Control', 'no-store');
+				res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+				return res.end('Not found\n');
+			}
+			file = path.join(root, 'index.html');
+		}
 		const name = path.basename(file);
 		const hashed = url.pathname.startsWith('/_app/immutable/') || /[.-][A-Za-z0-9_-]{8,}\./.test(name);
 		res.setHeader('Content-Type', types[path.extname(file)] ?? 'application/octet-stream');

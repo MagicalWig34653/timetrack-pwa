@@ -14,8 +14,8 @@ const pushSubscribe = vi.fn();
 const matchAll = vi.fn();
 const openWindow = vi.fn(async () => null);
 const cacheStore = new Map<string, Response>();
-const cacheAddAll = vi.fn(async (requests: Request[]) => {
-	for (const r of requests) cacheStore.set(new URL(r.url).pathname, new Response('x'));
+const cachePut = vi.fn(async (key: string | Request, response: Response) => {
+	cacheStore.set(typeof key === 'string' ? key : new URL(key.url).pathname, response);
 });
 const cacheNames = ['tt-static-old', 'tt-static-v-test', 'unrelated'];
 const deleted: string[] = [];
@@ -31,9 +31,9 @@ beforeAll(async () => {
 	});
 	vi.stubGlobal('caches', {
 		open: async () => ({
-			addAll: cacheAddAll,
 			match: async (key: string | Request) => cacheStore.get(typeof key === 'string' ? key : new URL(key.url).pathname),
-			put: vi.fn()
+			put: cachePut,
+			delete: vi.fn(async () => true)
 		}),
 		keys: async () => cacheNames,
 		delete: async (name: string) => (deleted.push(name), true)
@@ -63,12 +63,27 @@ function clickEvent(data: unknown) {
 
 describe('lifecycle', () => {
 	it('precaches build assets, static files and the shell, and does not skip waiting on install', async () => {
+		const fetched: string[] = [];
+		vi.stubGlobal('fetch', vi.fn(async (req: Request) => {
+			fetched.push(new URL(req.url).pathname);
+			const html = new URL(req.url).pathname === '/index.html';
+			return new Response('x', { status: 200, headers: { 'content-type': html ? 'text/html' : 'text/javascript' } });
+		}));
 		const waits: Promise<unknown>[] = [];
 		listeners.install({ waitUntil: (p: Promise<unknown>) => waits.push(p) });
 		await Promise.all(waits);
-		const paths = cacheAddAll.mock.calls[0][0].map((r) => new URL(r.url).pathname);
-		expect(paths).toEqual(['/_app/immutable/entry/app.abc.js', '/manifest.webmanifest', '/icons/icon-192.png', '/index.html']);
+		expect(fetched).toEqual(['/_app/immutable/entry/app.abc.js', '/manifest.webmanifest', '/icons/icon-192.png', '/index.html']);
+		expect(cachePut).toHaveBeenCalledTimes(4);
 		expect(skipWaiting).not.toHaveBeenCalled();
+	});
+
+	it('fails the install instead of caching HTML for a script URL', async () => {
+		cachePut.mockClear();
+		vi.stubGlobal('fetch', vi.fn(async () => new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } })));
+		const waits: Promise<unknown>[] = [];
+		listeners.install({ waitUntil: (p: Promise<unknown>) => waits.push(p) });
+		await expect(Promise.all(waits)).rejects.toThrow(/unusable response/);
+		expect(cachePut).not.toHaveBeenCalledWith('/_app/immutable/entry/app.abc.js', expect.anything());
 	});
 
 	it('activates a new version only after the SKIP_WAITING message', () => {

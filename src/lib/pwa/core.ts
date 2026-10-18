@@ -96,3 +96,17 @@ export const isOldCache = (name: string, version: string) => name.startsWith(CAC
 export function isIosDevice(userAgent: string, maxTouchPoints: number): boolean {
 	return /iPad|iPhone|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1);
 }
+
+/** True for the SPA shell and other documents; only these may be HTML. */
+const isDocumentPath = (pathname: string) => pathname === '/index.html' || pathname === '/offline' || !/\.[A-Za-z0-9]+$/.test(pathname);
+
+/**
+ * Guards the cache against the "HTML answered for an asset" failure (a server falling back to the SPA shell for a
+ * missing hashed file). A response may be cached or served for `pathname` only when it is OK and, unless the path is a
+ * document, is not text/html.
+ */
+export function isUsableAssetResponse(pathname: string, ok: boolean, contentType: string | null): boolean {
+	if (!ok) return false;
+	if (isDocumentPath(pathname)) return true;
+	return !/text\/html/i.test(contentType ?? '');
+}

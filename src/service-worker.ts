@@ -4,7 +4,7 @@
 /// <reference lib="webworker" />
 import { version } from '$app/env';
 import { assets, immutable } from '$app/manifest';
-import { base64urlToBytes, cacheNameFor, isInterceptable, isOldCache, parsePushPayload, safeRelativeUrl } from './lib/pwa/core';
+import { base64urlToBytes, cacheNameFor, isInterceptable, isOldCache, isUsableAssetResponse, parsePushPayload, safeRelativeUrl } from './lib/pwa/core';
 import { handleSubscriptionChange, type SubscriptionLike } from './lib/pwa/subscription-change';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
@@ -23,7 +23,18 @@ const PRECACHED = new Set(PRECACHE);
 sw.addEventListener('install', (event) => {
 	// No skipWaiting here: a new version waits until the user confirms the update banner (SKIP_WAITING message).
 	event.waitUntil(
-		caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map((path) => new Request(sw.location.origin + path, { cache: 'reload' }))))
+		(async () => {
+			const cache = await caches.open(CACHE);
+			// Not cache.addAll(): a server that answers the SPA shell (HTML) for a missing .js file would be stored as that file.
+			// Any unusable response fails the install, so the previous worker and its caches stay in charge.
+			await Promise.all(
+				PRECACHE.map(async (path) => {
+					const response = await fetch(new Request(sw.location.origin + path, { cache: 'reload' }));
+					if (!isUsableAssetResponse(path, response.ok, response.headers.get('content-type'))) throw new Error(`precache: unusable response for ${path}`);
+					await cache.put(path, response);
+				})
+			);
+		})()
 	);
 });
 
@@ -66,10 +77,17 @@ async function navigate(request: Request, url: URL): Promise<Response> {
 
 async function cacheFirst(request: Request): Promise<Response> {
 	const cache = await caches.open(CACHE);
+	const pathname = new URL(request.url).pathname;
 	const hit = await cache.match(request);
-	if (hit) return hit;
+	if (hit && isUsableAssetResponse(pathname, hit.ok, hit.headers.get('content-type'))) return hit;
+	if (hit) await cache.delete(request);
 	const response = await fetch(request);
-	if (response.ok && response.type === 'basic') void cache.put(request, response.clone());
+	if (isUsableAssetResponse(pathname, response.ok, response.headers.get('content-type'))) {
+		if (response.type === 'basic') void cache.put(request, response.clone());
+		return response;
+	}
+	// HTML (or an error) for an asset URL: never cache it and never hand a document to a script/style loader.
+	if (response.ok) return new Response('Not found', { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
 	return response;
 }
 
