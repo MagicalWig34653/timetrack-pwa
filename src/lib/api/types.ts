@@ -1005,6 +1005,8 @@ export interface MailTestResult {
 	sent: boolean;
 	to: string;
 	durationMs: number;
+}
+
 /** GET /system/info (contract v0.19.0, ADR-0023): version and build data of server and the PWA it serves. */
 export interface SystemInfo {
 	backend: {

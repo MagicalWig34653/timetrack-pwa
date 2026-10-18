@@ -199,7 +199,7 @@
 					<pre class="overflow-x-auto font-mono text-[13px] leading-relaxed" data-testid="mail-example">{[...SETUP_LINES.required, ...SETUP_LINES.optional].join('\n')}</pre>
 				</div>
 				<p class="mt-3 text-[13px] text-muted-foreground">{t('mail.setup.after')}</p>
-				<p class="mt-1 text-[13px] text-muted-foreground" data-testid="mail-docs">{t('mail.setup.docs')}: <code class="font-mono">docs/installation/konfiguration.md</code></p>
+				<p class="mt-1 text-[13px] text-muted-foreground" data-testid="mail-docs">{t('mail.setup.docs')}: <a class="underline underline-offset-2" href="https://magicalwig34653.github.io/timetrack-backend/docs/installation/konfiguration" target="_blank" rel="noopener">docs/installation/konfiguration</a></p>
 			</Panel>
 		{:else}
 			<Panel title={t('mail.check.title')} description={t('mail.check.text')} data-testid="mail-check">

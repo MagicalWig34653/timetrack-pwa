@@ -56,7 +56,10 @@ describe('/admin/mail', () => {
 		expect(within(setup).getByText('SMTP_HOST')).toBeInTheDocument();
 		expect(within(setup).getByText('SMTP_PASSWORD_FILE')).toBeInTheDocument();
 		expect(screen.getByTestId('mail-example')).toHaveTextContent('SMTP_HOST=smtp.example.org');
-		expect(screen.getByTestId('mail-docs')).toHaveTextContent('docs/installation/konfiguration.md');
+		const docs = screen.getByRole('link', { name: 'docs/installation/konfiguration' });
+		expect(docs).toHaveAttribute('href', 'https://magicalwig34653.github.io/timetrack-backend/docs/installation/konfiguration');
+		expect(docs).toHaveAttribute('target', '_blank');
+		expect(docs).toHaveAttribute('rel', 'noopener');
 		expect(screen.queryByTestId('mail-check-run')).toBeNull();
 	});
 
