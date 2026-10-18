@@ -9,6 +9,7 @@ import { deProfile } from './de-profile';
 import { dePwa } from './de-pwa';
 import { deReports } from './de-reports';
 import { deTransfer } from './de-transfer';
+import { deVacationPlanner } from './de-vacation-planner';
 import { deWeek } from './de-week';
 import { deWorktime } from './de-worktime';
 
@@ -26,6 +27,7 @@ export const de = {
 	...dePwa,
 	...deReports,
 	...deTransfer,
+	...deVacationPlanner,
 	...deWorktime,
 	...deWeek,
 	'app.name': 'Timetrack',

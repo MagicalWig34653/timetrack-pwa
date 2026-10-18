@@ -51,7 +51,11 @@
 	}
 </script>
 
-<PageHeader title={t('vacation.title')} description={t('vacation.description')} />
+<PageHeader title={t('vacation.title')} description={t('vacation.description')}>
+	{#snippet primary()}
+		<Button href="/vacation/planner" data-testid="open-planner">{t('planner.open')}</Button>
+	{/snippet}
+</PageHeader>
 
 {#if load.status === 'loading'}
 	<p class="text-sm text-muted-foreground">{t('common.loading')}</p>

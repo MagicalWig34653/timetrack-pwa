@@ -16,6 +16,7 @@ import type {
 	WorkModel
 } from '../src/lib/api/types.ts';
 import { holidaysFor } from './holidays.ts';
+import { suggestVacation } from './vacation-suggestions.ts';
 import { daysBetween, modelForDate, type DerivedDayContext } from './evaluate.ts';
 
 export interface PlanningRequest {
@@ -187,6 +188,66 @@ export function createPlanningMock(deps: PlanningDeps) {
 		};
 	}
 
+	/** GET /vacation/suggestions (contract 0.22.0): read-only; validation and defaults as in the backend. */
+	function suggestions(accountId: string, query: URLSearchParams): PlanningResponse {
+		const state = stateOf(accountId);
+		const today = todayLocal(undefined, new Date(deps.clock()));
+		const from = query.get('from') ?? today;
+		const to = query.get('to') ?? `${Number(today.slice(0, 4)) + 1}-12-31`;
+		const intParam = (name: string, fallback: number, max: number): number | null => {
+			const raw = query.get(name);
+			if (raw === null) return fallback;
+			const n = /^\d+$/.test(raw) ? Number(raw) : NaN;
+			return n >= 1 && n <= max ? n : null;
+		};
+		const maxVacationDays = intParam('maxVacationDays', 10, 60);
+		const minDaysOff = intParam('minDaysOff', 4, 60);
+		const limit = intParam('limit', 20, 100);
+		if (!isDate(from) || !isDate(to) || to < from || maxVacationDays === null || minDaysOff === null || limit === null) return fail(400, 'invalid');
+		if (daysBetween(from, to).length > 550) return fail(400, 'range_too_large');
+		const models = deps.modelsOf(accountId);
+		const holidays = new Map<string, string>();
+		for (let year = Number(from.slice(0, 4)); year <= Number(to.slice(0, 4)); year++) {
+			for (const h of holidaysFor(year, regionOf(state))) if (h.kind === 'holiday') holidays.set(h.startDate, h.name);
+		}
+		for (const c of state.customDays) if (c.kind === 'holiday') for (const d of daysBetween(c.startDate, c.endDate)) holidays.set(d, c.name);
+		const vacationDates = new Set<string>();
+		const absenceDates = new Set<string>();
+		for (const a of state.absences) {
+			if (a.status === 'rejected' || a.status === 'cancelled') continue;
+			for (const d of daysBetween(a.startDate, a.endDate)) (a.kind === 'vacation' ? vacationDates : absenceDates).add(d);
+		}
+		const planDates = new Map<string, string>();
+		for (const [date, plan] of state.plan) planDates.set(date, plan.mode);
+		const year = Number(from.slice(0, 4));
+		const b = balance(accountId, year);
+		const remainingOfYear = (y: number) => balance(accountId, y).availableAfterPlannedHalfDays / 2;
+		return ok({
+			from,
+			to,
+			budget: {
+				entitlementDays: (b.availableAfterPlannedHalfDays + b.bookedHalfDays + b.plannedHalfDays) / 2,
+				takenDays: b.bookedHalfDays / 2,
+				plannedDays: b.plannedHalfDays / 2,
+				remainingDays: b.availableAfterPlannedHalfDays / 2
+			},
+			suggestions: suggestVacation({
+				from,
+				to,
+				maxVacationDays,
+				minDaysOff,
+				limit,
+				workdays: (date) => modelForDate(models, date)?.workdays ?? [1, 2, 3, 4, 5],
+				holidays,
+				schoolHolidays: state.customDays.filter((c) => c.kind === 'school_holiday').map((c) => ({ startDate: c.startDate, endDate: c.endDate, name: c.name })),
+				vacationDates,
+				absenceDates,
+				planDates,
+				remainingOfYear
+			})
+		});
+	}
+
 	/** v0.3.1: only vacation counts half days, and not once rejected or cancelled. */
 	function withCount(accountId: string, absence: Omit<Absence, 'countedHalfDays'>): Absence {
 		const counts = absence.kind === 'vacation' && absence.status !== 'rejected' && absence.status !== 'cancelled';
@@ -349,6 +410,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 				return ok({ ...state.settings, configured: true });
 			}
 		}
+		if (route === 'vacation/suggestions' && method === 'GET') return suggestions(accountId, query);
 		if (route === 'vacation/balance' && method === 'GET') {
 			const year = yearOf();
 			return year === null ? fail(400, 'bad_request') : ok(balance(accountId, year));

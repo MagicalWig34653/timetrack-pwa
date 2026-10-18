@@ -351,6 +351,47 @@ export interface VacationEntries {
 	adjustments: VacationAdjustmentEntry[];
 }
 
+export type VacationSuggestionKind = 'bridge' | 'holiday_cluster' | 'school_holiday_extension' | 'long_break';
+export type VacationConflictType = 'absence' | 'school_day' | 'plan' | 'already_vacation';
+
+export interface VacationSuggestionConflict {
+	date: string;
+	type: VacationConflictType;
+}
+
+/** One ranked vacation proposal (contract 0.22.0, ADR-0025). Day amounts are whole or half days (numbers, not half-day integers). */
+export interface VacationSuggestion {
+	id: string;
+	kind: VacationSuggestionKind;
+	start: string;
+	end: string;
+	/** work days that cost vacation (whole days), not necessarily contiguous */
+	vacationDates: string[];
+	vacationDaysNeeded: number;
+	totalDaysOff: number;
+	efficiency: number;
+	holidays: { date: string; name: string }[];
+	schoolHolidays: { startDate: string; endDate: string; name: string }[];
+	conflicts: VacationSuggestionConflict[];
+	fitsBudget: boolean;
+	remainingAfter: number;
+}
+
+export interface VacationSuggestions {
+	from: string;
+	to: string;
+	budget: { entitlementDays: number; takenDays: number; plannedDays: number; remainingDays: number };
+	suggestions: VacationSuggestion[];
+}
+
+export interface VacationSuggestionQuery {
+	from?: string;
+	to?: string;
+	maxVacationDays?: number;
+	minDaysOff?: number;
+	limit?: number;
+}
+
 export type AbsenceKind = 'vacation' | 'sick' | 'excused' | 'other';
 export type AbsenceStatus = 'planned' | 'requested' | 'approved' | 'rejected' | 'cancelled' | 'taken';
 export type DocumentStatus = 'not_needed' | 'pending' | 'submitted';

@@ -51,6 +51,8 @@ import type {
 	SharedView,
 	VacationBalance,
 	VacationEntries,
+	VacationSuggestionQuery,
+	VacationSuggestions,
 	VacationSettings,
 	OnboardingState,
 	Preferences,
@@ -483,6 +485,12 @@ export const api = {
 		request<VacationBalance>('POST', '/vacation/adjustments', input),
 
 	listVacationEntries: (year: number) => request<VacationEntries>('GET', `/vacation/entries?year=${year}`),
+	getVacationSuggestions: (query: VacationSuggestionQuery = {}) => {
+		const params = new URLSearchParams();
+		for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, String(value));
+		const qs = params.toString();
+		return request<VacationSuggestions>('GET', `/vacation/suggestions${qs ? `?${qs}` : ''}`);
+	},
 	deleteVacationEntry: (id: string) => request<void>('DELETE', `/vacation/entries/${id}`),
 
 	// absences; `ifMatchVersion` becomes the If-Match header; ranges above 366 days are loaded in chunks

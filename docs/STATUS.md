@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket V2-PWA (Urlaubsplanung, 19.10.2026, Branch v2-vacation-planner, nicht gemergt, Lead-Prüfung offen)
+Neue Seite `/vacation/planner` (Modul planning, Knopf „Urlaub planen“ auf `/vacation`): Budgetkopf, Filter (gemerkt je Browser), gerankte Vorschlagskarten mit Faktor, Konfliktwarnungen, Budgetzustand, Tagesstreifen und „In meinen Urlaub übernehmen“ (Bestätigung, je Block eine geplante Urlaubs-Abwesenheit, Häkchen bei Konflikten). Füllfenster unter Faktor 2 standardmäßig ausgeblendet. Vertrag v0.22.0. Zahlen und Details: `docs/handoffs/V2-pwa.md`.
+
 ## Paket AC2 (sechs weitere Akzentfarben, 18.10.2026, Lead-Prüfung offen)
 Voreinstellungen `wine`, `slate`, `cocoa`, `olive`, `ocean`, `ink` (Wein, Schiefer, Kakao, Oliv, Ozean, Tinte; weiße Schrift, Kontrast mindestens 5,36:1), Vertrag v0.21.0. Server vor v0.21.0 lehnen die IDs ab: die PWA speichert dort `custom` plus Hex und behält den Leuchteffekt. Details: `docs/handoffs/AC2.md`.
 
@@ -29,7 +32,7 @@ Kern (immer an): `/` Dashboard, `/time`, `/time/[date]`, `/notifications` (Hinwe
 `/admin/invitations`, `/admin/accounts`, `/admin/modules` (nur Admin), öffentlich `/login`, `/invite/[token]`, `/recover`, `/recover/passkey`, `/setup/recovery`, `/offline`; Dev-Mock: `/mock-idp`, `/mock-oauth`.
 Module (abschaltbar, ADR-0012, Zuordnung in `src/lib/modules/map.ts`):
 - reports: `/reports`, `/settings/learning-fields`, Dashboard-Karte
-- planning: `/vacation`, `/calendar`, `/absences`, `/shared`, `/settings/sharing`
+- planning: `/vacation`, `/vacation/planner`, `/calendar`, `/absences`, `/shared`, `/settings/sharing`
 - transfer: `/export`, `/import`, `/settings/storage` (Admin), Anhänge (Abwesenheitsformular, Berichtsheft-Quellen)
 - automation: `/settings/devices`, `/suggestions`, Hinweis auf dem Dashboard
 - mcp: `/settings/api-tokens`, `/settings/connections`, `/settings/mcp-help`, `/oauth/consent`

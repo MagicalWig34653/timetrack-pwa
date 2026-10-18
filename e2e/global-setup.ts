@@ -111,6 +111,7 @@ export default async function globalSetup() {
 	const profileNoMailPort = Number(process.env.E2E_PROFILE_NOMAIL_PORT ?? port + 12);
 	const profileSmtpPort = Number(process.env.E2E_PROFILE_SMTP_PORT ?? port + 13);
 	const appearancePort = Number(process.env.E2E_APPEARANCE_PORT ?? port + 14);
+	const vacationPlannerPort = Number(process.env.E2E_VACATION_PLANNER_PORT ?? port + 15);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -327,7 +328,26 @@ export default async function globalSetup() {
 	process.env.E2E_APPEARANCE_BASE_URL = `http://localhost:${appearancePort}`;
 	process.env.E2E_APPEARANCE_BOOTSTRAP_LINK = stage14.link;
 
+	// Package V2-PWA (vacation planner against GET /vacation/suggestions): one plain instance.
+	let stage15: Instance;
+	try {
+		stage15 = await startInstance(binary, vacationPlannerPort);
+	} catch (e) {
+		await stage14.stop();
+		await stage13.stop();
+		await stage12.stop();
+		await stage11.stop();
+		await stage10.stop();
+		await stage9.stop();
+		await stage8.stop();
+		await stopBase();
+		throw e;
+	}
+	process.env.E2E_VACATION_PLANNER_BASE_URL = `http://localhost:${vacationPlannerPort}`;
+	process.env.E2E_VACATION_PLANNER_BOOTSTRAP_LINK = stage15.link;
+
 	return async () => {
+		await stage15.stop();
 		await stage14.stop();
 		await stage13.stop();
 		await stage12.stop();

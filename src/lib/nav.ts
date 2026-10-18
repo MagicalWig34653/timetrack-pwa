@@ -186,6 +186,10 @@ export function breadcrumbs(pathname: string): Crumb[] {
 		return trail;
 	}
 	const label = ALL_LABELS.get(`/${parts[0]}`);
+	if (label && pathname === '/vacation/planner') {
+		trail.push({ label, href: '/vacation' }, { label: 'planner.title' });
+		return trail;
+	}
 	if (label) {
 		trail.push(parts.length > 1 ? { label, href: `/${parts[0]}` } : { label });
 		if (parts.length > 1) trail.push({ label: null, text: parts.slice(1).join(' / ') });
