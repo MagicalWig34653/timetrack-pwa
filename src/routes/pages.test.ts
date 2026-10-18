@@ -186,3 +186,31 @@ describe('admin invitations', () => {
 		await waitFor(() => expect(screen.getByText('Widerrufen', { selector: '[data-slot=badge]' })).toBeInTheDocument());
 	});
 });
+
+describe('help dialog version section', () => {
+	it('shows PWA and backend build data and flags an older interface', async () => {
+		await signInAsAdmin();
+		const { default: VersionInfo } = await import('#lib/components/shell/VersionInfo.svelte');
+		render(VersionInfo);
+		expect(await screen.findByTestId('version-backend-number')).toHaveTextContent('0.19.0-mock');
+		expect(screen.getByTestId('version-backend-commit')).toHaveTextContent('0123456');
+		expect(screen.getByText('mock-replica-1')).toBeInTheDocument();
+		expect(screen.getByText('1 Tag 2 Std. 3 Min.', { exact: false })).toBeInTheDocument();
+		// vitest embeds the real build info of this checkout; the mock serves a different PWA revision (fedcba9)
+		expect(screen.getByTestId('version-pwa-number')).toBeInTheDocument();
+		expect(screen.queryByTestId('version-mismatch')).toBeInTheDocument();
+	});
+
+	it('degrades gracefully when the server has no system info endpoint', async () => {
+		await signInAsAdmin();
+		const original = mock.fetch;
+		vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
+			String(input).endsWith('/system/info') ? Promise.resolve(new Response('{}', { status: 404 })) : original(input, init)
+		);
+		const { default: VersionInfo } = await import('#lib/components/shell/VersionInfo.svelte');
+		render(VersionInfo);
+		expect(await screen.findByTestId('version-unavailable')).toBeInTheDocument();
+		expect(screen.getByTestId('version-pwa')).toBeInTheDocument();
+		expect(screen.queryByTestId('version-mismatch')).not.toBeInTheDocument();
+	});
+});

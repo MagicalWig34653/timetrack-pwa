@@ -950,3 +950,20 @@ export interface ServerModule {
 	enabled: boolean;
 	lockedByOperator: boolean;
 }
+
+/** GET /system/info (contract v0.19.0, ADR-0023): version and build data of server and the PWA it serves. */
+export interface SystemInfo {
+	backend: {
+		version: string;
+		revision: string;
+		revisionShort: string;
+		buildDate: string | null;
+		apiVersion: string;
+		database: 'mariadb' | 'sqlite';
+		schemaMigrations: number;
+		migrationsPending: boolean;
+		uptimeSeconds: number;
+		replicaId: string;
+	};
+	pwa: { version: string | null; revision: string | null; buildDate: string | null } | null;
+}

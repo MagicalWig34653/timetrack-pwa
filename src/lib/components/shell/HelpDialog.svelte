@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
+	import VersionInfo from './VersionInfo.svelte';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
@@ -21,7 +22,7 @@
 <dialog
 	bind:this={dialog}
 	aria-labelledby="help-title"
-	class="glass-pop m-auto w-[min(32rem,calc(100vw-2rem))] rounded-2xl border p-0 text-popover-foreground shadow-[var(--shadow-pop)]"
+	class="glass-pop m-auto max-h-[calc(100dvh-2rem)] w-[min(36rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border p-0 text-popover-foreground shadow-[var(--shadow-pop)]"
 	data-testid="help-dialog"
 	onclose={() => (open = false)}
 >
@@ -36,6 +37,7 @@
 			<li>{t('help.item_settings')}</li>
 			<li>{t('help.item_search')}</li>
 		</ul>
+		{#if open}<VersionInfo />{/if}
 		<div class="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
 			{#if moduleStore.enabled('mcp')}
 				<Button variant="outline" href="/settings/mcp-help" onclick={() => (open = false)}>{t('help.mcp')}</Button>

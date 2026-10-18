@@ -9,6 +9,11 @@ declare global {
 		// interface Platform {}
 	}
 
+	/** Build metadata injected by vite.config.ts (`define`). */
+	const __APP_VERSION__: string;
+	const __APP_REVISION__: string;
+	const __APP_BUILD_DATE__: string;
+
 	interface ImportMetaEnv {
 		/** '1' when started via `npm run dev:mock`: in-repo mock API and fake authenticator */
 		readonly VITE_MOCK?: string;

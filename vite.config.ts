@@ -2,13 +2,33 @@ import tailwindcss from '@tailwindcss/vite';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import type { Adapter } from '@sveltejs/kit';
 import { mockApiPlugin } from './mock/vite-plugin.ts';
+import { resolveBuildInfo } from './scripts/build-info.ts';
 
 // `VITE_MOCK=1 vite dev` serves the in-repo mock API instead of proxying to the backend.
 const useMock = process.env.VITE_MOCK === '1';
 const backendUrl = process.env.BACKEND_URL ?? 'http://127.0.0.1:18080';
 
+// Embedded build metadata (Hilfe > Version und Build) and build/version.json, which the backend reports under `pwa`.
+const buildInfo = resolveBuildInfo();
+const staticAdapter = adapter({ pages: 'build', assets: 'build', fallback: 'index.html' });
+const adapterWithVersion: Adapter = {
+	...staticAdapter,
+	async adapt(builder) {
+		await staticAdapter.adapt(builder);
+		mkdirSync('build', { recursive: true });
+		writeFileSync('build/version.json', JSON.stringify(buildInfo, null, 2) + '\n');
+	}
+};
+
 export default defineConfig({
+	define: {
+		__APP_VERSION__: JSON.stringify(buildInfo.version),
+		__APP_REVISION__: JSON.stringify(buildInfo.revision),
+		__APP_BUILD_DATE__: JSON.stringify(buildInfo.buildDate)
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit({
@@ -18,7 +38,7 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			// SPA fallback: the backend serves build/index.html for unknown paths so deep links work.
-			adapter: adapter({ fallback: 'index.html' }),
+			adapter: adapterWithVersion,
 			// The service worker is registered by src/lib/pwa (production on https/localhost only, never in dev).
 			serviceWorker: { register: false }
 		}),

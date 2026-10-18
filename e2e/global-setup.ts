@@ -65,6 +65,10 @@ async function startInstance(
 		WEBAUTHN_ORIGIN: base,
 		WEBAUTHN_RP_ID: 'localhost',
 		SESSION_TTL_HOURS: '24',
+		// build metadata like the Docker image bakes in (Hilfe > Version und Build)
+		TIMETRACK_VERSION: '0.0.0-e2e',
+		TIMETRACK_REVISION: 'e2e0123456789abcdef0123456789abcdef01234',
+		TIMETRACK_BUILD_DATE: '2026-10-18T08:00:00Z',
 		...extraEnv
 	};
 

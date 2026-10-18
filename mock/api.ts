@@ -98,6 +98,8 @@ interface MockInvitation {
 }
 
 export interface MockOptions {
+	/** the PWA build the mock server reports under `pwa` in GET /system/info (the dev server passes the real build info); null = no PWA on the server */
+	pwaBuild?: { version: string; revision: string; buildDate: string } | null;
 	/** false mimics a server without mail delivery (email.available = false) */
 	mailAvailable?: boolean;
 	/** clock in epoch ms; defaults to Date.now. Lets tests freeze time for deterministic demo data. */
@@ -132,7 +134,10 @@ function error(status: number, code: string, message = code): MockResponse {
 	return { status, body: { error: { code, message } } };
 }
 
+const DEMO_PWA_BUILD = { version: '0.0.1', revision: 'fedcba9876543210fedcba9876543210fedcba98', buildDate: '2026-10-18T08:00:00Z' };
+
 export function createMockApi(options: MockOptions = {}) {
+	const startedAt = Date.now();
 	const mailAvailable = options.mailAvailable ?? true;
 	const time = createTimeMock(options.now ?? Date.now);
 	const accounts = new Map<string, MockAccount>();
@@ -591,6 +596,26 @@ export function createMockApi(options: MockOptions = {}) {
 		if (mutating && req.csrfToken !== session.csrfToken) return error(403, 'csrf_invalid');
 
 		if (path === '/api/v1/auth/session' && method === 'GET') return { status: 200, body: sessionBody(session) };
+		if (path === '/api/v1/system/info' && method === 'GET') {
+			return {
+				status: 200,
+				body: {
+					backend: {
+						version: '0.19.0-mock',
+						revision: '0123456789abcdef0123456789abcdef01234567',
+						revisionShort: '0123456',
+						buildDate: '2026-10-18T08:00:00Z',
+						apiVersion: '0.19.0',
+						database: 'sqlite',
+						schemaMigrations: 42,
+						migrationsPending: false,
+						uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000) + 93784,
+						replicaId: 'mock-replica-1'
+					},
+					pwa: options.pwaBuild === undefined ? DEMO_PWA_BUILD : options.pwaBuild
+				}
+			};
+		}
 		if (path === '/api/v1/auth/session' && method === 'DELETE') {
 			sessions.delete(sessionId!);
 			return { status: 204, sessionCookie: null };

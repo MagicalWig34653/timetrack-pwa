@@ -282,3 +282,25 @@ test('contract: CSRF, cookie, error codes, SPA fallback', async ({ browser, requ
 	await expect(dup.page.getByText('Dieser Kontoname ist bereits vergeben.')).toBeVisible();
 	await dup.context.close();
 });
+
+test('help dialog: version and build of PWA and backend (ADR-0023)', async ({ request }) => {
+	const { page } = admin;
+	// public probe and session-guarded endpoint
+	const health = await (await request.get('/health')).json();
+	expect(health).toEqual({ status: 'ok', version: '0.0.0-e2e', revision: 'e2e0123456789abcdef0123456789abcdef01234' });
+	expect((await request.get('/api/v1/system/info')).status()).toBe(401);
+	const info = (await apiCall(page, 'GET', '/api/v1/system/info')).body;
+	expect(info.backend).toMatchObject({ version: '0.0.0-e2e', revisionShort: 'e2e0123', buildDate: '2026-10-18T08:00:00Z', database: 'sqlite', migrationsPending: false });
+	expect(info.backend.schemaMigrations).toBeGreaterThan(10);
+	// version.json written by the PWA build and served from the same directory
+	expect(info.pwa.revision).toMatch(/^[0-9a-f]{40}$|^unknown$/);
+
+	await page.goto('/');
+	await page.getByRole('button', { name: 'Hilfe' }).first().click();
+	await expect(page.getByTestId('version-backend-number')).toHaveText('0.0.0-e2e');
+	await expect(page.getByTestId('version-backend-commit')).toHaveText('e2e0123');
+	await expect(page.getByTestId('version-pwa-commit')).toHaveText(info.pwa.revision.slice(0, 7).replace(/^unknown$/, 'unbekannt'));
+	await expect(page.getByTestId('version-info')).toContainText('sqlite');
+	await expect(page.getByTestId('version-mismatch')).toHaveCount(0);
+	await page.keyboard.press('Escape');
+});

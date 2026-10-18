@@ -3,6 +3,7 @@ import { pwa } from '../pwa/pwa.svelte';
 import { ApiError } from './errors';
 import type {
 	AdminAccount,
+	SystemInfo,
 	AdminAccountPage,
 	AdminAccountPatch,
 	NotificationList,
@@ -568,6 +569,9 @@ export const api = {
 	createPushSubscription: (input: PushSubscriptionInput) => request<PushSubscriptionInfo>('POST', '/me/push-subscriptions', input),
 	deletePushSubscription: (id: string) => request<void>('DELETE', `/me/push-subscriptions/${id}`),
 	sendTestPush: (id: string) => request<void>('POST', `/me/push-subscriptions/${id}/test`),
+
+	// version information, contract v0.19.0 (ADR-0023); older servers answer 404
+	getSystemInfo: () => request<SystemInfo>('GET', '/system/info'),
 
 	// module switches, contract v0.9.0 (ADR-0012); a PUT only needs the keys that change
 	listModules: () => request<ModuleStatus[]>('GET', '/modules'),
