@@ -105,7 +105,9 @@ export function accentTokens(input: string, dark: boolean): AccentTokens | null 
 export const ACCENT_IDS = [
 	'blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite',
 	// contract v0.15.0: darker fills that carry white text
-	'indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze'
+	'indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze',
+	// contract v0.21.0: six more dark fills that carry white text
+	'wine', 'slate', 'cocoa', 'olive', 'ocean', 'ink'
 ] as const;
 export type PresetId = (typeof ACCENT_IDS)[number];
 /** `custom` means "the colour is `accentCustomHex`". */
@@ -126,11 +128,20 @@ export const ACCENT_PRESETS: { id: PresetId; hex: string }[] = [
 	{ id: 'crimson', hex: '#b91c1c' },
 	{ id: 'forest', hex: '#166534' },
 	{ id: 'petrol', hex: '#0f766e' },
-	{ id: 'bronze', hex: '#92400e' }
+	{ id: 'bronze', hex: '#92400e' },
+	{ id: 'wine', hex: '#7f1d3f' },
+	{ id: 'slate', hex: '#475a8c' },
+	{ id: 'cocoa', hex: '#5c4033' },
+	{ id: 'olive', hex: '#4d6b1f' },
+	{ id: 'ocean', hex: '#0e7490' },
+	{ id: 'ink', hex: '#334155' }
 ];
 
 /** Ids that older servers (before contract v0.15.0) reject; the store falls back to `custom` plus the colour for them. */
 export const ACCENT_IDS_V015: readonly PresetId[] = ['indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze'];
+
+/** Ids that servers before contract v0.21.0 reject (v0.15.0 to v0.20.0 know the ones above). */
+export const ACCENT_IDS_V021: readonly PresetId[] = ['wine', 'slate', 'cocoa', 'olive', 'ocean', 'ink'];
 
 /** True when the text on the accent fill is white (the fill is dark enough for 4.5:1). */
 export function whiteOnAccent(hex: string): boolean {

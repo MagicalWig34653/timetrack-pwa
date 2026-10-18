@@ -93,7 +93,7 @@ export const deDesign = {
 	'appearance.glow_preview': 'Vorschau Leuchteffekt',
 	'appearance.glow_preview_card': 'Beispielkarte',
 	'appearance.accent_white_hint': 'Aa zeigt die Schriftfarbe auf der Fläche: weiße Schrift bei den dunkleren Tönen.',
-	'appearance.color_names': 'Blau,Türkis,Violett,Grün,Orange,Rosa,Graphit,Indigo,Marine,Purpur,Magenta,Karmin,Waldgrün,Petrol,Bronze',
+	'appearance.color_names': 'Blau,Türkis,Violett,Grün,Orange,Rosa,Graphit,Indigo,Marine,Purpur,Magenta,Karmin,Waldgrün,Petrol,Bronze,Wein,Schiefer,Kakao,Oliv,Ozean,Tinte',
 
 	'kpi.target': 'Soll',
 	'kpi.actual': 'Ist',

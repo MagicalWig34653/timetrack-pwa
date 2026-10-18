@@ -117,7 +117,7 @@ test('the glow level is chosen on the appearance page and in the palette, saved 
 test('the new white-text presets are offered, saved and shown with white text', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
 	await page.goto('/settings/appearance');
-	for (const id of ['indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze']) {
+	for (const id of ['indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze', 'wine', 'slate', 'cocoa', 'olive', 'ocean', 'ink']) {
 		await expect(page.getByTestId(`accent-${id}`)).toHaveAttribute('data-white-text', 'true');
 	}
 	await expect(page.getByTestId('accent-orange')).toHaveAttribute('data-white-text', 'false');
@@ -125,5 +125,19 @@ test('the new white-text presets are offered, saved and shown with white text', 
 	await expect(syncState(page)).toHaveAttribute('data-state', 'saved');
 	expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-accent-foreground').trim())).toBe('#ffffff');
 	expect(await page.evaluate(async () => (await (await fetch('/api/v1/me/preferences', { credentials: 'include' })).json()).accent)).toBe('crimson');
+	await context.close();
+});
+
+test('AC2 accents are saved with their ids and shown with their German names', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
+	await page.goto('/settings/appearance');
+	const names = { wine: 'Wein', slate: 'Schiefer', cocoa: 'Kakao', olive: 'Oliv', ocean: 'Ozean', ink: 'Tinte' };
+	for (const [id, name] of Object.entries(names)) {
+		await expect(page.getByTestId(`accent-${id}`)).toHaveAttribute('aria-label', name);
+		await page.getByTestId(`accent-${id}`).click();
+		await expect(syncState(page)).toHaveAttribute('data-state', 'saved');
+		expect(await page.evaluate(async () => (await (await fetch('/api/v1/me/preferences', { credentials: 'include' })).json()).accent)).toBe(id);
+	}
+	await page.getByTestId('accent-blue').click();
 	await context.close();
 });

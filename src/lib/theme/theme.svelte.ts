@@ -2,6 +2,7 @@ import { api, ApiError } from '#lib/api/client.js';
 import type { Preferences, PreferencesPatch } from '#lib/api/types.js';
 import {
 	ACCENT_IDS_V015,
+	ACCENT_IDS_V021,
 	ACCENT_PRESETS,
 	DEFAULT_ACCENT,
 	accentTokens,
@@ -67,6 +68,8 @@ class ThemeStore {
 	private flushing = false;
 	/** True once the server turned out to predate contract v0.15.0 (no `glow`, no new accent ids): the patch then keeps to the v0.14.0 shape. */
 	private legacyServer = false;
+	/** True once the server turned out to predate contract v0.21.0 (knows `glow` and the v0.15.0 ids, but not the newest accent ids). */
+	private oldIdsServer = false;
 
 	get dark(): boolean {
 		return this.mode === 'dark' || (this.mode === 'system' && this.systemDark);
@@ -155,7 +158,10 @@ class ThemeStore {
 	/** The state as a PATCH body (the colour only for a custom accent). */
 	private patch(): PreferencesPatch {
 		// a server older than v0.15.0 knows neither the newer preset ids nor `glow`; it stores those colours as custom ones
-		const asCustom = this.accentId === 'custom' || (this.legacyServer && ACCENT_IDS_V015.includes(this.accentId as never));
+		const asCustom =
+			this.accentId === 'custom' ||
+			(this.legacyServer && ACCENT_IDS_V015.includes(this.accentId as never)) ||
+			((this.legacyServer || this.oldIdsServer) && ACCENT_IDS_V021.includes(this.accentId as never));
 		const body: PreferencesPatch = asCustom
 			? { accent: 'custom', accentCustomHex: this.accent, colorScheme: this.mode }
 			: { accent: this.accentId as Exclude<AccentId, 'custom'>, colorScheme: this.mode };
@@ -185,7 +191,9 @@ class ThemeStore {
 				} catch (error) {
 					// a server that predates v0.15.0 rejects `glow` and the newer accent ids: repeat in the old shape
 					if (error instanceof ApiError && error.status === 400 && !this.legacyServer) {
-						this.legacyServer = true;
+						// first the newest ids are suspected (v0.15.0 to v0.20.0 servers), only then `glow` (older servers)
+						if (!this.oldIdsServer && ACCENT_IDS_V021.includes(this.accentId as never)) this.oldIdsServer = true;
+						else this.legacyServer = true;
 						continue;
 					}
 					// a refused value (400) would fail forever: drop it, the next session load shows the account's value

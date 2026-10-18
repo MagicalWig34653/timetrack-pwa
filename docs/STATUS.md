@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket AC2 (sechs weitere Akzentfarben, 18.10.2026, Lead-Prüfung offen)
+Voreinstellungen `wine`, `slate`, `cocoa`, `olive`, `ocean`, `ink` (Wein, Schiefer, Kakao, Oliv, Ozean, Tinte; weiße Schrift, Kontrast mindestens 5,36:1), Vertrag v0.21.0. Server vor v0.21.0 lehnen die IDs ab: die PWA speichert dort `custom` plus Hex und behält den Leuchteffekt. Details: `docs/handoffs/AC2.md`.
+
 ## Paket P3a (Update-Banner und 503, 18.10.2026, Lead-Prüfung offen)
 Update-Banner bei Rolling Updates robust: wartender Worker zählt nur, wenn die vom Server gemeldete PWA-Revision abweicht; 10 Minuten Ruhe nach angewendetem Update; Hard Reset (Service Worker abmelden, Caches löschen, einmal neu laden), wenn der Controller nicht wechselt. API-Client beachtet `Retry-After` (max. 5 s) bei 503 `database_unavailable`, neue deutsche Meldung. Vertrag v0.20.0. Details: `docs/handoffs/P3a.md`.
 

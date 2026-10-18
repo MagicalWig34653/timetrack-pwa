@@ -220,6 +220,21 @@ describe('theme store with account preferences', () => {
 			expect(theme.accentId).toBe('forest');
 		});
 
+		it('keeps glow on a v0.15.0 to v0.20.0 server that rejects only the v0.21.0 accent ids', async () => {
+			const { ApiError } = await import('#lib/api/client.js');
+			const theme = await freshTheme();
+			theme.reconcile('a1', withGlow('blue', 'medium'));
+			update.mockRejectedValueOnce(new ApiError(400, 'bad_request', 'x'));
+			theme.setPreset('wine');
+			await vi.waitFor(() => expect(theme.sync).toBe('saved'));
+			expect(update).toHaveBeenNthCalledWith(1, { accent: 'wine', colorScheme: 'system', glow: 'medium' });
+			expect(update).toHaveBeenNthCalledWith(2, { accent: 'custom', accentCustomHex: '#7f1d3f', colorScheme: 'system', glow: 'medium' });
+			expect(theme.accentId).toBe('wine');
+			// older ids still go out by their id on that server
+			theme.setPreset('forest');
+			await vi.waitFor(() => expect(update).toHaveBeenLastCalledWith({ accent: 'forest', colorScheme: 'system', glow: 'medium' }));
+		});
+
 		it('uploads a pre-account glow choice once', async () => {
 			localStorage.setItem('tt.glow', 'off');
 			localStorage.setItem('tt.accent', '#2563eb');

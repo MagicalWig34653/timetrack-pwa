@@ -746,7 +746,7 @@ export function createMockApi(options: MockOptions = {}) {
 		if (path === '/api/v1/me/preferences' && method === 'GET') return { status: 200, body: preferencesBody(account) };
 		if (path === '/api/v1/me/preferences' && method === 'PATCH') {
 			// same rules as the backend (ADR-0020): merge patch, whitelist of keys, strict values
-			const accents = ['blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite', 'indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze', 'custom'];
+			const accents = ['blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite', 'indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze', 'wine', 'slate', 'cocoa', 'olive', 'ocean', 'ink', 'custom'];
 			const glows = ['off', 'subtle', 'medium', 'strong'];
 			const schemes = ['system', 'light', 'dark'];
 			if (!body || typeof body !== 'object' || Array.isArray(body) || JSON.stringify(body).length > 1024) return error(400, 'bad_request');

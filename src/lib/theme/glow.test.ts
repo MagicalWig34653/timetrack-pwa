@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACCENT_IDS, ACCENT_IDS_V015, ACCENT_PRESETS, MIN_TEXT_CONTRAST, SURFACES, accentTokens, contrastRatio, mix, whiteOnAccent } from './accent';
+import { ACCENT_IDS, ACCENT_IDS_V015, ACCENT_IDS_V021, ACCENT_PRESETS, MIN_TEXT_CONTRAST, SURFACES, accentTokens, contrastRatio, hexToRgb, mix, whiteOnAccent } from './accent';
 import { DEFAULT_GLOW, GLOW_IDS, MIN_GLOW_CONTRAST, glowColor, glowLevel, glowTokens, isGlowId } from './glow';
 
 describe('glow levels', () => {
@@ -41,9 +41,11 @@ describe('glow colour derivation', () => {
 });
 
 describe('accent presets', () => {
-	it('keeps the contract ids and adds eight white-text presets', () => {
+	it('keeps the contract ids and adds fourteen white-text presets', () => {
 		expect(ACCENT_IDS.slice(0, 7)).toEqual(['blue', 'teal', 'violet', 'green', 'orange', 'pink', 'graphite']);
 		expect([...ACCENT_IDS_V015]).toEqual(['indigo', 'navy', 'purple', 'magenta', 'crimson', 'forest', 'petrol', 'bronze']);
+		expect([...ACCENT_IDS_V021]).toEqual(['wine', 'slate', 'cocoa', 'olive', 'ocean', 'ink']);
+		expect(ACCENT_IDS).toHaveLength(21);
 		expect(ACCENT_PRESETS.map((p) => p.id)).toEqual([...ACCENT_IDS]);
 		expect(new Set(ACCENT_PRESETS.map((p) => p.hex)).size).toBe(ACCENT_PRESETS.length);
 	});
@@ -62,8 +64,43 @@ describe('accent presets', () => {
 	}
 
 	it('the new presets carry white text, three of the old ones black', () => {
-		for (const id of ACCENT_IDS_V015) expect(whiteOnAccent(ACCENT_PRESETS.find((p) => p.id === id)!.hex), id).toBe(true);
+		for (const id of [...ACCENT_IDS_V015, ...ACCENT_IDS_V021]) expect(whiteOnAccent(ACCENT_PRESETS.find((p) => p.id === id)!.hex), id).toBe(true);
 		for (const id of ['teal', 'green', 'orange']) expect(whiteOnAccent(ACCENT_PRESETS.find((p) => p.id === id)!.hex), id).toBe(false);
+	});
+});
+
+/** OKLab distance (x100) of two hex colours. */
+function oklabDistance(a: string, b: string): number {
+	const lab = (hex: string) => {
+		const [r, g, bl] = hexToRgb(hex).map((v) => {
+			const x = v / 255;
+			return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+		});
+		const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * bl);
+		const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * bl);
+		const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * bl);
+		return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+	};
+	const x = lab(a);
+	const y = lab(b);
+	return Math.hypot(...x.map((v, i) => (v - y[i]) * 100));
+}
+
+describe('AC2 presets', () => {
+	const added = ACCENT_PRESETS.filter((p) => ACCENT_IDS_V021.includes(p.id));
+
+	it('every new preset has white-text contrast of at least 4.5:1', () => {
+		expect(added).toHaveLength(6);
+		for (const preset of added) expect(contrastRatio(preset.hex, '#ffffff'), preset.id).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+	});
+
+	it('every new preset is visibly distinct from all other presets (OKLab distance >= 5.5)', () => {
+		for (const preset of added) {
+			for (const other of ACCENT_PRESETS) {
+				if (other.id === preset.id) continue;
+				expect(oklabDistance(preset.hex, other.hex), `${preset.id} vs ${other.id}`).toBeGreaterThanOrEqual(5.5);
+			}
+		}
 	});
 });
 
