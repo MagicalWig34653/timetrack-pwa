@@ -517,8 +517,11 @@ export const api = {
 	deleteVacationEntry: (id: string) => request<void>('DELETE', `/vacation/entries/${id}`),
 
 	// absences; `ifMatchVersion` becomes the If-Match header; ranges above 366 days are loaded in chunks
-	listAbsences: async (from: string, to: string) =>
-		(await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<Absence[]>('GET', `/absences?from=${r.from}&to=${r.to}`)))).flat(),
+	// `hasAttachment` is the contract 0.24.0 server filter (older servers ignore it and return everything)
+	listAbsences: async (from: string, to: string, options: { hasAttachment?: boolean } = {}) => {
+		const filter = options.hasAttachment === undefined ? '' : `&hasAttachment=${options.hasAttachment}`;
+		return (await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<Absence[]>('GET', `/absences?from=${r.from}&to=${r.to}${filter}`)))).flat();
+	},
 	getAbsence: (id: string) => request<Absence>('GET', `/absences/${id}`),
 	createAbsence: (input: AbsenceInput) => request<Absence>('POST', '/absences', input),
 	updateAbsence: (id: string, input: AbsenceInput, ifMatchVersion: number) =>

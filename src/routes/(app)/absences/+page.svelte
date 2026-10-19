@@ -20,6 +20,7 @@
 		ABSENCE_SORTS,
 		applyFilters,
 		ATTACHMENT_FILTERS,
+		countsFromList,
 		DEFAULT_ABSENCE_FILTERS,
 		filtersFromQuery,
 		filtersToQuery,
@@ -46,7 +47,7 @@
 	let year = $state(yearFromQuery(page.url.searchParams, currentYear));
 	let absences = $state<Absence[]>([]);
 	let filters = $state<AbsenceFilters>(queryHasFilters(page.url.searchParams) ? filtersFromQuery(page.url.searchParams) : loadFilters());
-	/** Attachment counts per absence; filled in the background (the list endpoint does not carry them). */
+	/** Attachment counts per absence; taken from the list (`attachmentCount`), adjusted live when attachments change. */
 	let counts = $state<AttachmentCounts>({});
 	let openAttachments = $state<Set<string>>(new Set());
 	let lastWritten = '';
@@ -61,7 +62,10 @@
 			today = todayLocal(await zoneStore.ensure());
 			absences = await api.listAbsences(`${year}-01-01`, `${year}-12-31`);
 			load = { status: 'ready' };
-			void loadCounts(absences);
+			// contract 0.24.0 delivers the counts with the list; an older server leaves them out, then they are counted per absence
+			const delivered = countsFromList(absences);
+			counts = delivered.counts;
+			if (!delivered.complete) void loadCounts(absences, delivered.counts);
 		} catch (e) {
 			load = toLoadState(e);
 		}
@@ -71,10 +75,10 @@
 		void refresh();
 	});
 
-	/** At most four requests at a time; a server without attachments (404/501) leaves the counts unknown. */
-	async function loadCounts(list: Absence[]) {
-		const queue = [...list];
-		const next: AttachmentCounts = {};
+	/** Fallback for servers before contract 0.24.0: at most four requests at a time; a server without attachments (404/501) leaves the counts unknown. */
+	async function loadCounts(list: Absence[], known: AttachmentCounts) {
+		const queue = list.filter((a) => known[a.id] === undefined);
+		const next: AttachmentCounts = { ...known };
 		const worker = async () => {
 			for (let a = queue.shift(); a; a = queue.shift()) {
 				try {

@@ -155,7 +155,8 @@ export function createMockApi(options: MockOptions = {}) {
 		modelsOf: time.modelsOf,
 		evaluateFor: time.evaluateFor,
 		findByHandle: (handle) => [...accounts.values()].find((a) => a.handle === handle),
-		displayNameOf: (id) => accounts.get(id)?.displayName ?? ''
+		displayNameOf: (id) => accounts.get(id)?.displayName ?? '',
+		attachmentCountOf: (accountId, absenceId) => transfer.attachmentCount(accountId, absenceId)
 	});
 	const mail = createMailMock({ configured: options.mailAvailable ?? true });
 	const modules = createModulesMock({ disabledByOperator: options.modulesDisabled });

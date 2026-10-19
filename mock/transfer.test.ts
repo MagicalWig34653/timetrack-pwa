@@ -257,3 +257,52 @@ describe('storage admin permissions', () => {
 		await expect(api.putStorageSettings({ rules: [{ maxBytes: null, backend: 'db' }] })).rejects.toMatchObject({ status: 403 });
 	});
 });
+
+describe('absence attachment count, hasAttachment filter and inline download (contract 0.24.0)', () => {
+	const pdf = () => new File(['%PDF-1.4 klein'], 'attest.pdf');
+	const list = (hasAttachment?: boolean) => api.listAbsences('2026-01-01', '2026-12-31', hasAttachment === undefined ? {} : { hasAttachment });
+
+	it('counts stored attachments per absence in list, detail and update', async () => {
+		const [first, second] = await list();
+		expect((await list()).every((a) => a.attachmentCount === 0)).toBe(true);
+		const a = await api.uploadFile(pdf());
+		const b = await api.uploadFile(new File(['%PDF-1.4 zwei'], 'zwei.pdf'));
+		await api.attachFile(first.id, a.id);
+		await api.attachFile(first.id, b.id);
+		await api.attachFile(second.id, a.id); // the same file on two absences counts for both
+		const counts = Object.fromEntries((await list()).map((x) => [x.id, x.attachmentCount]));
+		expect(counts[first.id]).toBe(2);
+		expect(counts[second.id]).toBe(1);
+		expect((await api.getAbsence(first.id)).attachmentCount).toBe(2);
+		const { id, version, countedHalfDays, attachmentCount, ...input } = first;
+		expect(attachmentCount).toBe(0);
+		expect((await api.updateAbsence(id, input, version)).attachmentCount).toBe(2);
+		await api.detachFile(first.id, a.id);
+		expect((await api.getAbsence(first.id)).attachmentCount).toBe(1);
+		await api.deleteFile(b.id);
+		expect((await api.getAbsence(first.id)).attachmentCount).toBe(0);
+	});
+
+	it('filters with hasAttachment=true|false and rejects other values', async () => {
+		const all = await list();
+		const file = await api.uploadFile(pdf());
+		await api.attachFile(all[0].id, file.id);
+		expect((await list(true)).map((a) => a.id)).toEqual([all[0].id]);
+		expect((await list(false)).map((a) => a.id)).toEqual(all.slice(1).map((a) => a.id));
+		const bad = await mock.fetch('/api/v1/absences?from=2026-01-01&to=2026-12-31&hasAttachment=maybe', { credentials: 'include' });
+		expect(bad.status).toBe(400);
+	});
+
+	it('serves safe types inline with nosniff and a sandbox CSP, everything else stays an attachment', async () => {
+		const file = await api.uploadFile(pdf());
+		const inline = await mock.fetch(`/api/v1/files/${file.id}?disposition=inline`, { credentials: 'include' });
+		expect(inline.headers.get('Content-Disposition')).toMatch(/^inline;/);
+		expect(inline.headers.get('X-Content-Type-Options')).toBe('nosniff');
+		expect(inline.headers.get('Content-Security-Policy')).toBe("sandbox; default-src 'none'");
+		const plain = await mock.fetch(`/api/v1/files/${file.id}`, { credentials: 'include' });
+		expect(plain.headers.get('Content-Disposition')).toMatch(/^attachment;/);
+		expect(plain.headers.get('Content-Security-Policy')).toBeNull();
+		const other = await mock.fetch(`/api/v1/files/${file.id}?disposition=sideways`, { credentials: 'include' });
+		expect(other.headers.get('Content-Disposition')).toMatch(/^attachment;/);
+	});
+});

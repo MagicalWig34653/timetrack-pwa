@@ -81,6 +81,9 @@ interface Stored {
 	links: Map<string, Set<string>>;
 }
 
+/** Content types the server may serve inline (contract 0.24.0 `disposition=inline` whitelist). */
+const INLINE_SAFE = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'application/pdf', 'text/plain']);
+
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && addDays(v, 0) === v;
 
 function decodeText(bytes: Uint8Array): string {
@@ -469,7 +472,17 @@ export function createTransferMock(deps: TransferDeps) {
 		return ok(publicStorage());
 	}
 
-	function fileRoutes(accountId: string, method: string, route: string, req: TransferRequest): TransferResponse | null {
+	function linkedFiles(accountId: string, absenceId: string): StoredFile[] {
+		const s = stateOf(accountId);
+		return [...s.links.entries()].filter(([, set]) => set.has(absenceId)).map(([id]) => files.get(id)).filter((f): f is StoredFile => !!f && f.ownerId === accountId);
+	}
+
+	/** Contract 0.24.0 `Absence.attachmentCount`: exactly the entries of GET /absences/{id}/attachments. */
+	function attachmentCount(accountId: string, absenceId: string): number {
+		return linkedFiles(accountId, absenceId).length;
+	}
+
+	function fileRoutes(accountId: string, method: string, route: string, req: TransferRequest, query: URLSearchParams): TransferResponse | null {
 		const s = stateOf(accountId);
 		let m: RegExpMatchArray | null;
 		if (route === 'files' && method === 'POST') {
@@ -494,6 +507,21 @@ export function createTransferMock(deps: TransferDeps) {
 			const file = files.get(m[1]);
 			if (!file || file.ownerId !== accountId) return fail(404, 'not_found');
 			if (method === 'GET') {
+				// contract 0.24.0: ?disposition=inline only for the safe types, with a sandbox CSP; anything else stays an attachment
+				if (query.get('disposition') === 'inline' && INLINE_SAFE.has(file.meta.contentType.split(';')[0].trim().toLowerCase())) {
+					return {
+						status: 200,
+						binary: {
+							bytes: file.bytes,
+							contentType: file.meta.contentType,
+							headers: {
+								'Content-Disposition': `inline; filename="${file.meta.name.replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(file.meta.name)}`,
+								'X-Content-Type-Options': 'nosniff',
+								'Content-Security-Policy': "sandbox; default-src 'none'"
+							}
+						}
+					};
+				}
 				return {
 					status: 200,
 					binary: {
@@ -512,7 +540,7 @@ export function createTransferMock(deps: TransferDeps) {
 		if ((m = route.match(/^absences\/([^/]+)\/attachments(?:\/([^/]+))?$/))) {
 			const absenceId = m[1];
 			if (!deps.absenceExists(accountId, absenceId)) return fail(404, 'not_found');
-			const linked = () => [...s.links.entries()].filter(([, set]) => set.has(absenceId)).map(([id]) => files.get(id)).filter((f): f is StoredFile => !!f && f.ownerId === accountId);
+			const linked = () => linkedFiles(accountId, absenceId);
 			if (!m[2] && method === 'GET') return ok(linked().map((f) => f.meta));
 			if (!m[2] && method === 'POST') {
 				const file = files.get(String(req.body?.fileId));
@@ -545,7 +573,7 @@ export function createTransferMock(deps: TransferDeps) {
 			if (method === 'GET') return ok(publicStorage());
 			if (method === 'PUT') return putStorage(req.body);
 		}
-		return importRoutes(accountId, method, route, req, query) ?? fileRoutes(accountId, method, route, req);
+		return importRoutes(accountId, method, route, req, query) ?? fileRoutes(accountId, method, route, req, query);
 	}
 
 	/** Dev/demo helper: stores a file and links it to an absence (as upload + attach would). */
@@ -566,5 +594,5 @@ export function createTransferMock(deps: TransferDeps) {
 		return meta;
 	}
 
-	return { handle, files, stored, seedAttachment };
+	return { handle, files, stored, seedAttachment, attachmentCount };
 }

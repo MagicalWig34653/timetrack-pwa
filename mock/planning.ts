@@ -39,6 +39,8 @@ export interface PlanningDeps {
 	evaluateFor: (accountId: string, date: string) => { evaluatedWorkSeconds: number; evaluatedStart?: string | null; evaluatedEnd?: string | null };
 	findByHandle: (handle: string) => { id: string; displayName: string } | undefined;
 	displayNameOf: (accountId: string) => string;
+	/** stored attachments of an absence (contract 0.24.0 `attachmentCount`); wired late because the transfer mock is created after this one */
+	attachmentCountOf?: (accountId: string, absenceId: string) => number;
 }
 
 interface AdjustmentEntry {
@@ -251,7 +253,8 @@ export function createPlanningMock(deps: PlanningDeps) {
 	/** v0.3.1: only vacation counts half days, and not once rejected or cancelled. */
 	function withCount(accountId: string, absence: Omit<Absence, 'countedHalfDays'>): Absence {
 		const counts = absence.kind === 'vacation' && absence.status !== 'rejected' && absence.status !== 'cancelled';
-		return { ...absence, countedHalfDays: counts ? countHalfDays(accountId, absence) : 0 };
+		const base = { ...absence, countedHalfDays: counts ? countHalfDays(accountId, absence) : 0 };
+		return deps.attachmentCountOf ? { ...base, attachmentCount: deps.attachmentCountOf(accountId, absence.id) } : base;
 	}
 
 	/**
@@ -454,10 +457,13 @@ export function createPlanningMock(deps: PlanningDeps) {
 			if (method === 'GET') {
 				const r = range();
 				if ('status' in r) return r;
+				const has = query.get('hasAttachment');
+				if (has !== null && has !== 'true' && has !== 'false') return fail(400, 'bad_request');
 				return ok(
 					state.absences
 						.filter((a) => a.startDate <= r.to && a.endDate >= r.from)
 						.map((a) => withCount(accountId, a))
+						.filter((a) => has === null || !deps.attachmentCountOf || ((a.attachmentCount ?? 0) > 0) === (has === 'true'))
 						.sort((a, b) => a.startDate.localeCompare(b.startDate))
 				);
 			}

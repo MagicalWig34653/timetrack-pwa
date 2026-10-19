@@ -3,6 +3,7 @@ import type { Absence } from '#lib/api/types.js';
 import {
 	ABSENCE_FILTER_STORAGE_KEY,
 	applyFilters,
+	countsFromList,
 	DEFAULT_ABSENCE_FILTERS,
 	filtersFromQuery,
 	filtersToQuery,
@@ -102,5 +103,25 @@ describe('query and persistence', () => {
 		expect(loadFilters(throwing)).toEqual(DEFAULT_ABSENCE_FILTERS);
 		expect(() => saveFilters(f({ q: 'x' }), throwing)).not.toThrow();
 		expect(normalizeFilters({ kind: 'x', q: 5 })).toEqual(DEFAULT_ABSENCE_FILTERS);
+	});
+});
+
+describe('countsFromList (contract 0.24.0 attachmentCount)', () => {
+	it('takes the counts delivered with the list and is complete', () => {
+		const r = countsFromList([a('x', { attachmentCount: 2 }), a('y', { attachmentCount: 0 })]);
+		expect(r).toEqual({ counts: { x: 2, y: 0 }, complete: true });
+	});
+
+	it('is incomplete when an older server leaves the field out', () => {
+		const r = countsFromList([a('x', { attachmentCount: 1 }), a('y', {})]);
+		expect(r.counts).toEqual({ x: 1 });
+		expect(r.complete).toBe(false);
+	});
+
+	it('filters with and without attachment from those counts', () => {
+		const items = [a('x', { attachmentCount: 1 }), a('y', { attachmentCount: 0 })];
+		const { counts } = countsFromList(items);
+		expect(ids(applyFilters(items, f({ attachment: 'with' }), counts))).toEqual(['x']);
+		expect(ids(applyFilters(items, f({ attachment: 'without' }), counts))).toEqual(['y']);
 	});
 });

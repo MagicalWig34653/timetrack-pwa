@@ -126,3 +126,44 @@ test('calendar tiles are coloured by working day, free day and absence', async (
 	expect(await state('2026-07-08')).toBe('vacation_booked');
 	await expect(page.getByTestId('tile-legend').getByRole('listitem')).toHaveCount(6);
 });
+
+test('P7: the server delivers attachmentCount and filters with hasAttachment (contract 0.24.0)', async () => {
+	const { page } = alice;
+	const list = async (query = '') => (await api(page, 'GET', `/api/v1/absences?from=2026-01-01&to=2026-12-31${query}`)).body as { id: string; attachmentCount: number }[];
+	const counts = Object.fromEntries((await list()).map((a) => [a.id, a.attachmentCount]));
+	expect(counts).toEqual({ [ids.sick!]: 3, [ids.vacation!]: 0, [ids.other!]: 0 });
+	expect((await list('&hasAttachment=true')).map((a) => a.id)).toEqual([ids.sick]);
+	expect((await list('&hasAttachment=false')).map((a) => a.id).sort()).toEqual([ids.vacation!, ids.other!].sort());
+	expect((await api(page, 'GET', '/api/v1/absences?from=2026-01-01&to=2026-12-31&hasAttachment=maybe')).status).toBe(400);
+	expect(((await api(page, 'GET', `/api/v1/absences/${ids.sick}`)).body as { attachmentCount: number }).attachmentCount).toBe(3);
+});
+
+test('P7: the list page needs no per-absence attachment requests and filters from the counts', async () => {
+	const { page } = alice;
+	const perAbsence: string[] = [];
+	page.on('request', (request) => {
+		if (/\/api\/v1\/absences\/[^/?]+\/attachments/.test(request.url())) perAbsence.push(request.url());
+	});
+	await page.goto('/absences?year=2026&sort=date_asc'); // explicit parameter: ignores filters remembered by earlier tests
+	await expect(page.getByRole('button', { name: 'Anhänge (3)' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Anhänge (0)' })).toHaveCount(2);
+	await page.getByLabel('Anhang').selectOption('with');
+	await expect(page.getByTestId('absence-row')).toHaveCount(1);
+	await page.getByLabel('Anhang').selectOption('without');
+	await expect(page.getByTestId('absence-row')).toHaveCount(2);
+	expect(perAbsence).toEqual([]);
+	await page.getByLabel('Anhang').selectOption('any');
+});
+
+test('P7: inline download serves safe types with nosniff and a sandbox CSP, the default stays an attachment', async () => {
+	const { page } = alice;
+	const attachments = (await api(page, 'GET', `/api/v1/absences/${ids.sick}/attachments`)).body as { id: string; name: string }[];
+	const png = attachments.find((f) => f.name === 'Scan.png')!;
+	const inline = await apiDownload(page, `/api/v1/files/${png.id}?disposition=inline`);
+	expect(inline.status).toBe(200);
+	expect(inline.headers['content-disposition']).toMatch(/^inline/);
+	expect(inline.headers['x-content-type-options']).toBe('nosniff');
+	expect(inline.headers['content-security-policy']).toContain('sandbox');
+	const plain = await apiDownload(page, `/api/v1/files/${png.id}`);
+	expect(plain.headers['content-disposition']).toMatch(/^attachment/);
+});

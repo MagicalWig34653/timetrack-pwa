@@ -423,6 +423,8 @@ export interface Absence extends AbsenceInput {
 	id: string;
 	version: number;
 	countedHalfDays: number;
+	/** Stored attachments of this absence (contract 0.24.0). Absent on older servers, which the UI then counts per absence. */
+	attachmentCount?: number;
 }
 
 export type CalendarDayKind = 'holiday' | 'school_holiday';

@@ -131,6 +131,47 @@ describe('absences list: sort and filter', () => {
 		await userEvent.selectOptions(screen.getByLabelText('Anhang'), 'without');
 		expect(rows()).toHaveLength(3);
 	});
+
+	async function attachToSick() {
+		const sick = (await api.listAbsences('2026-01-01', '2026-12-31')).find((a) => a.kind === 'sick')!;
+		const meta = await api.uploadFile(file(samplePdf('Test'), 'attest.pdf', 'application/pdf'));
+		await api.attachFile(sick.id, meta.id);
+	}
+
+	it('takes the counts from the list without per-absence attachment requests (contract 0.24.0)', async () => {
+		await attachToSick();
+		const urls: string[] = [];
+		vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+			urls.push(String(input instanceof Request ? input.url : input));
+			return mock.fetch(input as string, init);
+		});
+		render(AbsencesPage);
+		await screen.findByTestId('absence-list');
+		expect(await screen.findByRole('button', { name: 'Anhänge (1)' })).toBeInTheDocument();
+		expect(screen.getAllByRole('button', { name: 'Anhänge (0)' })).toHaveLength(3);
+		await userEvent.selectOptions(screen.getByLabelText('Anhang'), 'without');
+		expect(rows()).toHaveLength(3);
+		expect(urls.filter((u) => /\/absences\/[^/?]+\/attachments/.test(u))).toEqual([]);
+	});
+
+	it('falls back to counting per absence when the server sends no attachmentCount (older server)', async () => {
+		await attachToSick();
+		const urls: string[] = [];
+		vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+			const url = String(input instanceof Request ? input.url : input);
+			urls.push(url);
+			const response = await mock.fetch(input as string, init);
+			if (!/\/absences\?/.test(url)) return response;
+			const list = (await response.json()) as Record<string, unknown>[];
+			return new Response(JSON.stringify(list.map(({ attachmentCount: _omit, ...rest }) => rest)), { status: response.status, headers: { 'Content-Type': 'application/json' } });
+		});
+		render(AbsencesPage);
+		await screen.findByTestId('absence-list');
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Anhänge (1)' })).toBeInTheDocument());
+		await userEvent.selectOptions(screen.getByLabelText('Anhang'), 'with');
+		expect(rows()).toHaveLength(1);
+		expect(urls.filter((u) => /\/absences\/[^/?]+\/attachments/.test(u))).toHaveLength(4);
+	});
 });
 
 describe('attachment preview', () => {

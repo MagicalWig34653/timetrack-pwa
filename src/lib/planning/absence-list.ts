@@ -107,6 +107,20 @@ export function saveFilters(filters: AbsenceFilters, storage: Pick<Storage, 'set
 /** Attachment counts by absence id; absent = not loaded yet. */
 export type AttachmentCounts = Record<string, number | undefined>;
 
+/**
+ * Counts delivered with the list (contract 0.24.0 `attachmentCount`). `complete` is false when at least one entry lacks the field
+ * (older server): the caller then falls back to counting per absence.
+ */
+export function countsFromList(list: Absence[]): { counts: AttachmentCounts; complete: boolean } {
+	const counts: AttachmentCounts = {};
+	let complete = true;
+	for (const a of list) {
+		if (typeof a.attachmentCount === 'number') counts[a.id] = a.attachmentCount;
+		else complete = false;
+	}
+	return { counts, complete };
+}
+
 export function matches(absence: Absence, f: AbsenceFilters, counts: AttachmentCounts = {}): boolean {
 	if (f.kind !== 'all' && absence.kind !== f.kind) return false;
 	if (f.status !== 'all' && absence.status !== f.status) return false;

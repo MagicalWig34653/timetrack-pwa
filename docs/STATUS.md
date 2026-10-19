@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket P7 (Anhangzahl vom Server, 19.10.2026, Branch p7-attachment-count, nicht gemergt)
+`/absences` nutzt Vertrag 0.24.0: Anhangzahlen kommen mit der Liste (`Absence.attachmentCount`), die Einzelabrufe der Anhanglisten entfallen; ohne das Feld (älterer Server) zählt die Seite wie in P5 je Abwesenheit. Mock auf 0.24.0 (`attachmentCount`, `hasAttachment`, `disposition=inline`), `api.listAbsences(from, to, { hasAttachment })`. Vorschau bleibt beim Blob. Details und offene Fragen: `docs/handoffs/P7.md`.
+
 ## Paket P6 (Urlaubsantrag ausfüllen, 19.10.2026, Branch p6-vacation-form, nicht gemergt)
 Neue Seite `/settings/vacation-form` (Modul planning): eigenes leeres PDF hochladen, Felder (AcroForm) oder Klickpositionen (flache PDFs) Datenquellen zuordnen, Live-Vorschau (pdf.js), Speichern; Knopf „Urlaubsantrag erstellen“ auf `/absences` und nach der Übernahme im Planer erzeugt das PDF im Browser (pdf-lib). Speicherung gegen vorgeschlagene Endpunkte `/vacation/request-form*` (Backend-Paket B7), Rückfall auf IndexedDB bei 404/501. Neue Abhängigkeiten pdf-lib (MIT), pdfjs-dist (Apache-2.0). Details, Formate und offene Fragen: `docs/handoffs/P6.md`.
 
