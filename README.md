@@ -45,4 +45,4 @@ Bitte vor größeren Änderungen ein Issue anlegen (nur synthetische Daten, kein
 
 ## Lizenz
 
-[GNU AGPL-3.0-only](LICENSE). Die übernommenen shadcn-svelte-Komponenten behalten ihre MIT-Lizenz, siehe [SHADCN-LICENSE.md](SHADCN-LICENSE.md). Abhängigkeitsinventar: Backend-Repo `docs/LIZENZEN.md`.
+[GNU AGPL-3.0-only](LICENSE). Die übernommenen shadcn-svelte-Komponenten behalten ihre MIT-Lizenz, siehe [SHADCN-LICENSE.md](SHADCN-LICENSE.md). Abhängigkeitsinventar: Backend-Repo `docs/LIZENZEN.md`. Laufzeit-Abhängigkeiten im ausgelieferten Bundle: `pdf-lib` (MIT, seit Jahren nicht mehr gepflegt; Ersatz `@cantoo/pdf-lib`) und `pdfjs-dist` (Apache-2.0) für den Urlaubsantrag.

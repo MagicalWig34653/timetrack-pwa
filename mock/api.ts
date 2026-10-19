@@ -31,6 +31,8 @@ export interface MockRequest {
 	/** raw binary body (PUT of the vacation form template) and its percent-encoded X-File-Name header */
 	rawBody?: Uint8Array;
 	fileName?: string;
+	/** Content-Type header of the raw binary body */
+	contentType?: string;
 }
 
 export interface MockResponse {
@@ -894,7 +896,7 @@ export function createMockApi(options: MockOptions = {}) {
 		const reportsResponse = reports.handle(account.id, { method, path: req.path, body: req.body, ifMatch: req.ifMatch });
 		if (reportsResponse) return reportsResponse;
 
-		const vacationFormResponse = vacationForm.handle(account.id, { method, path: req.path, body: req.body, rawBody: req.rawBody, fileName: req.fileName });
+		const vacationFormResponse = vacationForm.handle(account.id, { method, path: req.path, body: req.body, rawBody: req.rawBody, fileName: req.fileName, contentType: req.contentType });
 		if (vacationFormResponse) return vacationFormResponse;
 
 		const planningResponse = planning.handle(account.id, {

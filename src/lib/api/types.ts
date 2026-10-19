@@ -333,13 +333,13 @@ export interface VacationBalance {
 	availableAfterPlannedHalfDays: number;
 }
 
-/** Stored vacation request form template (proposed contract, backend package B7). `mapping` is opaque JSON of at most 64 KB. */
+/** Stored vacation request form template (contract 0.25.0, B7, ADR-0026): exactly one private template per account. `mapping` is opaque JSON of at most 64 KB; without a template `exists` is false and the rest null. */
 export interface VacationRequestFormInfo {
 	exists: boolean;
-	fileName?: string | null;
-	sizeBytes?: number | null;
-	mapping?: unknown;
-	updatedAt?: string | null;
+	fileName: string | null;
+	sizeBytes: number | null;
+	mapping: Record<string, unknown> | null;
+	updatedAt: string | null;
 }
 
 export interface VacationSnapshotEntry {

@@ -4,7 +4,7 @@ import { FormTemplateStore, createMemoryBackend } from '#lib/vacation-form/form-
 import { emptyMapping, MappingTooLargeError } from '#lib/vacation-form/mapping.js';
 import { makeFormPdf } from '#lib/vacation-form/test-pdf.js';
 import { createMockFetch } from './fetch.ts';
-import { FORM_MAX_FILE_BYTES } from './vacation-form.ts';
+import { FORM_MAX_FILE_BYTES, FORM_MAX_MAPPING_BYTES } from './vacation-form.ts';
 
 let mock: ReturnType<typeof createMockFetch>;
 type Fetch = typeof fetch;
@@ -41,11 +41,15 @@ describe('mock vacation request form endpoints', () => {
 	});
 
 	it('validates magic number, size and mapping preconditions', async () => {
-		expect(await code(api.putVacationRequestFormFile(new TextEncoder().encode('hello world'), 'x.pdf'))).toBe('415:unsupported_type');
+		expect(await code(api.putVacationRequestFormFile(new TextEncoder().encode('hello world'), 'x.pdf'))).toBe('400:bad_request'); // PDF content type without the magic number
+		expect(await code(api.putVacationRequestFormFile(new Uint8Array(0), 'x.pdf'))).toBe('400:bad_request');
 		const big = new Uint8Array(FORM_MAX_FILE_BYTES + 1);
 		big.set(new TextEncoder().encode('%PDF-1.7'));
 		expect(await code(api.putVacationRequestFormFile(big, 'x.pdf'))).toBe('413:file_too_large');
 		expect(await code(api.putVacationRequestFormMapping({ a: 1 }))).toBe('409:no_template');
+		await api.putVacationRequestFormFile(await makeFormPdf(), 'x.pdf');
+		const bigMapping = { pad: 'x'.repeat(FORM_MAX_MAPPING_BYTES) };
+		expect(await code(api.putVacationRequestFormMapping(bigMapping))).toBe('413:mapping_too_large');
 	});
 
 	it('keeps templates apart per account', async () => {
@@ -90,32 +94,75 @@ describe('FormTemplateStore against the server', () => {
 	});
 });
 
-describe.each([404, 501])('FormTemplateStore falls back to local storage on %i', (status) => {
-	const refuse = (inner: Fetch): Fetch => async (input, init) =>
-		String(input).includes('/vacation/request-form')
-			? new Response(JSON.stringify({ error: { code: status === 404 ? 'not_found' : 'not_implemented', message: 'x' } }), { status, headers: { 'Content-Type': 'application/json' } })
-			: inner(input, init);
-	beforeEach(() => login(refuse));
-
-	it('stores in the local backend, per account', async () => {
-		const local = createMemoryBackend();
-		const store = new FormTemplateStore('acc-1', local);
-		expect(await store.load()).toBeNull();
-		expect(store.storage).toBe('local');
-		const pdf = await makeFormPdf();
-		await store.saveFile(pdf, 'form.pdf');
-		await store.saveMapping({ ...emptyMapping(), person: { ...emptyMapping().person, lastName: 'Muster' } });
-		const loaded = await store.load();
-		expect(loaded?.bytes).toEqual(pdf);
-		expect(loaded?.mapping.person.lastName).toBe('Muster');
-		expect(await new FormTemplateStore('acc-2', local).exists()).toBe(false);
-		await store.remove();
-		expect(await store.exists()).toBe(false);
+describe('FormTemplateStore offline cache', () => {
+	const cut = { on: false };
+	const flaky = (inner: Fetch): Fetch => async (input, init) => {
+		if (cut.on) throw new TypeError('offline');
+		return inner(input, init);
+	};
+	beforeEach(() => {
+		cut.on = false;
+		return login(flaky);
 	});
 
-	it('cannot save a mapping without a template', async () => {
+	it('serves the cached copy when the server is unreachable, but refuses writes', async () => {
+		const local = createMemoryBackend();
+		const store = new FormTemplateStore('acc-1', local);
+		const pdf = await makeFormPdf();
+		await store.saveFile(pdf, 'form.pdf', { ...emptyMapping(), person: { ...emptyMapping().person, lastName: 'Muster' } });
+		cut.on = true;
+		const offline = new FormTemplateStore('acc-1', local);
+		const loaded = await offline.load();
+		expect(offline.storage).toBe('offline');
+		expect(loaded?.bytes).toEqual(pdf);
+		expect(loaded?.mapping.person.lastName).toBe('Muster');
+		expect(await offline.exists()).toBe(true);
+		await expect(offline.saveMapping(emptyMapping())).rejects.toMatchObject({ code: 'network_error' });
+		await expect(offline.remove()).rejects.toMatchObject({ code: 'network_error' });
+		expect(await new FormTemplateStore('acc-2', local).exists().catch(() => 'net')).toBe(false); // other account: no cache
+	});
+
+	it('shows the network error offline without a cached copy', async () => {
+		cut.on = true;
+		await expect(new FormTemplateStore('acc-1', createMemoryBackend()).load()).rejects.toMatchObject({ code: 'network_error' });
+	});
+
+	it('drops the cache when the server has no template or after removal', async () => {
+		const local = createMemoryBackend();
+		const store = new FormTemplateStore('acc-1', local);
+		await store.saveFile(await makeFormPdf(), 'form.pdf');
+		expect(await local.read('template:acc-1')).not.toBeNull();
+		await store.remove();
+		expect(await local.read('template:acc-1')).toBeNull();
+	});
+
+	it('updates the cached mapping after saving', async () => {
+		const local = createMemoryBackend();
+		const store = new FormTemplateStore('acc-1', local);
+		await store.saveFile(await makeFormPdf(), 'form.pdf');
+		await store.saveMapping({ ...emptyMapping(), flatten: true });
+		expect((await local.read('template:acc-1'))?.mapping).toMatchObject({ flatten: true });
+	});
+
+	it('does not break when the cache itself fails', async () => {
+		const broken = { read: async () => { throw new Error('idb'); }, write: async () => { throw new Error('idb'); }, remove: async () => { throw new Error('idb'); } };
+		const store = new FormTemplateStore('acc-1', broken);
+		await store.saveFile(await makeFormPdf(), 'form.pdf');
+		expect((await store.load())?.fileName).toBe('form.pdf');
+	});
+
+	it('surfaces no_template (409) as an ApiError instead of writing locally', async () => {
 		const store = new FormTemplateStore('acc-1', createMemoryBackend());
-		await expect(store.saveMapping(emptyMapping())).rejects.toThrow('no template');
+		await expect(store.saveMapping(emptyMapping())).rejects.toMatchObject({ status: 409, code: 'no_template' });
+	});
+
+	it('treats a 404 as a real answer, not as a missing endpoint', async () => {
+		await login((inner) => async (input, init) =>
+			String(input).includes('/vacation/request-form')
+				? new Response(JSON.stringify({ error: { code: 'not_found', message: 'x' } }), { status: 404, headers: { 'Content-Type': 'application/json' } })
+				: inner(input, init)
+		);
+		await expect(new FormTemplateStore('acc-1', createMemoryBackend()).load()).rejects.toMatchObject({ status: 404 });
 	});
 });
 

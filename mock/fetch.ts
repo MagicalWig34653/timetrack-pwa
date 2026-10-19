@@ -36,6 +36,7 @@ export function createMockFetch(options?: MockOptions) {
 			body: typeof init.body === 'string' ? JSON.parse(init.body) : undefined,
 			file,
 			rawBody,
+			contentType: headers.get('Content-Type') ?? undefined,
 			fileName: headers.get('X-File-Name') ?? undefined,
 			cookies: sessionCookie ? { tt_session: sessionCookie } : {},
 			csrfToken,

@@ -11,8 +11,6 @@ export interface StoredTemplate {
 	updatedAt: string | null;
 }
 
-export type StorageMode = 'server' | 'local';
-
 /** Local (browser) persistence behind the same operations; IndexedDB in the app, memory in tests. */
 export interface LocalBackend {
 	read(key: string): Promise<LocalRecord | null>;
@@ -63,14 +61,18 @@ export function createIndexedDbBackend(): LocalBackend {
 	};
 }
 
-/** The endpoints answer 404 (route unknown) or 501 until backend package B7 exists; a disabled module is a real error. */
-export function isUnsupported(error: unknown): boolean {
-	return error instanceof ApiError && (error.status === 501 || (error.status === 404 && error.code !== 'module_disabled'));
+/** The server is the source of truth; `offline` means the data came from the browser cache because the server was unreachable. */
+export type StorageMode = 'server' | 'offline';
+
+/** Only a transport failure (no response at all) counts as offline; every HTTP answer, including 404, is a real result. */
+export function isOffline(error: unknown): boolean {
+	return error instanceof ApiError && error.status === 0;
 }
 
 /**
- * Template + mapping storage. Prefers the server endpoints (`/vacation/request-form`); when they answer 404/501 the
- * store switches to IndexedDB for this session, keyed per account so users of one browser never see each other's data.
+ * Template + mapping storage on the server (`/vacation/request-form`, contract 0.25.0). The browser keeps a per-account
+ * copy in IndexedDB only as a cache: it is refreshed on every successful server operation and read when the server is
+ * unreachable, so filling out a request works offline. Writes are never accepted offline (they would silently diverge).
  */
 export class FormTemplateStore {
 	private mode: StorageMode | null = null;
@@ -84,43 +86,55 @@ export class FormTemplateStore {
 		return `template:${this.accountId}`;
 	}
 
-	/** Where data lives; known after the first operation. */
+	/** Where the last read came from; known after the first operation. */
 	get storage(): StorageMode | null {
 		return this.mode;
 	}
 
-	/** Runs a server operation; on 404/501 switches to local storage and runs the fallback instead. */
-	private async withServer<T>(server: () => Promise<T>, fallback: () => Promise<T>): Promise<T> {
-		if (this.mode === 'local') return fallback();
+	/** Cache access never breaks the server path (private windows, quota, blocked IndexedDB). */
+	private async cache(work: () => Promise<void>): Promise<void> {
 		try {
-			const result = await server();
-			this.mode = 'server';
-			return result;
-		} catch (error) {
-			if (!isUnsupported(error)) throw error;
-			this.mode = 'local';
-			return fallback();
+			await work();
+		} catch {
+			// the cache is optional
 		}
 	}
 
 	async load(): Promise<StoredTemplate | null> {
-		return this.withServer(
-			async () => {
-				const info = await api.getVacationRequestForm();
-				if (!info.exists) return null;
-				const file = await api.downloadVacationRequestFormFile();
-				return {
-					fileName: info.fileName ?? file.filename ?? 'vorlage.pdf',
-					bytes: new Uint8Array(await file.blob.arrayBuffer()),
-					mapping: parseMapping(info.mapping),
-					updatedAt: info.updatedAt ?? null
-				};
-			},
-			async () => {
-				const record = await this.local.read(this.key);
-				return record ? { fileName: record.fileName, bytes: new Uint8Array(record.bytes), mapping: parseMapping(record.mapping), updatedAt: record.updatedAt } : null;
+		try {
+			const info = await api.getVacationRequestForm();
+			if (!info.exists) {
+				this.mode = 'server';
+				await this.cache(() => this.local.remove(this.key));
+				return null;
 			}
-		);
+			const file = await api.downloadVacationRequestFormFile();
+			const stored: StoredTemplate = {
+				fileName: info.fileName ?? file.filename ?? 'vorlage.pdf',
+				bytes: new Uint8Array(await file.blob.arrayBuffer()),
+				mapping: parseMapping(info.mapping),
+				updatedAt: info.updatedAt ?? null
+			};
+			this.mode = 'server';
+			await this.cache(() =>
+				this.local.write(this.key, { fileName: stored.fileName, bytes: stored.bytes.slice().buffer, mapping: info.mapping ?? null, updatedAt: stored.updatedAt ?? new Date().toISOString() })
+			);
+			return stored;
+		} catch (error) {
+			if (!isOffline(error)) throw error;
+			const record = await this.readCache();
+			if (!record) throw error; // offline without a cached copy: show the network error
+			this.mode = 'offline';
+			return { fileName: record.fileName, bytes: new Uint8Array(record.bytes), mapping: parseMapping(record.mapping), updatedAt: record.updatedAt };
+		}
+	}
+
+	private async readCache(): Promise<LocalRecord | null> {
+		try {
+			return await this.local.read(this.key);
+		} catch {
+			return null;
+		}
 	}
 
 	/** Stores a new template file and resets the mapping (field names belong to the file). */
@@ -128,39 +142,45 @@ export class FormTemplateStore {
 		validatePdfBytes(bytes);
 		if (bytes.length > PDF_MAX_BYTES) throw new Error('too large');
 		const json = serializeMapping(mapping); // size check before anything is sent
-		await this.withServer(
-			async () => {
-				await api.putVacationRequestFormFile(bytes, fileName);
-				await api.putVacationRequestFormMapping(JSON.parse(json));
-			},
-			async () => this.local.write(this.key, { fileName, bytes: bytes.slice().buffer, mapping: JSON.parse(json), updatedAt: new Date().toISOString() })
-		);
+		await api.putVacationRequestFormFile(bytes, fileName);
+		let info: Awaited<ReturnType<typeof api.putVacationRequestFormMapping>>;
+		try {
+			info = await api.putVacationRequestFormMapping(JSON.parse(json));
+		} catch (error) {
+			// the server now holds the new file with the old mapping; the cached copy would be stale
+			await this.cache(() => this.local.remove(this.key));
+			throw error;
+		}
+		this.mode = 'server';
+		await this.cache(() => this.local.write(this.key, { fileName, bytes: bytes.slice().buffer, mapping: JSON.parse(json), updatedAt: info.updatedAt ?? new Date().toISOString() }));
 	}
 
 	async saveMapping(mapping: FormMapping): Promise<void> {
 		const json = serializeMapping(mapping);
-		await this.withServer(
-			async () => void (await api.putVacationRequestFormMapping(JSON.parse(json))),
-			async () => {
-				const record = await this.local.read(this.key);
-				if (!record) throw new Error('no template');
-				await this.local.write(this.key, { ...record, mapping: JSON.parse(json), updatedAt: new Date().toISOString() });
-			}
-		);
+		const info = await api.putVacationRequestFormMapping(JSON.parse(json)); // 409 no_template without a stored file
+		this.mode = 'server';
+		await this.cache(async () => {
+			const record = await this.local.read(this.key);
+			if (record) await this.local.write(this.key, { ...record, mapping: JSON.parse(json), updatedAt: info.updatedAt ?? new Date().toISOString() });
+		});
 	}
 
 	async remove(): Promise<void> {
-		await this.withServer(
-			() => api.deleteVacationRequestForm(),
-			() => this.local.remove(this.key)
-		);
+		await api.deleteVacationRequestForm();
+		this.mode = 'server';
+		await this.cache(() => this.local.remove(this.key));
 	}
 
-	/** Cheap existence check for the "Urlaubsantrag erstellen" action. */
+	/** Cheap existence check for the "Urlaubsantrag erstellen" action; falls back to the cache when offline. */
 	async exists(): Promise<boolean> {
-		return this.withServer(
-			async () => (await api.getVacationRequestForm()).exists,
-			async () => (await this.local.read(this.key)) !== null
-		);
+		try {
+			const exists = (await api.getVacationRequestForm()).exists;
+			this.mode = 'server';
+			return exists;
+		} catch (error) {
+			if (!isOffline(error)) throw error;
+			this.mode = 'offline';
+			return (await this.readCache()) !== null;
+		}
 	}
 }

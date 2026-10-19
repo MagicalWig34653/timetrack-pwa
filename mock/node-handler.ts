@@ -27,6 +27,7 @@ export async function handleNodeRequest(api: ReturnType<typeof createMockApi>, p
 		body: raw ? JSON.parse(raw) : undefined,
 		file,
 		rawBody,
+		contentType: contentType || undefined,
 		fileName: req.headers['x-file-name'] as string | undefined,
 		cookies,
 		csrfToken: Array.isArray(csrf) ? csrf[0] : csrf,

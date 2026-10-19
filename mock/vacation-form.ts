@@ -1,4 +1,4 @@
-// Mock of the proposed vacation request form endpoints (backend package B7; not yet in contracts/openapi.yaml):
+// Mock of the vacation request form endpoints (backend package B7, contract 0.25.0, ADR-0026):
 //   GET    /api/v1/vacation/request-form           -> {exists, fileName, sizeBytes, mapping, updatedAt}
 //   PUT    /api/v1/vacation/request-form/file      body application/pdf (<= 5 MB), header X-File-Name (percent-encoded)
 //   PUT    /api/v1/vacation/request-form/mapping   JSON body (opaque, <= 64 KB)
@@ -23,6 +23,7 @@ export interface VacationFormRequest {
 	body?: any;
 	rawBody?: Uint8Array;
 	fileName?: string;
+	contentType?: string;
 }
 
 const error = (status: number, code: string): MockResponse => ({ status, body: { error: { code, message: code } } });
@@ -59,10 +60,12 @@ export function createVacationFormMock(clock: () => number) {
 				};
 			}
 			if (req.method === 'PUT') {
+				// order as on the server: Content-Type 415, empty body 400, size 413, missing %PDF- magic number 400
+				if (req.contentType !== undefined && !req.contentType.toLowerCase().startsWith('application/pdf')) return error(415, 'unsupported_type');
 				const bytes = req.rawBody;
 				if (!bytes || bytes.length === 0) return error(400, 'bad_request');
 				if (bytes.length > FORM_MAX_FILE_BYTES) return error(413, 'file_too_large');
-				if (!hasPdfMagic(bytes)) return error(415, 'unsupported_type');
+				if (!hasPdfMagic(bytes)) return error(400, 'bad_request');
 				let fileName = 'vorlage.pdf';
 				try {
 					fileName = decodeURIComponent(req.fileName ?? '') || fileName;
@@ -77,7 +80,7 @@ export function createVacationFormMock(clock: () => number) {
 		if (route === 'vacation/request-form/mapping' && req.method === 'PUT') {
 			if (!form) return error(409, 'no_template');
 			if (req.body === undefined || req.body === null || typeof req.body !== 'object') return error(400, 'bad_request');
-			if (JSON.stringify(req.body).length > FORM_MAX_MAPPING_BYTES) return error(413, 'file_too_large');
+			if (new TextEncoder().encode(JSON.stringify(req.body)).length > FORM_MAX_MAPPING_BYTES) return error(413, 'mapping_too_large');
 			form.mapping = req.body;
 			form.updatedAt = now;
 			return { status: 200, body: info(form) };

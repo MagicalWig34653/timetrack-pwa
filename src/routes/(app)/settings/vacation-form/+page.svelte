@@ -27,6 +27,7 @@
 		serializeMapping,
 		suggestSource
 	} from '#lib/vacation-form/mapping.js';
+	import { ApiError } from '#lib/api/errors.js';
 	import { PdfError } from '#lib/vacation-form/pdf-limits.js';
 	import type { DetectedField, PdfInfo } from '#lib/vacation-form/pdf.js';
 	import { SAMPLE_REQUEST, previewMapping } from '#lib/vacation-form/sample.js';
@@ -36,7 +37,7 @@
 
 	let load = $state<LoadState>({ status: 'loading' });
 	let store: FormTemplateStore | null = null;
-	let storage = $state<'server' | 'local' | null>(null);
+	let storage = $state<'server' | 'offline' | null>(null);
 	let fileName = $state('');
 	let bytes = $state<Uint8Array | null>(null);
 	let info = $state<PdfInfo | null>(null);
@@ -102,6 +103,13 @@
 	function pdfProblem(error: unknown): string {
 		if (error instanceof PdfError) return t(`vform.pdf_error.${error.problem}` as MessageKey);
 		if (error instanceof MappingTooLargeError) return t('vform.mapping_too_large');
+		// server answers of the template endpoints get form-specific German texts (contract 0.25.0)
+		if (error instanceof ApiError) {
+			if (error.code === 'file_too_large') return t('vform.pdf_error.too_large');
+			if (error.code === 'unsupported_type') return t('vform.pdf_error.not_pdf');
+			if (error.code === 'mapping_too_large') return t('vform.mapping_too_large');
+			if (error.code === 'no_template') return t('vform.error_no_template');
+		}
 		return errorMessage(error);
 	}
 
@@ -252,7 +260,7 @@
 				{#if info}
 					<div class="flex flex-wrap items-center gap-2" data-testid="vform-file-info">
 						<span class="text-sm font-medium break-all">{fileName}</span>
-						<Badge variant="secondary">{storage === 'server' ? t('vform.storage_server') : t('vform.storage_local')}</Badge>
+						<Badge variant="secondary">{storage === 'offline' ? t('vform.storage_offline') : t('vform.storage_server')}</Badge>
 					</div>
 					<p class="text-sm text-muted-foreground">{t('vform.upload_info', { name: fileName, size: formatBytes(bytes?.length ?? 0), pages: info.pageCount, fields: info.fields.length })}</p>
 				{:else}

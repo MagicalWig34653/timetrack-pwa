@@ -4,9 +4,10 @@ export const deVacationForm = {
 	'vform.title': 'Urlaubsantrag-Vorlage',
 	'vform.description': 'Lade das leere Antragsformular deines Arbeitgebers hoch und lege fest, welche Angaben in welches Feld kommen. Danach erstellst du Urlaubsanträge mit einem Klick.',
 	'vform.privacy':
-		'Das PDF wird nur in deinem Browser ausgefüllt. Weder die Vorlage noch deine Angaben gehen an Dritte. Gespeichert wird sie in deinem Konto, auf älteren Servern nur in diesem Browser.',
+		'Das PDF wird nur in deinem Browser ausgefüllt. Weder die Vorlage noch deine Angaben gehen an Dritte. Gespeichert wird sie in deinem Konto auf dem Server; dieser Browser hält nur eine Kopie, damit das Ausfüllen auch ohne Verbindung geht.',
 	'vform.storage_server': 'Gespeichert in deinem Konto',
-	'vform.storage_local': 'Nur in diesem Browser gespeichert (der Server unterstützt das Speichern noch nicht)',
+	'vform.storage_offline': 'Server nicht erreichbar: Kopie aus diesem Browser. Änderungen sind erst wieder mit Verbindung möglich.',
+	'vform.error_no_template': 'Der Server hat keine Vorlage für dein Konto. Lade zuerst ein leeres PDF hoch.',
 	'vform.loading': 'Vorlage wird geladen …',
 	'vform.preview_loading': 'Vorschau wird erstellt …',
 
@@ -118,6 +119,7 @@ export const deVacationForm = {
 	'vform.source_group.request': 'Dieser Antrag',
 	'vform.source_group.fixed': 'Fest',
 
+	'error.mapping_too_large': 'Die Zuordnung ist zu groß (mehr als 64 KB).',
 	'error.no_template': 'Es ist noch keine Urlaubsantrag-Vorlage hochgeladen.',
 	'vform.action': 'Urlaubsantrag erstellen',
 	'vform.dialog_title': 'Urlaubsantrag erstellen',

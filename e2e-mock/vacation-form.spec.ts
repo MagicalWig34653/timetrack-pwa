@@ -160,6 +160,49 @@ test('planner: a taken suggestion offers the request form, a removed template sh
 	await context.close();
 });
 
+test('server errors of the template endpoints show German messages (413, 415, 409)', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser, { viewport: viewports[1][1] });
+	await uploadSynthetic(page);
+	const answer = (status: number, code: string) => (route: any) =>
+		route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ error: { code, message: code } }) });
+
+	await page.route('**/api/v1/vacation/request-form/mapping', answer(413, 'mapping_too_large'));
+	await page.getByLabel('Nachname', { exact: true }).fill('Mustermann');
+	await page.getByTestId('vform-save').click();
+	await expect(page.getByTestId('vform-problem')).toContainText('Die Zuordnung ist zu groß');
+	await page.unroute('**/api/v1/vacation/request-form/mapping');
+
+	await page.route('**/api/v1/vacation/request-form/mapping', answer(409, 'no_template'));
+	await page.getByTestId('vform-save').click();
+	await expect(page.getByTestId('vform-problem')).toContainText('keine Vorlage für dein Konto');
+	await page.unroute('**/api/v1/vacation/request-form/mapping');
+
+	await page.route('**/api/v1/vacation/request-form/file', (route) => (route.request().method() === 'PUT' ? answer(415, 'unsupported_type')(route) : route.continue()));
+	await page.getByTestId('vform-file-input').setInputFiles({ name: 'again.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await makeFormPdf()) });
+	await expect(page.getByTestId('vform-problem')).toContainText('keine PDF-Datei');
+	await page.unroute('**/api/v1/vacation/request-form/file');
+
+	await page.route('**/api/v1/vacation/request-form/file', (route) => (route.request().method() === 'PUT' ? answer(413, 'file_too_large')(route) : route.continue()));
+	await page.getByTestId('vform-file-input').setInputFiles({ name: 'again.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await makeFormPdf()) });
+	await expect(page.getByTestId('vform-problem')).toContainText('größer als 5 MB');
+	await context.close();
+});
+
+test('offline: the browser copy is shown when the server is unreachable, writes are refused', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser, { viewport: viewports[1][1] });
+	await uploadSynthetic(page);
+	await page.reload(); // a successful server load fills the browser cache
+	await expect(page.getByTestId('vform-field')).toHaveCount(16);
+	await page.route('**/api/v1/vacation/request-form**', (route) => route.abort('failed'));
+	await page.reload();
+	await expect(page.getByTestId('vform-field')).toHaveCount(16);
+	await expect(page.getByTestId('vform-file-info')).toContainText('Server nicht erreichbar');
+	await page.getByLabel('Nachname', { exact: true }).fill('Offline');
+	await page.getByTestId('vform-save').click();
+	await expect(page.getByTestId('vform-problem')).toContainText('nicht erreichbar');
+	await context.close();
+});
+
 test('module gating: the page is gone when planning is switched off', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser, { viewport: viewports[1][1] });
 	await page.goto('/settings/modules');
