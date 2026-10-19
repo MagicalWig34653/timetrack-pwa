@@ -24,6 +24,8 @@ export function createMockFetch(options?: MockOptions) {
 		const csrfToken = headers.get('X-CSRF-Token') ?? undefined;
 		calls.push({ method, path, csrf: csrfToken, credentials: init.credentials });
 		let file;
+		let rawBody: Uint8Array | undefined;
+		if (ArrayBuffer.isView(init.body)) rawBody = new Uint8Array(init.body.buffer, init.body.byteOffset, init.body.byteLength);
 		if (init.body instanceof FormData) {
 			const entry = init.body.get('file');
 			if (entry instanceof Blob) file = { name: (entry as File).name ?? 'file', type: entry.type, bytes: await readBytes(entry) };
@@ -33,6 +35,8 @@ export function createMockFetch(options?: MockOptions) {
 			path,
 			body: typeof init.body === 'string' ? JSON.parse(init.body) : undefined,
 			file,
+			rawBody,
+			fileName: headers.get('X-File-Name') ?? undefined,
 			cookies: sessionCookie ? { tt_session: sessionCookie } : {},
 			csrfToken,
 			ifMatch: headers.get('If-Match') ?? undefined,

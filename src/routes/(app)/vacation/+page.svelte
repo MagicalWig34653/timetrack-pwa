@@ -65,13 +65,14 @@
 	<Alert variant="destructive">{load.message}</Alert>
 {:else if balance}
 	<div class="flex flex-col gap-4">
-		<nav class="flex items-center gap-2" aria-label={t('vacation.year_nav')}>
+		<nav class="flex flex-wrap items-center gap-2" aria-label={t('vacation.year_nav')}>
 			<Button variant="outline" size="icon" aria-label={t('vacation.previous_year')} onclick={() => shiftYear(-1)}><ChevronLeft /></Button>
 			<span class="min-w-16 text-center font-medium tabular-nums" data-testid="vacation-year">{year}</span>
 			<Button variant="outline" size="icon" aria-label={t('vacation.next_year')} onclick={() => shiftYear(1)}><ChevronRight /></Button>
-			<span class="ml-auto flex gap-2 text-sm">
+			<span class="ml-auto flex flex-wrap gap-x-3 gap-y-1 text-sm">
 				<a class="underline underline-offset-4" href="/absences">{t('nav.absences')}</a>
 				<a class="underline underline-offset-4" href="/calendar">{t('nav.calendar')}</a>
+				<a class="underline underline-offset-4" href="/settings/vacation-form" data-testid="vacation-form-link">{t('vform.settings_link')}</a>
 			</span>
 		</nav>
 		<VacationBalanceCard {balance} {settings} />

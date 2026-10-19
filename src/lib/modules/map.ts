@@ -38,7 +38,7 @@ export const CORE_ROUTES = [
 
 export const MODULE_ROUTES: Record<ModuleKey, readonly string[]> = {
 	reports: ['/reports', '/settings/learning-fields'],
-	planning: ['/vacation', '/calendar', '/plan', '/absences', '/shared', '/settings/sharing'],
+	planning: ['/vacation', '/calendar', '/plan', '/absences', '/shared', '/settings/sharing', '/settings/vacation-form'],
 	transfer: ['/export', '/import', '/settings/storage'],
 	automation: ['/settings/devices', '/suggestions'],
 	mcp: ['/settings/api-tokens', '/settings/connections', '/settings/mcp-help', '/oauth/consent']

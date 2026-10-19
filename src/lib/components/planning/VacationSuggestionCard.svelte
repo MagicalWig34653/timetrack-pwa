@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '#lib/api/client.js';
-	import type { VacationConflictType, VacationSuggestion } from '#lib/api/types.js';
+	import type { Absence, VacationConflictType, VacationSuggestion } from '#lib/api/types.js';
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -17,7 +17,7 @@
 	import TreePalm from '@lucide/svelte/icons/tree-palm';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 
-	let { suggestion, ontaken }: { suggestion: VacationSuggestion; ontaken: (message: string, partial?: boolean) => void } = $props();
+	let { suggestion, ontaken }: { suggestion: VacationSuggestion; ontaken: (message: string, partial?: boolean, created?: Absence[]) => void } = $props();
 
 	let confirming = $state(false);
 	let ackConflicts = $state(false);
@@ -56,9 +56,10 @@
 		pending = true;
 		error = '';
 		let done = 0;
+		const created: Absence[] = [];
 		try {
 			for (const block of blocks) {
-				await api.createAbsence({ kind: 'vacation', startDate: block.start, endDate: block.end, status: 'planned' });
+				created.push(await api.createAbsence({ kind: 'vacation', startDate: block.start, endDate: block.end, status: 'planned' }));
 				done += 1;
 			}
 			const first = blocks[0];
@@ -66,12 +67,14 @@
 			ontaken(
 				blocks.length === 1
 					? t('planner.take_done_one', { start: formatDateNumeric(first.start), end: formatDateNumeric(first.end) })
-					: t('planner.take_done', { count: blocks.length, start: formatDateNumeric(first.start), end: formatDateNumeric(last.end) })
+					: t('planner.take_done', { count: blocks.length, start: formatDateNumeric(first.start), end: formatDateNumeric(last.end) }),
+				false,
+				created
 			);
 		} catch (e) {
 			const reason = errorMessage(e);
 			error = done > 0 ? t('planner.take_partial', { done, total: blocks.length, reason }) : reason;
-			if (done > 0) ontaken(error, true);
+			if (done > 0) ontaken(error, true, created);
 		} finally {
 			pending = false;
 		}

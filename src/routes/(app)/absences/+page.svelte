@@ -35,6 +35,7 @@
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { formatHalfDays } from '#lib/vacation/halfdays.js';
+	import VacationRequestDialog, { type RequestTarget } from '#lib/components/vacation-form/VacationRequestDialog.svelte';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import { onMount } from 'svelte';
@@ -50,6 +51,7 @@
 	let openAttachments = $state<Set<string>>(new Set());
 	let lastWritten = '';
 	let editing = $state<Absence | 'new' | null>(null);
+	let requesting = $state<RequestTarget | null>(null);
 	let notice = $state('');
 	let error = $state('');
 	let today = $state(todayLocal(zoneStore.value));
@@ -282,6 +284,9 @@
 									<div class="flex flex-wrap gap-2">
 										<Button variant="outline" size="sm" onclick={() => (editing = absence)}>{t('absence.edit')}</Button>
 										<Button variant="outline" size="sm" onclick={() => remove(absence)}>{t('absence.delete')}</Button>
+										{#if absence.kind === 'vacation' && absence.status !== 'cancelled' && absence.status !== 'rejected'}
+											<Button variant="outline" size="sm" onclick={() => (requesting = absence)} data-testid="absence-request-form">{t('vform.action')}</Button>
+										{/if}
 										<Button
 											variant="outline"
 											size="sm"
@@ -308,3 +313,5 @@
 		<p class="text-xs text-muted-foreground">{t('absences.footnote')}</p>
 	</div>
 {/if}
+
+<VacationRequestDialog target={requesting} onclose={() => (requesting = null)} />

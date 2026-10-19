@@ -3,6 +3,7 @@ import { createMailMock } from './mail.ts';
 import { createModulesMock, type ModuleKey } from './modules.ts';
 import { createNotificationsMock } from './notifications.ts';
 import { createPlanningMock } from './planning.ts';
+import { createVacationFormMock } from './vacation-form.ts';
 import { createReportsMock } from './reports.ts';
 import { createTimeMock } from './time.ts';
 import { createWeekMock } from './week.ts';
@@ -27,6 +28,9 @@ export interface MockRequest {
 	authorization?: string;
 	/** multipart upload (field `file`) */
 	file?: UploadedFile;
+	/** raw binary body (PUT of the vacation form template) and its percent-encoded X-File-Name header */
+	rawBody?: Uint8Array;
+	fileName?: string;
 }
 
 export interface MockResponse {
@@ -145,6 +149,7 @@ export function createMockApi(options: MockOptions = {}) {
 	const mailAvailable = options.mailAvailable ?? true;
 	const time = createTimeMock(options.now ?? Date.now);
 	const accounts = new Map<string, MockAccount>();
+	const vacationForm = createVacationFormMock(options.now ?? Date.now);
 	const planning = createPlanningMock({
 		clock: options.now ?? Date.now,
 		modelsOf: time.modelsOf,
@@ -887,6 +892,9 @@ export function createMockApi(options: MockOptions = {}) {
 
 		const reportsResponse = reports.handle(account.id, { method, path: req.path, body: req.body, ifMatch: req.ifMatch });
 		if (reportsResponse) return reportsResponse;
+
+		const vacationFormResponse = vacationForm.handle(account.id, { method, path: req.path, body: req.body, rawBody: req.rawBody, fileName: req.fileName });
+		if (vacationFormResponse) return vacationFormResponse;
 
 		const planningResponse = planning.handle(account.id, {
 			method,

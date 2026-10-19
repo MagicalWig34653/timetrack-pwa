@@ -333,6 +333,15 @@ export interface VacationBalance {
 	availableAfterPlannedHalfDays: number;
 }
 
+/** Stored vacation request form template (proposed contract, backend package B7). `mapping` is opaque JSON of at most 64 KB. */
+export interface VacationRequestFormInfo {
+	exists: boolean;
+	fileName?: string | null;
+	sizeBytes?: number | null;
+	mapping?: unknown;
+	updatedAt?: string | null;
+}
+
 export interface VacationSnapshotEntry {
 	id: string;
 	date: string;

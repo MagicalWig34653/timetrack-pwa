@@ -50,6 +50,7 @@ import type {
 	ShareScopes,
 	SharedView,
 	VacationBalance,
+	VacationRequestFormInfo,
 	VacationEntries,
 	VacationSuggestionQuery,
 	VacationSuggestions,
@@ -181,6 +182,22 @@ async function upload<T>(path: string, file: File): Promise<T> {
 	let response: Response;
 	try {
 		response = await netFetch(BASE + path, { method: 'POST', headers, credentials: 'include', body: form });
+	} catch {
+		throw new ApiError(0, 'network_error');
+	}
+	if (!response.ok) throw await toApiError(response);
+	invalidateReadCache();
+	const text = await response.text();
+	return (text ? JSON.parse(text) : undefined) as T;
+}
+
+/** PUT of a raw binary body (PDF template); the file name travels percent-encoded in X-File-Name. */
+async function putBinary<T>(path: string, bytes: Uint8Array, contentType: string, fileName: string): Promise<T> {
+	const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': contentType, 'X-File-Name': encodeURIComponent(fileName) };
+	if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+	let response: Response;
+	try {
+		response = await netFetch(BASE + path, { method: 'PUT', headers, credentials: 'include', body: bytes as BodyInit });
 	} catch {
 		throw new ApiError(0, 'network_error');
 	}
@@ -491,6 +508,12 @@ export const api = {
 		const qs = params.toString();
 		return request<VacationSuggestions>('GET', `/vacation/suggestions${qs ? `?${qs}` : ''}`);
 	},
+	// vacation request form template (proposed endpoints, backend package B7; 404/501 = not implemented yet)
+	getVacationRequestForm: () => request<VacationRequestFormInfo>('GET', '/vacation/request-form'),
+	putVacationRequestFormFile: (bytes: Uint8Array, fileName: string) => putBinary<VacationRequestFormInfo>('/vacation/request-form/file', bytes, 'application/pdf', fileName),
+	putVacationRequestFormMapping: (mapping: unknown) => request<VacationRequestFormInfo>('PUT', '/vacation/request-form/mapping', mapping),
+	downloadVacationRequestFormFile: () => download('/vacation/request-form/file'),
+	deleteVacationRequestForm: () => request<void>('DELETE', '/vacation/request-form'),
 	deleteVacationEntry: (id: string) => request<void>('DELETE', `/vacation/entries/${id}`),
 
 	// absences; `ifMatchVersion` becomes the If-Match header; ranges above 366 days are loaded in chunks

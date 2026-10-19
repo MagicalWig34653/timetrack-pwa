@@ -34,6 +34,7 @@ export const SETTINGS_LINKS: { href: string; label: MessageKey }[] = [
 	{ href: '/settings/modules', label: 'nav.modules' },
 	{ href: '/settings/devices', label: 'nav.devices' },
 	{ href: '/settings/sharing', label: 'nav.sharing' },
+	{ href: '/settings/vacation-form', label: 'nav.vacation_form' },
 	{ href: '/settings/passkeys', label: 'nav.passkeys' },
 	{ href: '/settings/identities', label: 'nav.identities' },
 	{ href: '/settings/connections', label: 'nav.connections' },
@@ -56,7 +57,7 @@ export const SETTINGS_ADMIN_LINKS: { href: string; label: MessageKey }[] = [
  */
 export const SETTINGS_GROUPS: { id: string; label: MessageKey; hrefs: string[] }[] = [
 	{ id: 'account', label: 'nav.settings_group.account', hrefs: ['/settings/profile', '/settings/passkeys', '/settings/identities', '/settings/recovery', '/settings/sessions', '/settings/privacy'] },
-	{ id: 'work', label: 'nav.settings_group.work', hrefs: ['/settings/work-model', '/settings/places', '/settings/account-time', '/settings/learning-fields'] },
+	{ id: 'work', label: 'nav.settings_group.work', hrefs: ['/settings/work-model', '/settings/places', '/settings/account-time', '/settings/vacation-form', '/settings/learning-fields'] },
 	{ id: 'app', label: 'nav.settings_group.app', hrefs: ['/settings/appearance', '/settings/notifications', '/settings/modules'] },
 	{ id: 'connections', label: 'nav.settings_group.connections', hrefs: ['/settings/devices', '/settings/sharing', '/settings/connections', '/settings/api-tokens', '/settings/mcp-help'] },
 	{ id: 'admin', label: 'nav.settings_group.admin', hrefs: ['/settings/storage', '/admin/mail'] }
@@ -141,6 +142,7 @@ export const SETTINGS_KEYWORDS: Record<string, string> = {
 	'/settings/places': 'orte standort ort automatik geofence',
 	'/settings/account-time': 'zeitkonto saldo anfangsstand korrektur',
 	'/settings/learning-fields': 'lernfelder berichtsheft ihk',
+	'/settings/vacation-form': 'urlaubsantrag antrag formular pdf vorlage urlaub ausfüllen',
 	'/settings/notifications': 'hinweise push benachrichtigung erinnerung',
 	'/settings/modules': 'module funktionen ausblenden',
 	'/settings/devices': 'geräte shortcuts automatik',

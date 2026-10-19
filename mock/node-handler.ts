@@ -8,11 +8,13 @@ export async function handleNodeRequest(api: ReturnType<typeof createMockApi>, p
 	const contentType = req.headers['content-type'] ?? '';
 	let file;
 	let raw = '';
+	let rawBody: Uint8Array | undefined;
 	if (contentType.startsWith('multipart/form-data')) {
 		const form = await new Request('http://localhost/', { method: 'POST', headers: { 'content-type': contentType }, body: buffer }).formData();
 		const entry = form.get('file');
 		if (entry instanceof File) file = { name: entry.name, type: entry.type, bytes: new Uint8Array(await entry.arrayBuffer()) };
-	} else raw = buffer.toString('utf8');
+	} else if (contentType.startsWith('application/pdf')) rawBody = new Uint8Array(buffer);
+	else raw = buffer.toString('utf8');
 	const cookies: Record<string, string> = {};
 	for (const part of (req.headers.cookie ?? '').split(';')) {
 		const [name, ...rest] = part.trim().split('=');
@@ -24,6 +26,8 @@ export async function handleNodeRequest(api: ReturnType<typeof createMockApi>, p
 		path: prefix + (req.url === '/' ? '' : (req.url ?? '')),
 		body: raw ? JSON.parse(raw) : undefined,
 		file,
+		rawBody,
+		fileName: req.headers['x-file-name'] as string | undefined,
 		cookies,
 		csrfToken: Array.isArray(csrf) ? csrf[0] : csrf,
 		ifMatch: req.headers['if-match'] as string | undefined,

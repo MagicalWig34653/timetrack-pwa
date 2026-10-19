@@ -48,5 +48,9 @@
     "#lib/*": "./src/lib/*"
   },
   "license": "AGPL-3.0-only",
-  "packageManager": "npm@11.17.0"
+  "packageManager": "npm@11.17.0",
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.4.299"
+  }
 }

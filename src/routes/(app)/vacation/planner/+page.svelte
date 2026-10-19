@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { api } from '#lib/api/client.js';
-	import type { VacationSuggestions } from '#lib/api/types.js';
+	import type { Absence, VacationSuggestions } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
+	import VacationRequestDialog, { type RequestTarget } from '#lib/components/vacation-form/VacationRequestDialog.svelte';
 	import TimelineLegend from '#lib/components/planning/TimelineLegend.svelte';
 	import Unavailable from '#lib/components/planning/Unavailable.svelte';
 	import VacationSuggestionCard from '#lib/components/planning/VacationSuggestionCard.svelte';
@@ -11,7 +12,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { t } from '#lib/i18n/index.js';
-	import { todayLocal } from '#lib/time/dates.js';
+	import { formatDateNumeric, todayLocal } from '#lib/time/dates.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import {
@@ -38,6 +39,9 @@
 	let data = $state<VacationSuggestions | null>(null);
 	let notice = $state<{ text: string; partial: boolean } | null>(null);
 	let sequence = 0;
+	/** Absences created by the last "In meinen Urlaub übernehmen"; each can be turned into a request form. */
+	let createdAbsences = $state<Absence[]>([]);
+	let requesting = $state<RequestTarget | null>(null);
 
 	const draftValid = $derived(filtersValid(filters));
 	const rangeOk = $derived(rangeValid(filters.from, filters.to));
@@ -96,8 +100,9 @@
 		void fetchSuggestions(filters);
 	}
 
-	function taken(text: string, partial = false) {
+	function taken(text: string, partial = false, created: Absence[] = []) {
 		notice = text ? { text, partial } : null;
+		createdAbsences = created;
 		void fetchSuggestions(applied ?? filters);
 	}
 
@@ -176,6 +181,15 @@
 			<span>{notice.text}</span>
 			<a class="underline underline-offset-4" href="/absences">{t('planner.take_open_absences')}</a>
 		</Alert>
+		{#if createdAbsences.length > 0}
+			<div class="flex flex-wrap gap-2" data-testid="planner-request-actions">
+				{#each createdAbsences as absence (absence.id)}
+					<Button variant="outline" size="sm" onclick={() => (requesting = absence)} data-testid="planner-request-form">
+						{createdAbsences.length === 1 ? t('vform.action') : `${t('vform.action')}: ${formatDateNumeric(absence.startDate)} – ${formatDateNumeric(absence.endDate)}`}
+					</Button>
+				{/each}
+			</div>
+		{/if}
 	{/if}
 
 	{#if load.status === 'unavailable'}
@@ -211,3 +225,5 @@
 		</div>
 	{/if}
 </div>
+
+<VacationRequestDialog target={requesting} onclose={() => (requesting = null)} />
