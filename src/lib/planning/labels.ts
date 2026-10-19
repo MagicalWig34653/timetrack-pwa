@@ -1,4 +1,5 @@
 import { t } from '#lib/i18n/index.js';
+import type { DayWorkState } from '#lib/planning/calendar.js';
 import type { AbsenceKind, AbsenceStatus, DocumentStatus, PlanMode, ShareScopes } from '#lib/api/types.js';
 
 export const ABSENCE_KINDS: AbsenceKind[] = ['vacation', 'sick', 'excused', 'other'];
@@ -35,3 +36,19 @@ export const PLAN_CLASSES: Record<PlanMode, string> = {
 
 export const HOLIDAY_CLASS = 'bg-amber-500/20 text-amber-900 dark:text-amber-200';
 export const SCHOOL_HOLIDAY_CLASS = 'bg-yellow-500/15 text-yellow-900 dark:text-yellow-200';
+
+/**
+ * Tile background per work state (P5). Alpha tints keep the dark/light text readable in both themes;
+ * planned vacation is lighter with a dashed border, so booked and planned differ without relying on colour alone.
+ */
+export const WORK_STATE_CLASSES: Record<DayWorkState, string> = {
+	work: 'bg-emerald-500/10',
+	free: 'bg-zinc-500/20',
+	vacation_booked: 'bg-sky-500/30',
+	vacation_planned: 'bg-sky-500/10 border-2 border-dashed border-sky-600/60 dark:border-sky-400/60',
+	sick: 'bg-rose-500/25',
+	absence: 'bg-violet-500/25'
+};
+
+export const WORK_STATE_ORDER: DayWorkState[] = ['work', 'free', 'vacation_booked', 'vacation_planned', 'sick', 'absence'];
+export const workStateLabel = (state: DayWorkState) => t(`calendar.state.${state}`);

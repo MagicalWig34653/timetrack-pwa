@@ -29,6 +29,7 @@ async function signIn() {
 }
 
 beforeEach(async () => {
+	localStorage.clear();
 	vi.useFakeTimers({ toFake: ['Date'], now: NOW });
 	mock = createMockFetch({ now: () => NOW.getTime() });
 	vi.stubGlobal('fetch', mock.fetch);
@@ -280,16 +281,16 @@ describe('absences page', () => {
 		expect(within(list).getAllByTestId('absence-row')).toHaveLength(4);
 		expect(within(list).getByText('Zählt: 5 Tage')).toBeInTheDocument(); // approved 26.-30.10.
 		expect(within(list).getByText(/Zählt: 2,5 Tage/)).toBeInTheDocument(); // planned with half day at the end
-		await userEvent.selectOptions(screen.getByLabelText('Status'), 'Genehmigt');
+		await userEvent.selectOptions(screen.getByLabelText('Status'), 'approved');
 		expect(screen.getAllByTestId('absence-row')).toHaveLength(1);
-		await userEvent.selectOptions(screen.getByLabelText('Status'), 'Storniert');
+		await userEvent.selectOptions(screen.getByLabelText('Status'), 'cancelled');
 		expect(screen.getByTestId('absences-empty')).toBeInTheDocument();
 	});
 
 	it('edits with If-Match and keeps counting once when approved becomes taken', async () => {
 		render(AbsencesPage);
 		await screen.findByTestId('absence-list');
-		await userEvent.selectOptions(screen.getByLabelText('Status'), 'Genehmigt');
+		await userEvent.selectOptions(screen.getByLabelText('Status'), 'approved');
 		await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
 		await userEvent.selectOptions(screen.getByLabelText('Status', { selector: '#abs-status' }), 'taken');
 		await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -440,7 +441,7 @@ describe('contract v0.3.1 in the UI', () => {
 	it('keeps editing on the fresh version in the absences page', async () => {
 		render(AbsencesPage);
 		await screen.findByTestId('absence-list');
-		await userEvent.selectOptions(screen.getByLabelText('Status'), 'Genehmigt');
+		await userEvent.selectOptions(screen.getByLabelText('Status'), 'approved');
 		await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
 		const [approved] = await api.listAbsences('2026-10-26', '2026-10-30');
 		await api.updateAbsence(approved.id, { ...approved, note: 'von woanders' }, approved.version);
@@ -455,7 +456,7 @@ describe('contract v0.3.1 in the UI', () => {
 		await api.createAbsence({ kind: 'sick', startDate: '2026-02-02', endDate: '2026-02-03', status: 'taken' });
 		render(AbsencesPage);
 		await screen.findByTestId('absence-list');
-		await userEvent.selectOptions(screen.getByLabelText('Art'), 'Krank');
+		await userEvent.selectOptions(screen.getByLabelText('Art'), 'sick');
 		expect(screen.getAllByTestId('absence-counted').some((e) => e.textContent?.includes('Verbraucht keinen Urlaub'))).toBe(true);
 	});
 

@@ -6,6 +6,7 @@ import { createPlanningMock } from './planning.ts';
 import { createReportsMock } from './reports.ts';
 import { createTimeMock } from './time.ts';
 import { createWeekMock } from './week.ts';
+import { samplePdf, samplePng } from './sample-files.ts';
 import { createTransferMock, type UploadedFile } from './transfer.ts';
 import { writeZip } from './worktime-xlsx.ts';
 
@@ -107,6 +108,8 @@ export interface MockOptions {
 	now?: () => number;
 	/** false skips the demo time-tracking data for the admin account */
 	seedTime?: boolean;
+	/** true adds a sample PDF and PNG to the demo sick absence of the admin (dev mock only; tests start without attachments) */
+	seedAttachments?: boolean;
 	/** false skips the demo vacation/plan data, the second demo account and the demo share */
 	seedPlanning?: boolean;
 	/** false mimics a server without STORAGE_SECRET_KEY: S3 storage settings are refused with 501 */
@@ -228,6 +231,13 @@ export function createMockApi(options: MockOptions = {}) {
 		accounts.set(lena.id, lena);
 		time.seedDemo(lena.id);
 		planning.seedDemo(admin.id);
+		if (options.seedAttachments) {
+			const sick = planning.states.get(admin.id)?.absences.find((a) => a.kind === 'sick');
+			if (sick) {
+				transfer.seedAttachment(admin.id, sick.id, 'Krankmeldung.pdf', samplePdf('Krankmeldung (Beispiel)'));
+				transfer.seedAttachment(admin.id, sick.id, 'Attest-Scan.png', samplePng());
+			}
+		}
 		planning.seedDemo(lena.id);
 		planning.seedShare(lena.id, admin.id, 'admin', { plan: true, actual: false, vacation: true });
 		identities.push({

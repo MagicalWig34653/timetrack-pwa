@@ -548,5 +548,23 @@ export function createTransferMock(deps: TransferDeps) {
 		return importRoutes(accountId, method, route, req, query) ?? fileRoutes(accountId, method, route, req);
 	}
 
-	return { handle, files, stored };
+	/** Dev/demo helper: stores a file and links it to an absence (as upload + attach would). */
+	function seedAttachment(accountId: string, absenceId: string, name: string, bytes: Uint8Array): FileMeta | null {
+		const contentType = sniffAttachment(name, bytes);
+		if (!contentType) return null;
+		const meta: FileMeta = {
+			id: uuid(),
+			name,
+			size: bytes.length,
+			sha256: createHash('sha256').update(bytes).digest('hex'),
+			contentType,
+			backend: backendFor(bytes.length),
+			createdAt: new Date(deps.clock()).toISOString()
+		};
+		files.set(meta.id, { meta, ownerId: accountId, bytes });
+		stateOf(accountId).links.set(meta.id, new Set([absenceId]));
+		return meta;
+	}
+
+	return { handle, files, stored, seedAttachment };
 }

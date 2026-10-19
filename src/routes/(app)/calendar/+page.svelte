@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.js';
-	import type { Absence, CalendarDay, DayEvaluation, Place, PlanDay } from '#lib/api/types.js';
+	import type { Absence, CalendarDay, DayEvaluation, Place, PlanDay, WorkModel } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import DayChips from '#lib/components/planning/DayChips.svelte';
 	import DayPanel from '#lib/components/planning/DayPanel.svelte';
@@ -9,8 +9,8 @@
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
-	import { addMonths, dayInfo, monthGrid, weekOf, yearsOf, type DayInfo } from '#lib/planning/calendar.js';
-	import { ABSENCE_CLASSES, absenceKindLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS } from '#lib/planning/labels.js';
+	import { addMonths, dayInfo, dayWorkState, monthGrid, weekOf, yearsOf, type DayInfo } from '#lib/planning/calendar.js';
+	import { ABSENCE_CLASSES, absenceKindLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS, WORK_STATE_CLASSES, WORK_STATE_ORDER, workStateLabel } from '#lib/planning/labels.js';
 	import { addDays, formatDateLong, formatDateNumeric, formatDateShort, isValidDate, todayLocal } from '#lib/time/dates.js';
 	import { formatDuration } from '#lib/time/format.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
@@ -38,6 +38,7 @@
 	let plan = $state<PlanDay[]>([]);
 	let days = $state<DayEvaluation[]>([]);
 	let places = $state<Place[]>([]);
+	let models = $state<WorkModel[]>([]);
 	let selected = $state<string | null>(null);
 	let panelEl = $state<HTMLElement | null>(null);
 	let reloadToken = $state(0);
@@ -49,13 +50,15 @@
 		void (async () => {
 			try {
 				await zoneStore.ensure();
-				const [h, a, p, d, pl] = await Promise.all([
+				const [h, a, p, d, pl, wm] = await Promise.all([
 					Promise.all(yearsOf(from, to).map((y) => api.listHolidays(y))),
 					api.listAbsences(from, to),
 					api.listPlanDays(from, to),
 					// Evaluation hints are optional: a server without time tracking must not break the calendar.
 					api.listDays(from, to).catch(() => [] as DayEvaluation[]),
-					api.listPlaces().catch(() => [] as Place[])
+					api.listPlaces().catch(() => [] as Place[]),
+					// Without work models Monday to Friday count as working days.
+					api.listWorkModels().catch(() => [] as WorkModel[])
 				]);
 				if (from !== gridFrom) return;
 				holidays = h.flat();
@@ -63,6 +66,7 @@
 				plan = p;
 				days = d;
 				places = pl.filter((x) => !x.archived);
+				models = wm;
 				load = { status: 'ready' };
 			} catch (error) {
 				load = toLoadState(error);
@@ -72,10 +76,11 @@
 
 	const data = $derived({ holidays, absences, plan, days });
 	const infoOf = (date: string): DayInfo => dayInfo(date, data);
+	const stateOf = (info: DayInfo) => dayWorkState(info, models);
 	const selectedInfo = $derived(selected ? infoOf(selected) : null);
 
 	function describe(info: DayInfo): string {
-		const parts: string[] = [formatDateLong(info.date)];
+		const parts: string[] = [formatDateLong(info.date), workStateLabel(stateOf(info))];
 		for (const h of info.holidays) parts.push(`${t('calendar.holiday')} ${h.name}`);
 		for (const h of info.schoolHolidays) parts.push(h.name);
 		for (const a of info.absences) parts.push(absenceKindLabel(a.kind));
@@ -128,6 +133,15 @@
 			<li class="rounded px-1.5 py-0.5 {PLAN_CLASSES.office}">{t('calendar.plan')}</li>
 		</ul>
 
+		<ul class="flex flex-wrap gap-x-3 gap-y-1.5 text-xs" aria-label={t('calendar.tile_legend')} data-testid="tile-legend">
+			{#each WORK_STATE_ORDER as state (state)}
+				<li class="flex items-center gap-1.5" data-state={state}>
+					<span class="inline-block size-4 rounded-sm border border-border {WORK_STATE_CLASSES[state]}" aria-hidden="true"></span>
+					{workStateLabel(state)}
+				</li>
+			{/each}
+		</ul>
+
 		<!-- month grid (tablet and desktop) -->
 		<table class="hidden w-full table-fixed border-collapse sm:table" data-testid="month-grid" aria-label={monthTitle}>
 			<thead>
@@ -142,11 +156,12 @@
 					<tr>
 						{#each week as date (date)}
 							{@const info = infoOf(date)}
-							<td class="h-28 border p-0 align-top {isOtherMonth(date) ? 'bg-muted/30' : ''}">
+							<td class="h-28 border p-0 align-top">
 								<button
 									type="button"
-									class="flex h-full w-full flex-col gap-1 p-1.5 text-left hover:bg-muted/60 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {selected === date ? 'bg-muted ring-2 ring-primary ring-inset' : ''}"
+									class="flex h-full w-full flex-col gap-1 p-1.5 text-left {WORK_STATE_CLASSES[stateOf(info)]} hover:brightness-95 dark:hover:brightness-125 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {isOtherMonth(date) ? 'opacity-60' : ''} {selected === date ? 'ring-2 ring-primary ring-inset' : ''}"
 									aria-label={describe(info)}
+									data-work-state={stateOf(info)}
 									aria-pressed={selected === date}
 									data-date={date}
 									onclick={() => select(date)}
@@ -168,8 +183,9 @@
 				<li>
 					<button
 						type="button"
-						class="flex min-h-14 w-full items-start gap-3 rounded-lg border bg-card p-3 text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {selected === date ? 'ring-2 ring-primary' : ''}"
+						class="flex min-h-14 w-full items-start gap-3 rounded-lg border bg-card p-3 text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {WORK_STATE_CLASSES[stateOf(info)]} {selected === date ? 'ring-2 ring-primary' : ''}"
 						aria-label={describe(info)}
+						data-work-state={stateOf(info)}
 						aria-pressed={selected === date}
 						data-date={date}
 						onclick={() => select(date)}

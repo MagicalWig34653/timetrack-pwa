@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api, ApiError } from '#lib/api/client.js';
 	import type { FileMeta } from '#lib/api/types.js';
+	import AttachmentPreviewDialog from '#lib/components/transfer/AttachmentPreviewDialog.svelte';
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
@@ -8,9 +9,10 @@
 	import { ATTACHMENT_ACCEPT, isAllowedAttachment } from '#lib/transfer/attachments.js';
 	import { formatBytes } from '#lib/transfer/bytes.js';
 	import { saveBlob } from '#lib/transfer/export.js';
+	import { previewKind, typeLabel } from '#lib/transfer/preview.js';
 	import { onMount } from 'svelte';
 
-	let { absenceId }: { absenceId: string } = $props();
+	let { absenceId, onchange }: { absenceId: string; /** called with the number of attachments after every (re)load */ onchange?: (count: number) => void } = $props();
 
 	let files = $state<FileMeta[]>([]);
 	let loading = $state(true);
@@ -20,10 +22,12 @@
 	let error = $state('');
 	let notice = $state('');
 	let input: HTMLInputElement | undefined = $state();
+	let previewing = $state<FileMeta | null>(null);
 
 	async function refresh() {
 		try {
 			files = await api.listAbsenceAttachments(absenceId);
+			onchange?.(files.length);
 		} catch (e) {
 			if (e instanceof ApiError && (e.status === 404 || e.status === 501)) unavailable = true;
 			else error = errorMessage(e);
@@ -115,9 +119,12 @@
 				<li class="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background p-2 text-sm" data-testid="attachment">
 					<span class="min-w-0 break-words">
 						<span class="font-medium">{file.name}</span>
-						<span class="block text-xs whitespace-nowrap text-muted-foreground">{formatBytes(file.size)} · {formatDateNumeric(localDateOf(file.createdAt))}</span>
+						<span class="block text-xs whitespace-nowrap text-muted-foreground">{typeLabel(file)} · {formatBytes(file.size)} · {formatDateNumeric(localDateOf(file.createdAt))}</span>
 					</span>
-					<span class="flex gap-2">
+					<span class="flex flex-wrap gap-2">
+						{#if previewKind(file) !== 'none'}
+							<Button type="button" variant="outline" size="sm" aria-label={t('attachments.view_label', { name: file.name })} onclick={() => (previewing = file)} data-testid="attachment-view">{t('attachments.view')}</Button>
+						{/if}
 						<Button type="button" variant="outline" size="sm" aria-label={t('attachments.download_label', { name: file.name })} onclick={() => download(file)}>{t('attachments.download')}</Button>
 						<Button type="button" variant="destructive" size="sm" aria-label={t('attachments.remove_label', { name: file.name })} disabled={busy} onclick={() => remove(file)}>{t('attachments.remove')}</Button>
 					</span>
@@ -146,3 +153,4 @@
 		<p class="text-xs text-muted-foreground" data-testid="attachments-never-shared">{t('attachments.never_shared')}</p>
 	{/if}
 </section>
+<AttachmentPreviewDialog file={previewing} onclose={() => (previewing = null)} />

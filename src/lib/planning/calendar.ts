@@ -1,5 +1,5 @@
-import type { Absence, CalendarDay, DayEvaluation, PlanDay } from '#lib/api/types.js';
-import { addDays, startOfWeek } from '#lib/time/dates.js';
+import type { Absence, CalendarDay, DayEvaluation, PlanDay, WorkModel } from '#lib/api/types.js';
+import { addDays, isoWeekday, startOfWeek } from '#lib/time/dates.js';
 
 /** "2026-10-14" -> "2026-10-01" */
 export function firstOfMonth(date: string): string {
@@ -86,4 +86,32 @@ export function parseDayMonth(input: string): string | null {
 	const month = Number(match[2]);
 	if (month < 1 || month > 12 || day < 1 || day > [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]) return null;
 	return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Whether the user has to work on a day, for tile backgrounds (P5). */
+export type DayWorkState = 'work' | 'free' | 'vacation_booked' | 'vacation_planned' | 'sick' | 'absence';
+
+type ModelLike = Pick<WorkModel, 'validFrom' | 'validTo' | 'workdays' | 'dailyTargetSeconds'>;
+
+/** Work model valid on a date (open end allowed); the latest start wins. */
+export function modelOn(date: string, models: ModelLike[]): ModelLike | null {
+	return models.filter((m) => m.validFrom <= date && (!m.validTo || date <= m.validTo)).sort((a, b) => (a.validFrom < b.validFrom ? 1 : -1))[0] ?? null;
+}
+
+/**
+ * Classification for the tile background. Precedence: absence > holiday > non-working day > working day.
+ * School holidays do not free the day. Without a valid work model Monday to Friday count as working days.
+ */
+export function dayWorkState(info: DayInfo, models: ModelLike[]): DayWorkState {
+	const absence = info.absences[0];
+	if (absence) {
+		if (absence.kind === 'vacation') return absence.status === 'approved' || absence.status === 'taken' ? 'vacation_booked' : 'vacation_planned';
+		return absence.kind === 'sick' ? 'sick' : 'absence';
+	}
+	if (info.holidays.length > 0) return 'free';
+	const weekday = isoWeekday(info.date);
+	const model = modelOn(info.date, models);
+	if (!(model ? model.workdays : [1, 2, 3, 4, 5]).includes(weekday)) return 'free';
+	if (model?.dailyTargetSeconds?.[String(weekday)] === 0) return 'free';
+	return 'work';
 }

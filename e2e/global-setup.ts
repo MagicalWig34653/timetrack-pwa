@@ -112,6 +112,7 @@ export default async function globalSetup() {
 	const profileSmtpPort = Number(process.env.E2E_PROFILE_SMTP_PORT ?? port + 13);
 	const appearancePort = Number(process.env.E2E_APPEARANCE_PORT ?? port + 14);
 	const vacationPlannerPort = Number(process.env.E2E_VACATION_PLANNER_PORT ?? port + 15);
+	const absencesPort = Number(process.env.E2E_ABSENCES_PORT ?? port + 16);
 	const backendDir = path.resolve(pwaDir, process.env.E2E_BACKEND_DIR ?? '../timetrack-backend');
 
 	if (!fs.existsSync(path.join(pwaDir, 'build', 'index.html'))) {
@@ -346,7 +347,30 @@ export default async function globalSetup() {
 	process.env.E2E_VACATION_PLANNER_BASE_URL = `http://localhost:${vacationPlannerPort}`;
 	process.env.E2E_VACATION_PLANNER_BOOTSTRAP_LINK = stage15.link;
 
+	// Package P5 (absence list filters, attachment preview): one plain instance (attachments use the default database backend).
+	const stopThrough15 = async () => {
+		await stage15.stop();
+		await stage14.stop();
+		await stage13.stop();
+		await stage12.stop();
+		await stage11.stop();
+		await stage10.stop();
+		await stage9.stop();
+		await stage8.stop();
+		await stopBase();
+	};
+	let stage16: Instance;
+	try {
+		stage16 = await startInstance(binary, absencesPort);
+	} catch (e) {
+		await stopThrough15();
+		throw e;
+	}
+	process.env.E2E_ABSENCES_BASE_URL = `http://localhost:${absencesPort}`;
+	process.env.E2E_ABSENCES_BOOTSTRAP_LINK = stage16.link;
+
 	return async () => {
+		await stage16.stop();
 		await stage15.stop();
 		await stage14.stop();
 		await stage13.stop();

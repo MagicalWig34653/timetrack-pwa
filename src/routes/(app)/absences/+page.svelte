@@ -1,17 +1,36 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { api } from '#lib/api/client.js';
-	import type { Absence, AbsenceKind, AbsenceStatus } from '#lib/api/types.js';
+	import type { Absence } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import AbsenceForm from '#lib/components/planning/AbsenceForm.svelte';
 	import Unavailable from '#lib/components/planning/Unavailable.svelte';
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import AbsenceAttachments from '#lib/components/transfer/AbsenceAttachments.svelte';
 	import { Card, CardContent } from '#lib/components/ui/card/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import { ABSENCE_CLASSES, ABSENCE_KINDS, ABSENCE_STATUSES, absenceKindLabel, absenceStatusLabel, documentStatusLabel } from '#lib/planning/labels.js';
+	import {
+		ABSENCE_SORTS,
+		applyFilters,
+		ATTACHMENT_FILTERS,
+		DEFAULT_ABSENCE_FILTERS,
+		filtersFromQuery,
+		filtersToQuery,
+		hasActiveFilters,
+		loadFilters,
+		queryHasFilters,
+		saveFilters,
+		yearFromQuery,
+		type AbsenceFilters,
+		type AttachmentCounts
+	} from '#lib/planning/absence-list.js';
 	import { formatDateNumeric, todayLocal } from '#lib/time/dates.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
@@ -21,10 +40,15 @@
 	import { onMount } from 'svelte';
 
 	let load = $state<LoadState>({ status: 'loading' });
-	let year = $state(Number(todayLocal(zoneStore.value).slice(0, 4)));
+	const currentYear = Number(todayLocal(zoneStore.value).slice(0, 4));
+	// URL parameters win over the remembered filters (shared or bookmarked links); without any, the remembered ones apply.
+	let year = $state(yearFromQuery(page.url.searchParams, currentYear));
 	let absences = $state<Absence[]>([]);
-	let statusFilter = $state<'all' | AbsenceStatus>('all');
-	let kindFilter = $state<'all' | AbsenceKind>('all');
+	let filters = $state<AbsenceFilters>(queryHasFilters(page.url.searchParams) ? filtersFromQuery(page.url.searchParams) : loadFilters());
+	/** Attachment counts per absence; filled in the background (the list endpoint does not carry them). */
+	let counts = $state<AttachmentCounts>({});
+	let openAttachments = $state<Set<string>>(new Set());
+	let lastWritten = '';
 	let editing = $state<Absence | 'new' | null>(null);
 	let notice = $state('');
 	let error = $state('');
@@ -35,15 +59,72 @@
 			today = todayLocal(await zoneStore.ensure());
 			absences = await api.listAbsences(`${year}-01-01`, `${year}-12-31`);
 			load = { status: 'ready' };
+			void loadCounts(absences);
 		} catch (e) {
 			load = toLoadState(e);
 		}
 	}
-	onMount(refresh);
+	onMount(() => {
+		lastWritten = page.url.search;
+		void refresh();
+	});
 
-	const visible = $derived(
-		absences.filter((a) => (statusFilter === 'all' || a.status === statusFilter) && (kindFilter === 'all' || a.kind === kindFilter))
-	);
+	/** At most four requests at a time; a server without attachments (404/501) leaves the counts unknown. */
+	async function loadCounts(list: Absence[]) {
+		const queue = [...list];
+		const next: AttachmentCounts = {};
+		const worker = async () => {
+			for (let a = queue.shift(); a; a = queue.shift()) {
+				try {
+					next[a.id] = (await api.listAbsenceAttachments(a.id)).length;
+				} catch {
+					/* unknown */
+				}
+			}
+		};
+		await Promise.all([worker(), worker(), worker(), worker()]);
+		if (list === absences) counts = next;
+	}
+
+	const visible = $derived(applyFilters(absences, filters, counts));
+	const active = $derived(hasActiveFilters(filters));
+	const attachmentsKnown = $derived(absences.every((a) => counts[a.id] !== undefined));
+	const facet = (patch: Partial<AbsenceFilters>) => applyFilters(absences, { ...filters, ...patch }, counts).length;
+
+	// Remember the filters and mirror them in the URL (replace, no history entries).
+	$effect(() => {
+		const snapshot = $state.snapshot(filters);
+		saveFilters(snapshot);
+		const search = filtersToQuery(snapshot, year, currentYear).toString();
+		const target = search ? `?${search}` : '';
+		if (load.status !== 'ready' || target === page.url.search) return;
+		lastWritten = target;
+		void goto(`${page.url.pathname}${target}`, { replace: true });
+	});
+
+	// Follow external URL changes (e.g. the sidebar link to the plain page, or browser navigation).
+	$effect(() => {
+		const search = page.url.search;
+		if (search === lastWritten) return;
+		lastWritten = search;
+		const params = page.url.searchParams;
+		filters = queryHasFilters(params) ? filtersFromQuery(params) : loadFilters();
+		const nextYear = yearFromQuery(params, currentYear);
+		if (nextYear !== year) {
+			year = nextYear;
+			void refresh();
+		}
+	});
+
+	function resetFilters() {
+		filters = { ...DEFAULT_ABSENCE_FILTERS, sort: filters.sort };
+	}
+
+	function toggleAttachments(id: string) {
+		const next = new Set(openAttachments);
+		if (!next.delete(id)) next.add(id);
+		openAttachments = next;
+	}
 
 	function shiftYear(delta: number) {
 		year += delta;
@@ -101,22 +182,55 @@
 				<span class="min-w-16 text-center font-medium tabular-nums" data-testid="absences-year">{year}</span>
 				<Button variant="outline" size="icon" aria-label={t('vacation.next_year')} onclick={() => shiftYear(1)}><ChevronRight /></Button>
 			</nav>
+			<Button class="sm:ml-auto" onclick={() => (editing = 'new')}>{t('absence.create_title')}</Button>
+		</div>
+
+		<section class="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('absences.filters')} data-testid="absence-filters">
+			<div class="flex flex-col gap-1.5 lg:col-span-2">
+				<Label for="filter-q">{t('absences.filter_q')}</Label>
+				<Input id="filter-q" type="search" bind:value={filters.q} placeholder={t('absences.filter_q_placeholder')} autocomplete="off" />
+			</div>
 			<div class="flex flex-col gap-1.5">
 				<Label for="filter-status">{t('absences.filter_status')}</Label>
-				<Select id="filter-status" bind:value={statusFilter} class="w-44">
-					<option value="all">{t('absences.filter_all')}</option>
-					{#each ABSENCE_STATUSES as option (option)}<option value={option}>{absenceStatusLabel(option)}</option>{/each}
+				<Select id="filter-status" bind:value={filters.status}>
+					<option value="all">{t('absences.filter_all')} ({facet({ status: 'all' })})</option>
+					{#each ABSENCE_STATUSES as option (option)}<option value={option}>{absenceStatusLabel(option)} ({facet({ status: option })})</option>{/each}
 				</Select>
 			</div>
 			<div class="flex flex-col gap-1.5">
 				<Label for="filter-kind">{t('absences.filter_kind')}</Label>
-				<Select id="filter-kind" bind:value={kindFilter} class="w-44">
-					<option value="all">{t('absences.filter_all')}</option>
-					{#each ABSENCE_KINDS as option (option)}<option value={option}>{absenceKindLabel(option)}</option>{/each}
+				<Select id="filter-kind" bind:value={filters.kind}>
+					<option value="all">{t('absences.filter_all')} ({facet({ kind: 'all' })})</option>
+					{#each ABSENCE_KINDS as option (option)}<option value={option}>{absenceKindLabel(option)} ({facet({ kind: option })})</option>{/each}
 				</Select>
 			</div>
-			<Button class="sm:ml-auto" onclick={() => (editing = 'new')}>{t('absence.create_title')}</Button>
-		</div>
+			<div class="flex flex-col gap-1.5">
+				<Label for="filter-from">{t('absences.filter_from')}</Label>
+				<Input id="filter-from" type="date" bind:value={filters.from} min="{year}-01-01" max="{year}-12-31" />
+			</div>
+			<div class="flex flex-col gap-1.5">
+				<Label for="filter-to">{t('absences.filter_to')}</Label>
+				<Input id="filter-to" type="date" bind:value={filters.to} min="{year}-01-01" max="{year}-12-31" />
+			</div>
+			<div class="flex flex-col gap-1.5">
+				<Label for="filter-attachment">{t('absences.filter_attachment')}</Label>
+				<Select id="filter-attachment" bind:value={filters.attachment} disabled={!attachmentsKnown && filters.attachment === 'any'}>
+					{#each ATTACHMENT_FILTERS as option (option)}<option value={option}>{t(`absences.attachment.${option}`)}</option>{/each}
+				</Select>
+			</div>
+			<div class="flex flex-col gap-1.5">
+				<Label for="sort">{t('absences.sort')}</Label>
+				<Select id="sort" bind:value={filters.sort}>
+					{#each ABSENCE_SORTS as option (option)}<option value={option}>{t(`absences.sort.${option}`)}</option>{/each}
+				</Select>
+			</div>
+			<div class="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-4">
+				<p class="text-sm text-muted-foreground tabular-nums" aria-live="polite" data-testid="absences-count">
+					{t('absences.count', { shown: visible.length, total: absences.length })}
+				</p>
+				{#if active}<Button type="button" variant="outline" size="sm" onclick={resetFilters} data-testid="absences-reset">{t('absences.reset')}</Button>{/if}
+			</div>
+		</section>
 
 		{#if notice}<Alert variant="success">{notice}</Alert>{/if}
 		{#if error}<Alert variant="destructive">{error}</Alert>{/if}
@@ -126,7 +240,10 @@
 		{/if}
 
 		{#if visible.length === 0}
-			<p class="text-sm text-muted-foreground" data-testid="absences-empty">{t('absences.empty')}</p>
+			<div class="flex flex-col items-start gap-2 rounded-lg border border-dashed p-4" data-testid="absences-empty">
+				<p class="text-sm text-muted-foreground">{absences.length === 0 ? t('absences.empty_year', { year }) : t('absences.empty')}</p>
+				{#if absences.length > 0 && active}<Button type="button" variant="outline" size="sm" onclick={resetFilters}>{t('absences.reset')}</Button>{/if}
+			</div>
 		{:else}
 			<ul class="flex flex-col gap-3" data-testid="absence-list">
 				{#each visible as absence (absence.id)}
@@ -165,7 +282,22 @@
 									<div class="flex flex-wrap gap-2">
 										<Button variant="outline" size="sm" onclick={() => (editing = absence)}>{t('absence.edit')}</Button>
 										<Button variant="outline" size="sm" onclick={() => remove(absence)}>{t('absence.delete')}</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											aria-expanded={openAttachments.has(absence.id)}
+											aria-controls="attachments-{absence.id}"
+											onclick={() => toggleAttachments(absence.id)}
+											data-testid="absence-attachments-toggle"
+										>
+											{counts[absence.id] === undefined ? t('absences.attachments') : t('absences.attachments_count', { count: counts[absence.id] ?? 0 })}
+										</Button>
 									</div>
+									{#if openAttachments.has(absence.id)}
+										<div id="attachments-{absence.id}">
+											<AbsenceAttachments absenceId={absence.id} onchange={(n) => (counts = { ...counts, [absence.id]: n })} />
+										</div>
+									{/if}
 								{/if}
 							</CardContent>
 						</Card>

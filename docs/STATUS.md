@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket P5 (Kalenderkacheln, Abwesenheiten filtern, Anhänge ansehen, 19.10.2026, Branch p5-absences-calendar, nicht gemergt)
+`/calendar`: Kachelhintergrund nach Arbeitstag, frei, Urlaub genehmigt, Urlaub geplant, krank, sonstige Abwesenheit samt Legende (Arbeitsmodell bestimmt Arbeitstage). `/absences`: Sortierung, Filter (Art, Status, Zeitraum, Anhang, Notiztext), Zähler, Leerzustand, URL-Parameter und Merken je Browser. Anhänge von Abwesenheiten lassen sich in einem Dialog ansehen (Bild, PDF, Text; sonst Download). Vertrag unverändert 0.23.0; Serverwünsche (Anhangzahl, Inline-Auslieferung) in `docs/handoffs/P5.md`.
+
 ## Paket P4 (Systeminfo für Mitglieder, 19.10.2026, Branch p4-system-info-members, nicht gemergt)
 Hilfe-Dialog und Kopiertext vertragen die Mitglieder-Variante von `GET /system/info` (Vertrag 0.23.0): Datenbank, Migrationen, Laufzeit und Replikat erscheinen nur, wenn der Server sie liefert (Admins). Details: `docs/handoffs/P4.md`.
 
