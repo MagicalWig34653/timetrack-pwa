@@ -30,6 +30,28 @@ test('the help dialog shows frontend and backend versions and a copyable support
 	await context.close();
 });
 
+test('members see only version fields (no database, migrations, uptime, replica) and a clean copy text', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser);
+	await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+	// contract v0.23.0: for members the operator keys are absent
+	await page.route('**/api/v1/system/info', async (route) => {
+		const response = await route.fetch();
+		const body = await response.json();
+		for (const key of ['database', 'schemaMigrations', 'migrationsPending', 'uptimeSeconds', 'replicaId']) delete body.backend[key];
+		await route.fulfill({ response, json: body });
+	});
+	await openHelp(page);
+	const info = page.getByTestId('version-info');
+	await expect(page.getByTestId('version-backend-number')).toHaveText('0.19.0-mock');
+	for (const label of ['Datenbank', 'Laufzeit', 'Replikat']) await expect(info).not.toContainText(label);
+	await expect(info).not.toContainText(/undefined|NaN/);
+	await expect(page.getByTestId('version-mismatch')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Angaben kopieren' }).click();
+	const text = await page.evaluate(() => navigator.clipboard.readText());
+	expect(text).toMatch(/Backend 0\.19\.0-mock \(0123456, 2026-10-18\), API 0\.19\.0$/);
+	await context.close();
+});
+
 test('an older loaded interface is flagged and the refresh button reloads', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser);
 	await page.route('**/api/v1/system/info', async (route) => {

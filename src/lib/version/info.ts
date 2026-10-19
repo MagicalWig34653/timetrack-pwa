@@ -42,6 +42,7 @@ export function revisionMismatch(own: PwaBuild, info: SystemInfo | null): boolea
 
 /** `93784` -> `1 Tag 2 Std. 3 Min.`; seconds only below a minute. */
 export function formatUptime(seconds: number): string {
+	if (!Number.isFinite(seconds)) return '–';
 	const total = Math.max(0, Math.floor(seconds));
 	const days = Math.floor(total / 86400);
 	const hours = Math.floor((total % 86400) / 3600);
@@ -61,7 +62,7 @@ const part = (build: { version?: string | null; revision?: string | null; buildD
 /** One line for bug reports, e.g. `Timetrack PWA 0.1.0 (abc1234, 2026-10-18), Backend 0.1.0 (def5678, 2026-10-18), API 0.19.0, mariadb`. */
 export function supportText(own: PwaBuild, info: SystemInfo | null): string {
 	let text = `Timetrack PWA ${part(own)}`;
-	if (info) text += `, Backend ${part(info.backend)}, API ${info.backend.apiVersion}, ${info.backend.database}`;
+	if (info) text += `, Backend ${part(info.backend)}, API ${info.backend.apiVersion}${info.backend.database ? `, ${info.backend.database}` : ''}`;
 	else text += ', Backend: keine Versionsangabe verfügbar';
 	return text;
 }

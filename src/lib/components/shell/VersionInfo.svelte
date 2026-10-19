@@ -86,10 +86,12 @@
 				{@render commit(b.revision, 'version-backend-commit')}
 				{@render row(t('version.build_date'), formatBuildDate(b.buildDate))}
 				{@render row(t('version.api'), b.apiVersion, true)}
-				{@render row(t('version.database'), b.database)}
-				{@render row(t('version.migrations'), t(b.migrationsPending ? 'version.migrations_pending' : 'version.migrations_value', { count: b.schemaMigrations }))}
-				{@render row(t('version.uptime'), formatUptime(b.uptimeSeconds))}
-				{@render row(t('version.replica'), b.replicaId, true)}
+				{#if b.database}{@render row(t('version.database'), b.database)}{/if}
+				{#if b.schemaMigrations !== undefined}
+					{@render row(t('version.migrations'), t(b.migrationsPending ? 'version.migrations_pending' : 'version.migrations_value', { count: b.schemaMigrations }))}
+				{/if}
+				{#if b.uptimeSeconds !== undefined}{@render row(t('version.uptime'), formatUptime(b.uptimeSeconds))}{/if}
+				{#if b.replicaId}{@render row(t('version.replica'), b.replicaId, true)}{/if}
 			</dl>
 			{#if !info.pwa}<p class="pt-1 text-[13px] text-muted-foreground">{t('version.no_pwa')}</p>{/if}
 		{:else}

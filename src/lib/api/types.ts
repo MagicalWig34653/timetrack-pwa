@@ -1056,11 +1056,12 @@ export interface SystemInfo {
 		revisionShort: string;
 		buildDate: string | null;
 		apiVersion: string;
-		database: 'mariadb' | 'sqlite';
-		schemaMigrations: number;
-		migrationsPending: boolean;
-		uptimeSeconds: number;
-		replicaId: string;
+		/** Operator details (contract v0.23.0): present for admins only, absent for normal members. */
+		database?: 'mariadb' | 'sqlite';
+		schemaMigrations?: number;
+		migrationsPending?: boolean;
+		uptimeSeconds?: number;
+		replicaId?: string;
 	};
 	pwa: { version: string | null; revision: string | null; buildDate: string | null } | null;
 }

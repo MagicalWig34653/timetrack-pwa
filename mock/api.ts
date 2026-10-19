@@ -609,11 +609,16 @@ export function createMockApi(options: MockOptions = {}) {
 						revisionShort: '0123456',
 						buildDate: '2026-10-18T08:00:00Z',
 						apiVersion: '0.19.0',
-						database: 'sqlite',
-						schemaMigrations: 42,
-						migrationsPending: false,
-						uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000) + 93784,
-						replicaId: 'mock-replica-1'
+						// operator details are admin-only since contract v0.23.0: the keys are absent for members
+						...(account.role === 'admin'
+							? {
+									database: 'sqlite',
+									schemaMigrations: 42,
+									migrationsPending: false,
+									uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000) + 93784,
+									replicaId: 'mock-replica-1'
+								}
+							: {})
 					},
 					pwa: options.pwaBuild === undefined ? DEMO_PWA_BUILD : options.pwaBuild
 				}

@@ -20,6 +20,14 @@ const info = (pwaRevision: string | null): SystemInfo => ({
 	pwa: pwaRevision === null ? null : { version: '0.1.0', revision: pwaRevision, buildDate: null }
 });
 
+const memberInfo = (): SystemInfo => {
+	const { backend, pwa } = info('abc1234def5678abc1234def5678abc1234def56');
+	// members receive no operator details: the keys are absent, not null
+	const { database, schemaMigrations, migrationsPending, uptimeSeconds, replicaId, ...versionOnly } = backend;
+	void [database, schemaMigrations, migrationsPending, uptimeSeconds, replicaId];
+	return { backend: versionOnly, pwa };
+};
+
 describe('version helpers', () => {
 	it('shortens revisions and dates', () => {
 		expect(shortRevision(own.revision)).toBe('abc1234');
@@ -37,6 +45,8 @@ describe('version helpers', () => {
 		expect(revisionMismatch(own, info('unknown'))).toBe(false);
 		expect(revisionMismatch({ ...own, revision: 'unknown' }, info('1111111'))).toBe(false);
 		expect(revisionMismatch(own, null)).toBe(false);
+		expect(revisionMismatch(own, { ...memberInfo(), pwa: { version: '0.1.0', revision: '1111111222222233333334444444555555566666', buildDate: null } })).toBe(true);
+		expect(revisionMismatch(own, memberInfo())).toBe(false);
 	});
 
 	it('formats the uptime', () => {
@@ -44,10 +54,15 @@ describe('version helpers', () => {
 		expect(formatUptime(125)).toBe('2 Min.');
 		expect(formatUptime(3 * 3600 + 5 * 60)).toBe('3 Std. 5 Min.');
 		expect(formatUptime(93784)).toBe('1 Tag 2 Std. 3 Min.');
+		expect(formatUptime(Number.NaN)).toBe('–');
+		expect(formatUptime(undefined as unknown as number)).toBe('–');
 	});
 
 	it('builds the support text, also for servers without the endpoint', () => {
 		expect(supportText(own, info(own.revision))).toBe('Timetrack PWA 0.1.0 (abc1234, 2026-10-18), Backend 0.1.0 (def5678, 2026-10-18), API 0.19.0, mariadb');
+		const member = supportText(own, memberInfo());
+		expect(member).toBe('Timetrack PWA 0.1.0 (abc1234, 2026-10-18), Backend 0.1.0 (def5678, 2026-10-18), API 0.19.0');
+		expect(member).not.toMatch(/undefined|NaN/);
 		expect(supportText(own, null)).toBe('Timetrack PWA 0.1.0 (abc1234, 2026-10-18), Backend: keine Versionsangabe verfügbar');
 	});
 });

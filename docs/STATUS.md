@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket P4 (Systeminfo für Mitglieder, 19.10.2026, Branch p4-system-info-members, nicht gemergt)
+Hilfe-Dialog und Kopiertext vertragen die Mitglieder-Variante von `GET /system/info` (Vertrag 0.23.0): Datenbank, Migrationen, Laufzeit und Replikat erscheinen nur, wenn der Server sie liefert (Admins). Details: `docs/handoffs/P4.md`.
+
 ## Paket V2-PWA (Urlaubsplanung, 19.10.2026, Branch v2-vacation-planner, nicht gemergt, Lead-Prüfung offen)
 Neue Seite `/vacation/planner` (Modul planning, Knopf „Urlaub planen“ auf `/vacation`): Budgetkopf, Filter (gemerkt je Browser), gerankte Vorschlagskarten mit Faktor, Konfliktwarnungen, Budgetzustand, Tagesstreifen und „In meinen Urlaub übernehmen“ (Bestätigung, je Block eine geplante Urlaubs-Abwesenheit, Häkchen bei Konflikten). Füllfenster unter Faktor 2 standardmäßig ausgeblendet. Vertrag v0.22.0. Zahlen und Details: `docs/handoffs/V2-pwa.md`.
 
