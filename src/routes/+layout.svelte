@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import favicon from '#lib/assets/favicon.svg';
+	import ContextMenuHost from '#lib/components/app/ContextMenuHost.svelte';
 	import PwaBanners from '#lib/components/app/PwaBanners.svelte';
 	import { theme } from '#lib/theme/theme.svelte.js';
 	import { shouldRegisterServiceWorker, pwa } from '#lib/pwa/pwa.svelte.js';
@@ -26,3 +27,4 @@
 
 <PwaBanners />
 {@render children()}
+<ContextMenuHost />

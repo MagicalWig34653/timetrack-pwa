@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket P9 (leistungsfähiger Kalender, 20.10.2026, Branch p9-calendar-power, nicht gemergt)
+Kalender mit Monat/Woche, Ziehen (Auswählen, Verschieben, Länge ändern) mit Ghost und Konflikthinweisen, Undo/Redo, Mehrfachauswahl, Tastatur und Kurzbefehl-Hilfe, Planungsfenster mit Backdrop-Blur (Popover/Bottom-Sheet), rechter Inspector ab 1400 px, zugängliche Kontextmenüs (Kalender, Abwesenheiten, Zeiteinträge, Zeitliste). Tagesdetail vereinheitlicht: `DayDetail` im Inspector und auf `/time/<Datum>`. Vertrag unverändert 0.25.0. Details, Inventur und Folgepakete: `docs/handoffs/P9.md`.
+
 ## Paket P8 (Urlaubsantrag-Vorlage auf Server-Endpunkten, 19.10.2026, Branch p8-vacation-form-b7, nicht gemergt)
 Vorlage (PDF) und Zuordnung liegen je Konto auf dem Server (Vertrag 0.25.0, B7, ADR-0026: `GET/DELETE /vacation/request-form`, `PUT .../file`, `PUT .../mapping`, `GET .../file`). Der Rückfall auf IndexedDB bei 404/501 entfällt; IndexedDB ist nur noch Kopie (Cache je Konto, nach jeder Serveroperation aktualisiert) und wird bei nicht erreichbarem Server gelesen (Hinweis „Server nicht erreichbar“, Schreiben gesperrt). Deutsche Meldungen für 409 `no_template`, 413 `mapping_too_large`/`file_too_large`, 415 `unsupported_type`. Mock folgt dem Server (Content-Type 415, Magic Number 400, `mapping_too_large`). Lizenzhinweise für `pdf-lib` (MIT, unmaintained) und `pdfjs-dist` (Apache-2.0) im Backend `docs/LIZENZEN.md`. Details: `docs/handoffs/P8.md`.
 

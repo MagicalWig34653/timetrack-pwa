@@ -164,8 +164,9 @@ test('today line, calendar detail and an older server without the endpoints', as
 	await expect(page.getByTestId('panel-plan-times')).toHaveText('Geplant 08:00–16:30, 30 Min. Pause');
 	// editing mode/note in the calendar keeps the times
 	await page.getByRole('button', { name: 'Planung ändern' }).click();
-	await page.getByLabel('Notiz (optional)').fill('Kunde ruft an');
-	await page.getByRole('button', { name: 'Speichern' }).click();
+	const planForm = page.getByTestId('plan-form');
+	await planForm.getByLabel('Notiz (optional)').fill('Kunde ruft an');
+	await planForm.getByRole('button', { name: 'Speichern' }).click();
 	await expect(page.getByTestId('panel-plan-times')).toBeVisible();
 
 	await page.route('**/api/v1/time/weeks/**', (route) => route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":{"code":"not_found","message":"x"}}' }));

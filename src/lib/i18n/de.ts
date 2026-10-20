@@ -1,4 +1,5 @@
 import { deAccounts } from './de-accounts';
+import { deCalendar } from './de-calendar';
 import { deDesign } from './de-design';
 import { deMail } from './de-mail';
 import { deMcp } from './de-mcp';
@@ -18,6 +19,7 @@ import { deWorktime } from './de-worktime';
 // Technical API error codes are mapped via `error.<code>` and `error.status_<http status>`.
 export const de = {
 	...deAccounts,
+	...deCalendar,
 	...deDesign,
 	...deMail,
 	...deMcp,

@@ -8,15 +8,13 @@
 	import type { DayInfo } from '#lib/planning/calendar.js';
 	import { absenceKindLabel, absenceStatusLabel, planModeLabel } from '#lib/planning/labels.js';
 	import { formatDateLong, formatDateNumeric } from '#lib/time/dates.js';
-	import { formatDuration } from '#lib/time/format.js';
-	import { markLabel } from '#lib/time/labels.js';
 	import { formatHalfDays } from '#lib/vacation/halfdays.js';
 	import { untrack } from 'svelte';
 	import AbsenceForm from './AbsenceForm.svelte';
 	import CustomDayForm from './CustomDayForm.svelte';
 	import PlanDayForm from './PlanDayForm.svelte';
 
-	let { info, places, onchanged, onclose }: { info: DayInfo; places: Place[]; onchanged: () => void; onclose: () => void } = $props();
+	let { info, places, onchanged, onclose, heading = true }: { info: DayInfo; places: Place[]; onchanged: () => void; onclose?: () => void; /** false where the page already shows the date (deep link /time/<date>) */ heading?: boolean } = $props();
 
 	type Mode = { type: 'none' } | { type: 'absence'; absence: Absence | null } | { type: 'plan' } | { type: 'custom' };
 	let mode = $state<Mode>({ type: 'none' });
@@ -61,13 +59,12 @@
 		}
 	}
 
-	const evaluation = $derived(info.evaluation);
 </script>
 
 <Card data-testid="day-panel">
 	<CardHeader class="flex-row items-start justify-between gap-2">
-		<CardTitle><h2 class="text-lg">{formatDateLong(info.date)}</h2></CardTitle>
-		<Button variant="ghost" size="sm" onclick={onclose}>{t('common.close')}</Button>
+		<CardTitle><h2 class="text-lg">{heading ? formatDateLong(info.date) : t('day.planning')}</h2></CardTitle>
+		{#if onclose}<Button variant="ghost" size="sm" onclick={onclose}>{t('common.close')}</Button>{/if}
 	</CardHeader>
 	<CardContent class="flex flex-col gap-4">
 		{#if notice}<Alert variant="success">{notice}</Alert>{/if}
@@ -100,15 +97,6 @@
 			<dd data-testid="panel-plan">
 				{#if info.plan}{planModeLabel(info.plan.mode)}{#if info.plan.plannedStart && info.plan.plannedEnd} · <span class="tabular-nums" data-testid="panel-plan-times">{t('calendar.plan_times', { start: info.plan.plannedStart, end: info.plan.plannedEnd })}{#if info.plan.plannedBreakMinutes}, {t('calendar.plan_break', { minutes: info.plan.plannedBreakMinutes })}{/if}</span>{/if}{#if info.plan.note} · {info.plan.note}{/if}{:else}{t('calendar.no_plan')}{/if}
 			</dd>
-			{#if evaluation}
-				<dt class="text-muted-foreground">{t('calendar.evaluation')}</dt>
-				<dd class="tabular-nums" data-testid="panel-evaluation">
-					{t('calendar.evaluation_text', { target: formatDuration(evaluation.targetSeconds), worked: formatDuration(evaluation.evaluatedWorkSeconds) })}
-					{#if evaluation.mark && evaluation.mark !== 'none'} · {markLabel(evaluation.mark)}{/if}
-					{#if evaluation.provisional} · {t('home.balance_provisional')}{/if}
-					· <a class="underline underline-offset-4" href="/time/{info.date}">{t('calendar.open_day')}</a>
-				</dd>
-			{/if}
 		</dl>
 
 		{#if mode.type === 'none'}

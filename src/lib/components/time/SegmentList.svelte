@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { contextmenu, type MenuEntry } from '#lib/a11y/context-menu.svelte.js';
 	import type { Place, Segment } from '#lib/api/types.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { t } from '#lib/i18n/index.js';
@@ -12,13 +13,16 @@
 		places,
 		timeZone,
 		now,
-		actions
+		actions,
+		menuFor
 	}: {
 		segments: Segment[];
 		places: Place[];
 		timeZone: string;
 		now: number;
 		actions?: Snippet<[Segment]>;
+		/** right-click / long-press menu of a row (P9); without it the system menu stays */
+		menuFor?: (segment: Segment) => MenuEntry[] | null;
 	} = $props();
 
 	const sorted = $derived([...segments].sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt)));
@@ -60,7 +64,7 @@
 				</li>
 			{:else}
 				{@const s = row.segment}
-				<li class="rounded-lg border bg-card px-3 py-2 {s.voided ? 'opacity-60' : ''}" data-testid="segment-row">
+				<li class="rounded-lg border bg-card px-3 py-2 {s.voided ? 'opacity-60' : ''}" data-testid="segment-row" use:contextmenu={() => menuFor?.(s) ?? null}>
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
 						<span class="font-medium tabular-nums {s.voided ? 'line-through' : ''}">{range(s.startedAt, s.endedAt)}</span>
 						<span class="tabular-nums text-sm text-muted-foreground">{formatDuration(seconds(s))}</span>

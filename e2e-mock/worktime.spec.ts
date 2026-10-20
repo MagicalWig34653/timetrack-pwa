@@ -158,7 +158,7 @@ test('excused: absence form hint, list filter and vacation balance stays untouch
 	await page.getByLabel('Art').selectOption('excused');
 	await expect(page.getByTestId('absence-excused-hint')).toContainText('verbraucht keinen Urlaub');
 	await page.locator('#abs-status').selectOption('approved');
-	await page.getByRole('button', { name: 'Speichern' }).click();
+	await page.getByTestId('absence-form').getByRole('button', { name: 'Speichern' }).click();
 	await page.goto('/absences');
 	for (let i = new Date().getFullYear(); i < 2036; i++) await page.getByRole('button', { name: 'Folgejahr' }).click();
 	await page.getByLabel('Art', { exact: true }).selectOption('excused');

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { contextmenu, type MenuEntry } from '#lib/a11y/context-menu.svelte.js';
 	import { api } from '#lib/api/client.js';
 	import type { DayEvaluation } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
@@ -15,6 +16,12 @@
 	import { markLabel } from '#lib/time/labels.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
+
+	/** Context menu of a day row (P9): the day detail is the same component as in the calendar inspector. */
+	const menuFor = (date: string): MenuEntry[] => [
+		{ id: 'open', label: t('cal.menu_open_day'), onselect: () => void goto(`/time/${date}`) },
+		{ id: 'calendar', label: t('absences.show_in_calendar'), onselect: () => void goto(`/calendar?date=${date}`) }
+	];
 
 	const timeZone = $derived(zoneStore.value);
 	const requested = $derived(page.url.searchParams.get('week') ?? '');
@@ -81,6 +88,7 @@
 					<li>
 						<a
 							href="/time/{day.date}"
+							use:contextmenu={() => menuFor(day.date)}
 							class="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 outline-none hover:bg-muted/50 focus-visible:bg-muted/50 sm:grid-cols-[9rem_1fr_auto_auto_auto]"
 							aria-current={day.date === today ? 'date' : undefined}
 						>

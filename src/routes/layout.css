@@ -487,3 +487,23 @@ dialog::backdrop {
 	-webkit-backdrop-filter: var(--bf-scrim);
 	backdrop-filter: var(--bf-scrim);
 }
+
+/* floating planning window (P9): popover pop-in on wide screens, slide-up sheet on phones; reduced motion is handled globally above */
+@keyframes floating-pop-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px) scale(0.98);
+	}
+}
+@keyframes floating-sheet-in {
+	from {
+		opacity: 0;
+		transform: translateY(28px);
+	}
+}
+.floating-pop {
+	animation: floating-pop-in 140ms ease-out;
+}
+.floating-sheet {
+	animation: floating-sheet-in 180ms ease-out;
+}

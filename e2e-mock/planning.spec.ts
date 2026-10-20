@@ -16,7 +16,7 @@ test('calendar: create an approved vacation from a day, see it in the grid and i
 	await panel.getByRole('button', { name: 'Abwesenheit anlegen' }).click();
 	await page.getByLabel('Bis').fill('2031-03-14');
 	await page.getByLabel('Status').selectOption('approved');
-	await page.getByRole('button', { name: 'Speichern' }).click();
+	await page.getByTestId('absence-form').getByRole('button', { name: 'Speichern' }).click();
 	await expect(page.getByText('Abwesenheit gespeichert.')).toBeVisible();
 	await expect(page.getByTestId('month-grid').locator('[data-chip="absence"]')).toHaveCount(5);
 
@@ -64,7 +64,7 @@ test('absence overlap is explained in German and nothing is saved', async ({ bro
 	await page.locator(`[data-date="2031-03-12"]:visible`).click();
 	await page.getByTestId('day-panel').getByRole('button', { name: 'Abwesenheit anlegen' }).click();
 	await page.getByLabel('Art').selectOption('sick');
-	await page.getByRole('button', { name: 'Speichern' }).click();
+	await page.getByTestId('absence-form').getByRole('button', { name: 'Speichern' }).click();
 	await expect(page.getByTestId('absence-error')).toContainText('Abwesenheiten dürfen sich nicht überschneiden');
 	await page.goto('/absences');
 	for (let i = new Date().getFullYear(); i < 2031; i++) await page.getByRole('button', { name: 'Folgejahr' }).click();

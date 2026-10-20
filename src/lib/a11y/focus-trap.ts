@@ -4,7 +4,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
  * Svelte action: keeps Tab inside `node`, closes on Escape and restores the previous focus on destroy.
  * Used by the off-canvas menu and popovers.
  */
-export function focusTrap(node: HTMLElement, options: { onclose?: () => void; autofocus?: boolean } = {}) {
+export function focusTrap(node: HTMLElement, options: { onclose?: () => void; autofocus?: boolean; /** false: the caller returns focus itself (default true) */ restoreFocus?: boolean } = {}) {
 	let current = options;
 	const previous = document.activeElement as HTMLElement | null;
 
@@ -43,7 +43,7 @@ export function focusTrap(node: HTMLElement, options: { onclose?: () => void; au
 		},
 		destroy() {
 			node.removeEventListener('keydown', onKeydown);
-			if (previous && document.contains(previous)) previous.focus();
+			if (current.restoreFocus !== false && previous && document.contains(previous)) previous.focus();
 		}
 	};
 }

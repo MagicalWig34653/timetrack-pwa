@@ -4,7 +4,7 @@
 	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS } from '#lib/planning/labels.js';
 	import { formatDuration } from '#lib/time/format.js';
 
-	let { info, compact = false }: { info: DayInfo; compact?: boolean } = $props();
+	let { info, compact = false, hidden = new Set<string>(), draggable = false }: { info: DayInfo; compact?: boolean; hidden?: Set<string>; draggable?: boolean } = $props();
 
 	const chip = 'block max-w-full truncate rounded px-1.5 py-0.5 text-left leading-tight';
 	const text = $derived(compact ? 'text-[11px]' : 'text-xs');
@@ -12,21 +12,34 @@
 </script>
 
 <span class="flex min-w-0 flex-col gap-0.5 {text}">
-	{#each info.holidays as holiday (holiday.name + holiday.startDate)}
-		<span class="{chip} {HOLIDAY_CLASS}" data-chip="holiday">{holiday.name}</span>
-	{/each}
-	{#each info.schoolHolidays as holiday (holiday.name + holiday.startDate)}
-		<span class="{chip} {SCHOOL_HOLIDAY_CLASS}" data-chip="school-holiday">{holiday.name}</span>
-	{/each}
-	{#each info.absences as absence (absence.id)}
-		<span class="{chip} {ABSENCE_CLASSES[absence.kind]}" data-chip="absence">
+	{#if !hidden.has('holiday')}
+		{#each info.holidays as holiday (holiday.name + holiday.startDate)}
+			<span class="{chip} {HOLIDAY_CLASS}" data-chip="holiday">{holiday.name}</span>
+		{/each}
+	{/if}
+	{#if !hidden.has('school_holiday')}
+		{#each info.schoolHolidays as holiday (holiday.name + holiday.startDate)}
+			<span class="{chip} {SCHOOL_HOLIDAY_CLASS}" data-chip="school-holiday">{holiday.name}</span>
+		{/each}
+	{/if}
+	{#each info.absences.filter((a) => !hidden.has(a.kind)) as absence (absence.id)}
+		<!-- pointer only: the keyboard alternative is Alt+arrow keys on the day and the edit window (see the shortcut help) -->
+		<span
+			class="{chip} relative {ABSENCE_CLASSES[absence.kind]} {draggable ? 'cursor-grab active:cursor-grabbing' : ''}"
+			data-chip="absence"
+			data-absence-id={draggable ? absence.id : undefined}
+		>
+			{#if draggable && absence.startDate === info.date}<span class="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize rounded-l bg-current/30" data-resize="start" aria-hidden="true"></span>{/if}
 			{absenceKindLabel(absence.kind)}{#if !compact} ({absenceStatusLabel(absence.status)}){/if}
+			{#if draggable && absence.endDate === info.date}<span class="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize rounded-r bg-current/30" data-resize="end" aria-hidden="true"></span>{/if}
 		</span>
 	{/each}
-	{#if info.plan}
-		<span class="{chip} {PLAN_CLASSES[info.plan.mode]}" data-chip="plan">{planModeLabel(info.plan.mode)}</span>
+	{#if info.plan && !hidden.has('plan')}
+		<span class="{chip} {PLAN_CLASSES[info.plan.mode]}" data-chip="plan">
+			{planModeLabel(info.plan.mode)}{#if !compact && info.plan.plannedStart && info.plan.plannedEnd}<span class="tabular-nums"> {info.plan.plannedStart}–{info.plan.plannedEnd}</span>{/if}
+		</span>
 	{/if}
-	{#if worked > 0}
+	{#if worked > 0 && !hidden.has('worked')}
 		<span class="px-1.5 tabular-nums text-muted-foreground" data-chip="worked">{t('calendar.worked', { time: formatDuration(worked) })}</span>
 	{/if}
 </span>

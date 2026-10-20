@@ -248,7 +248,7 @@ describe('calendar page', () => {
 		await userEvent.click(within(panel).getByRole('button', { name: 'Abwesenheit anlegen' }));
 		await userEvent.selectOptions(screen.getByLabelText('Art'), 'sick');
 		await userEvent.selectOptions(screen.getByLabelText('Status'), 'taken');
-		await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+		await userEvent.click(within(screen.getByTestId('absence-form')).getByRole('button', { name: 'Speichern' }));
 		expect(await screen.findByText('Abwesenheit gespeichert.')).toBeInTheDocument();
 		await waitFor(() => expect(within(screen.getByTestId('month-grid')).getAllByText('Krank').length).toBeGreaterThan(0));
 	});
@@ -260,7 +260,7 @@ describe('calendar page', () => {
 		await userEvent.click(grid.querySelector('[data-date="2026-10-27"]') as HTMLElement);
 		await userEvent.click(within(await screen.findByTestId('day-panel')).getByRole('button', { name: 'Planung festlegen' }));
 		await userEvent.selectOptions(screen.getByLabelText('Arbeitsform'), 'customer');
-		await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+		await userEvent.click(within(screen.getByTestId('plan-form')).getByRole('button', { name: 'Speichern' }));
 		expect(await screen.findByText('Planung gespeichert.')).toBeInTheDocument();
 		expect(await api.listPlanDays('2026-10-27', '2026-10-27')).toMatchObject([{ mode: 'customer' }]);
 	});

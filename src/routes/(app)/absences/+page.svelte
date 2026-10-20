@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { contextmenu, type MenuEntry } from '#lib/a11y/context-menu.svelte.js';
 	import { api } from '#lib/api/client.js';
-	import type { Absence } from '#lib/api/types.js';
+	import type { Absence, AbsenceStatus } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import AbsenceForm from '#lib/components/planning/AbsenceForm.svelte';
 	import Unavailable from '#lib/components/planning/Unavailable.svelte';
@@ -37,6 +38,7 @@
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { formatHalfDays } from '#lib/vacation/halfdays.js';
 	import VacationRequestDialog, { type RequestTarget } from '#lib/components/vacation-form/VacationRequestDialog.svelte';
+	import { absenceInputOf } from '#lib/planning/operations.js';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import { onMount } from 'svelte';
@@ -169,6 +171,34 @@
 		editing = fresh;
 	}
 
+	async function setStatus(absence: Absence, status: AbsenceStatus) {
+		error = '';
+		notice = '';
+		try {
+			await api.updateAbsence(absence.id, { ...absenceInputOf(absence), status }, absence.version);
+			notice = t('absence.saved');
+			await refresh();
+		} catch (e) {
+			error = errorMessage(e);
+		}
+	}
+
+	/** Context menu of an absence row (P9): the same actions as the buttons, plus quick status changes. */
+	function menuFor(absence: Absence): MenuEntry[] {
+		return [
+			{ id: 'edit', label: t('absence.edit'), onselect: () => (editing = absence) },
+			...(['planned', 'approved', 'taken', 'cancelled'] as AbsenceStatus[])
+				.filter((s) => s !== absence.status)
+				.map<MenuEntry>((s) => ({ id: `status-${s}`, label: t('cal.menu_status', { status: absenceStatusLabel(s) }), onselect: () => void setStatus(absence, s) })),
+			{ separator: true },
+			{ id: 'attachments', label: t('absences.attachments'), onselect: () => toggleAttachments(absence.id) },
+			...(absence.kind === 'vacation' && absence.status !== 'cancelled' && absence.status !== 'rejected' ? [{ id: 'form', label: t('vform.action'), onselect: () => (requesting = absence) } satisfies MenuEntry] : []),
+			{ id: 'calendar', label: t('absences.show_in_calendar'), onselect: () => void goto(`/calendar?date=${absence.startDate}`) },
+			{ separator: true },
+			{ id: 'delete', label: t('absence.delete'), danger: true, onselect: () => void remove(absence) }
+		];
+	}
+
 	const countsNot = (a: Absence) => a.status === 'rejected' || a.status === 'cancelled';
 </script>
 
@@ -253,7 +283,7 @@
 		{:else}
 			<ul class="flex flex-col gap-3" data-testid="absence-list">
 				{#each visible as absence (absence.id)}
-					<li>
+					<li use:contextmenu={() => menuFor(absence)}>
 						<Card data-testid="absence-row">
 							<CardContent class="flex flex-col gap-3">
 								{#if editing !== null && editing !== 'new' && editing.id === absence.id}
