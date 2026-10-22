@@ -157,4 +157,22 @@ describe('mock time API', () => {
 		await api.revokeDeviceToken(created.id);
 		expect((await post('departure', crypto.randomUUID())).status).toBe(401);
 	});
+
+	it('trigger links: token and path only in the POST response, validation, limit, revoke', async () => {
+		const created = await api.createTriggerLink({ label: 'Tag', actions: ['start', 'toggle'], expiresInDays: 10 });
+		expect(created.path).toBe(`/t/${created.token}`);
+		expect(created.token).toHaveLength(43);
+		expect(created).toMatchObject({ kind: 'work', placeId: null, lastUsedAt: null });
+		const listed = await api.listTriggerLinks();
+		expect(JSON.stringify(listed)).not.toContain(created.token!);
+		expect(listed[0].path).toBeUndefined();
+		expect(await code(api.createTriggerLink({ label: ' ', actions: ['start'] }))).toBe('400:bad_request');
+		expect(await code(api.createTriggerLink({ label: 'x', actions: [] }))).toBe('400:bad_request');
+		expect(await code(api.createTriggerLink({ label: 'x', actions: ['start'], expiresInDays: 731 }))).toBe('400:bad_request');
+		expect(await code(api.createTriggerLink({ label: 'x', actions: ['start'], placeId: crypto.randomUUID() }))).toBe('404:not_found');
+		for (let i = 1; i < 20; i++) await api.createTriggerLink({ label: `l${i}`, actions: ['stop'] });
+		expect(await code(api.createTriggerLink({ label: 'x', actions: ['stop'] }))).toBe('409:too_many_trigger_links');
+		await api.revokeTriggerLink(created.id);
+		expect(await code(api.revokeTriggerLink(created.id))).toBe('404:not_found');
+	});
 });

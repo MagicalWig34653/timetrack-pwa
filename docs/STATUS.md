@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket W1-PWA (Auslöse-Links, 22.10.2026, Branch w1-trigger-links, nicht gemergt)
+Neue Seite `/settings/trigger-links` (Modul automation): Links auflisten, anlegen (Bezeichnung, Aktionen, Ort, Art, Ablauf), Adresse einmalig mit Kopierknopf und Warnung, Widerruf mit Bestätigung, Sicherheits- und Aufrufhilfe. Service Worker fängt `/t/` nie ab (Test). Vertrag 0.26.0, Mock erweitert. Details: `docs/handoffs/W1-pwa.md`.
+
 ## Paket P9 (leistungsfähiger Kalender, 20.10.2026, Branch p9-calendar-power, nicht gemergt)
 Kalender mit Monat/Woche, Ziehen (Auswählen, Verschieben, Länge ändern) mit Ghost und Konflikthinweisen, Undo/Redo, Mehrfachauswahl, Tastatur und Kurzbefehl-Hilfe, Planungsfenster mit Backdrop-Blur (Popover/Bottom-Sheet), rechter Inspector ab 1400 px, zugängliche Kontextmenüs (Kalender, Abwesenheiten, Zeiteinträge, Zeitliste). Tagesdetail vereinheitlicht: `DayDetail` im Inspector und auf `/time/<Datum>`. Vertrag unverändert 0.25.0. Details, Inventur und Folgepakete: `docs/handoffs/P9.md`.
 

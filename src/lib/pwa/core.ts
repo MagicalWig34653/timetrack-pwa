@@ -3,7 +3,7 @@ import { dePwa } from '../i18n/de-pwa';
 // Pure helpers shared by the service worker and the page. No DOM, no `$service-worker` imports, so they are unit-testable.
 
 /** Paths the service worker must never cache or intercept (API, OAuth, MCP, discovery, probes). */
-export const BYPASS_PREFIXES = ['/api', '/oauth', '/mcp', '/.well-known', '/health', '/ready'] as const;
+export const BYPASS_PREFIXES = ['/api', '/oauth', '/mcp', '/.well-known', '/health', '/ready', '/t'] as const;
 
 export function isBypassPath(pathname: string): boolean {
 	return BYPASS_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'));

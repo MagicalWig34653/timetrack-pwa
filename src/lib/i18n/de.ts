@@ -9,6 +9,7 @@ import { dePlanning } from './de-planning';
 import { deProfile } from './de-profile';
 import { dePwa } from './de-pwa';
 import { deReports } from './de-reports';
+import { deTrigger } from './de-trigger';
 import { deTransfer } from './de-transfer';
 import { deVacationForm } from './de-vacation-form';
 import { deVacationPlanner } from './de-vacation-planner';
@@ -30,6 +31,7 @@ export const de = {
 	...dePwa,
 	...deReports,
 	...deTransfer,
+	...deTrigger,
 	...deVacationForm,
 	...deVacationPlanner,
 	...deWorktime,

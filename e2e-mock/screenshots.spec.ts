@@ -3,7 +3,7 @@ import { loginAsAdmin } from './helpers';
 
 // Only runs when SCREENSHOT_DIR is set; used for the manual layout review (390 px phone and desktop, light and dark).
 const dir = process.env.SCREENSHOT_DIR;
-const routes = ['/', '/time', '/settings/work-model', '/settings/places', '/settings/account-time', '/settings/devices', '/suggestions', '/vacation', '/calendar', '/absences', '/settings/sharing', '/shared', '/export', '/import', '/settings/storage'];
+const routes = ['/', '/time', '/settings/work-model', '/settings/places', '/settings/account-time', '/settings/devices', '/settings/trigger-links', '/suggestions', '/vacation', '/calendar', '/absences', '/settings/sharing', '/shared', '/export', '/import', '/settings/storage'];
 
 let variant = 0;
 

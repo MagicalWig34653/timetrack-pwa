@@ -40,7 +40,7 @@ export const MODULE_ROUTES: Record<ModuleKey, readonly string[]> = {
 	reports: ['/reports', '/settings/learning-fields'],
 	planning: ['/vacation', '/calendar', '/plan', '/absences', '/shared', '/settings/sharing', '/settings/vacation-form'],
 	transfer: ['/export', '/import', '/settings/storage'],
-	automation: ['/settings/devices', '/suggestions'],
+	automation: ['/settings/devices', '/settings/trigger-links', '/suggestions'],
 	mcp: ['/settings/api-tokens', '/settings/connections', '/settings/mcp-help', '/oauth/consent']
 };
 

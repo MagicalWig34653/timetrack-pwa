@@ -4,6 +4,7 @@ import { addDays, DEFAULT_TIMEZONE, localDateOf, todayLocal, zonedTimeToInstant 
 import type {
 	DayMarkKind,
 	DeviceToken,
+	TriggerLink,
 	Place,
 	PlaceInput,
 	Segment,
@@ -37,6 +38,10 @@ interface StoredToken extends DeviceToken {
 	secret: string;
 }
 
+interface StoredTriggerLink extends TriggerLink {
+	secret: string;
+}
+
 interface TimeState {
 	accountId: string;
 	models: WorkModel[];
@@ -46,6 +51,7 @@ interface TimeState {
 	adjustments: Adjustment[];
 	suggestions: Suggestion[];
 	tokens: StoredToken[];
+	triggerLinks: StoredTriggerLink[];
 	timerEvents: Map<string, string>;
 	automationEvents: Map<string, { result: string; segmentId: string | null; suggestionId: string | null }>;
 }
@@ -75,6 +81,7 @@ export function createTimeMock(clock: () => number) {
 				adjustments: [],
 				suggestions: [],
 				tokens: [],
+				triggerLinks: [],
 				timerEvents: new Map(),
 				automationEvents: new Map()
 			};
@@ -563,6 +570,43 @@ export function createTimeMock(clock: () => number) {
 			const index = state.tokens.findIndex((t) => t.id === m![1]);
 			if (index < 0) return fail(404, 'not_found');
 			state.tokens.splice(index, 1);
+			return { status: 204 };
+		}
+
+		// --- trigger links (contract 0.26.0): the token and path exist only in the POST response ---
+		if (route === 'me/trigger-links') {
+			if (method === 'GET') return ok(state.triggerLinks.map(({ secret: _secret, ...rest }) => rest));
+			if (method === 'POST') {
+				const actions = body.actions;
+				if (typeof body.label !== 'string' || !body.label.trim() || body.label.length > 80) return fail(400, 'bad_request');
+				if (!Array.isArray(actions) || actions.length === 0 || actions.some((a) => !['start', 'stop', 'toggle'].includes(a))) return fail(400, 'bad_request');
+				if (body.kind !== undefined && !SEGMENT_KINDS.includes(body.kind)) return fail(400, 'bad_request');
+				const days = body.expiresInDays;
+				if (days !== undefined && !(Number.isInteger(days) && days >= 1 && days <= 730)) return fail(400, 'bad_request');
+				if (body.placeId && !state.places.some((p) => p.id === body.placeId && !p.archived)) return fail(404, 'not_found');
+				if (state.triggerLinks.length >= 20) return fail(409, 'too_many_trigger_links');
+				const secret = (uuid() + uuid()).replace(/-/g, '').slice(0, 43);
+				const link: StoredTriggerLink = {
+					id: uuid(),
+					label: body.label.trim(),
+					actions: [...new Set<string>(actions)] as TriggerLink['actions'],
+					placeId: body.placeId ?? null,
+					kind: body.kind ?? 'work',
+					createdAt: new Date(clock()).toISOString(),
+					expiresAt: days ? new Date(clock() + days * 86400_000).toISOString() : null,
+					lastUsedAt: null,
+					lastAction: null,
+					secret
+				};
+				state.triggerLinks.push(link);
+				const { secret: _s, ...publicLink } = link;
+				return ok({ ...publicLink, token: secret, path: `/t/${secret}` }, 201);
+			}
+		}
+		if ((m = route.match(/^me\/trigger-links\/([^/]+)$/)) && method === 'DELETE') {
+			const index = state.triggerLinks.findIndex((l) => l.id === m![1]);
+			if (index < 0) return fail(404, 'not_found');
+			state.triggerLinks.splice(index, 1);
 			return { status: 204 };
 		}
 		return null;

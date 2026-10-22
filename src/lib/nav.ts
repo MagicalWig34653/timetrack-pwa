@@ -33,6 +33,7 @@ export const SETTINGS_LINKS: { href: string; label: MessageKey }[] = [
 	{ href: '/settings/notifications', label: 'nav.notification_settings' },
 	{ href: '/settings/modules', label: 'nav.modules' },
 	{ href: '/settings/devices', label: 'nav.devices' },
+	{ href: '/settings/trigger-links', label: 'nav.trigger_links' },
 	{ href: '/settings/sharing', label: 'nav.sharing' },
 	{ href: '/settings/vacation-form', label: 'nav.vacation_form' },
 	{ href: '/settings/passkeys', label: 'nav.passkeys' },
@@ -59,7 +60,7 @@ export const SETTINGS_GROUPS: { id: string; label: MessageKey; hrefs: string[] }
 	{ id: 'account', label: 'nav.settings_group.account', hrefs: ['/settings/profile', '/settings/passkeys', '/settings/identities', '/settings/recovery', '/settings/sessions', '/settings/privacy'] },
 	{ id: 'work', label: 'nav.settings_group.work', hrefs: ['/settings/work-model', '/settings/places', '/settings/account-time', '/settings/vacation-form', '/settings/learning-fields'] },
 	{ id: 'app', label: 'nav.settings_group.app', hrefs: ['/settings/appearance', '/settings/notifications', '/settings/modules'] },
-	{ id: 'connections', label: 'nav.settings_group.connections', hrefs: ['/settings/devices', '/settings/sharing', '/settings/connections', '/settings/api-tokens', '/settings/mcp-help'] },
+	{ id: 'connections', label: 'nav.settings_group.connections', hrefs: ['/settings/devices', '/settings/trigger-links', '/settings/sharing', '/settings/connections', '/settings/api-tokens', '/settings/mcp-help'] },
 	{ id: 'admin', label: 'nav.settings_group.admin', hrefs: ['/settings/storage', '/admin/mail'] }
 ];
 
@@ -146,6 +147,7 @@ export const SETTINGS_KEYWORDS: Record<string, string> = {
 	'/settings/notifications': 'hinweise push benachrichtigung erinnerung',
 	'/settings/modules': 'module funktionen ausblenden',
 	'/settings/devices': 'geräte shortcuts automatik',
+	'/settings/trigger-links': 'auslöse links url start stopp timer schaltfläche widget kurzbefehl',
 	'/settings/sharing': 'freigaben teilen plan privat',
 	'/settings/passkeys': 'passkey anmeldung sicherheit konto',
 	'/settings/identities': 'openid oidc anmeldung verknüpft',

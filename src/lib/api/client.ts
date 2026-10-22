@@ -64,6 +64,8 @@ import type {
 	DayPreferences,
 	DeviceToken,
 	DeviceTokenCreated,
+	TriggerLink,
+	TriggerLinkInput,
 	Place,
 	PlaceInput,
 	Segment,
@@ -491,6 +493,9 @@ export const api = {
 	createDeviceToken: (input: { name: string; expiresInDays?: number }) =>
 		request<DeviceTokenCreated>('POST', '/me/device-tokens', input),
 	revokeDeviceToken: (id: string) => request<void>('DELETE', `/me/device-tokens/${id}`),
+	listTriggerLinks: () => request<TriggerLink[]>('GET', '/me/trigger-links'),
+	createTriggerLink: (input: TriggerLinkInput) => request<TriggerLink>('POST', '/me/trigger-links', input),
+	revokeTriggerLink: (id: string) => request<void>('DELETE', `/me/trigger-links/${id}`),
 
 	// vacation (contract v0.3.1); amounts are half days; GET settings answers 200 with `configured: false` until saved
 	getVacationSettings: () => request<VacationSettings>('GET', '/vacation/settings'),

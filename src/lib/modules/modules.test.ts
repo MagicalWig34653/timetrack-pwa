@@ -63,6 +63,7 @@ describe('module route classification (ADR-0012)', () => {
 			'/import': 'transfer',
 			'/settings/storage': 'transfer',
 			'/settings/devices': 'automation',
+			'/settings/trigger-links': 'automation',
 			'/suggestions': 'automation',
 			'/settings/api-tokens': 'mcp',
 			'/settings/connections': 'mcp',

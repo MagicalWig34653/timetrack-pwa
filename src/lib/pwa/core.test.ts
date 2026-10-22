@@ -70,7 +70,7 @@ describe('parsePushPayload', () => {
 describe('request interception rules', () => {
 	const origin = 'https://app.example';
 	it('never touches API, OAuth, MCP, discovery and probes', () => {
-		for (const p of ['/api/v1/time/segments', '/api', '/oauth/consent', '/oauth/authorize', '/mcp', '/.well-known/oauth-authorization-server', '/health', '/ready']) {
+		for (const p of ['/api/v1/time/segments', '/api', '/oauth/consent', '/oauth/authorize', '/mcp', '/.well-known/oauth-authorization-server', '/health', '/ready', '/t', '/t/abc/start', '/t/abc/toggle?at=2026-10-22T08:00:00Z']) {
 			expect(isBypassPath(p), p).toBe(true);
 			expect(isInterceptable(new URL(p, origin), 'GET', origin), p).toBe(false);
 		}
@@ -82,6 +82,10 @@ describe('request interception rules', () => {
 		expect(isInterceptable(new URL('/time', origin), 'POST', origin)).toBe(false);
 		expect(isInterceptable(new URL('https://cdn.example/x.js'), 'GET', origin)).toBe(false);
 		expect(isBypassPath('/apiary')).toBe(false);
+		// '/t' is the trigger link prefix (ADR-0027), but must not swallow other paths that merely start with t
+		expect(isBypassPath('/time')).toBe(false);
+		expect(isBypassPath('/time/2026-10-15')).toBe(false);
+		expect(isBypassPath('/tx')).toBe(false);
 	});
 });
 

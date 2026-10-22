@@ -19,7 +19,7 @@ export function moduleOfApiPath(path: string): ModuleKey | null {
 	if (/^\/api\/v1\/(export|imports|import-templates|files|admin\/storage)(\/|$)/.test(path)) return 'transfer';
 	if (/^\/api\/v1\/reports(\/|$)/.test(path)) return 'reports';
 	if (/^\/api\/v1\/(vacation|absences|calendar|plan|shares)(\/|$)/.test(path)) return 'planning';
-	if (/^\/api\/v1\/(me\/device-tokens|automation\/events|time\/suggestions)(\/|$)/.test(path)) return 'automation';
+	if (/^\/api\/v1\/(me\/device-tokens|me\/trigger-links|automation\/events|time\/suggestions)(\/|$)/.test(path)) return 'automation';
 	if (/^\/api\/v1\/(me\/api-tokens|me\/oauth-grants|oauth\/requests)(\/|$)/.test(path)) return 'mcp';
 	if (/^\/(oauth\/register|oauth\/authorize|oauth\/token|oauth\/revoke|mcp|\.well-known\/oauth-[a-z-]+)$/.test(path)) return 'mcp';
 	return null;

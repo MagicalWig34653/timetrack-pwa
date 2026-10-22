@@ -304,6 +304,31 @@ export interface DeviceTokenCreated extends DeviceToken {
 	token: string;
 }
 
+export type TriggerAction = 'start' | 'stop' | 'toggle';
+
+/** Trigger link (contract 0.26.0, ADR-0027). `token` and `path` only exist in the POST response. */
+export interface TriggerLink {
+	id: string;
+	label: string;
+	actions: TriggerAction[];
+	placeId?: string | null;
+	kind: SegmentKind;
+	createdAt: string;
+	expiresAt?: string | null;
+	lastUsedAt?: string | null;
+	lastAction?: TriggerAction | null;
+	token?: string;
+	path?: string;
+}
+
+export interface TriggerLinkInput {
+	label: string;
+	actions: TriggerAction[];
+	placeId?: string | null;
+	kind?: SegmentKind;
+	expiresInDays?: number;
+}
+
 // --- Planning and vacation (contracts/openapi.yaml v0.3.1) ---
 
 export interface VacationSettings {
