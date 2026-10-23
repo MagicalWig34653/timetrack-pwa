@@ -77,7 +77,7 @@ export interface NavItem {
 	href: string;
 	label: MessageKey;
 	prefix: boolean;
-	icon: 'house' | 'clock' | 'week' | 'calendar' | 'book' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'users' | 'modules' | 'storage' | 'mail';
+	icon: 'house' | 'clock' | 'week' | 'calendar' | 'book' | 'chart' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'users' | 'modules' | 'storage' | 'mail';
 	/** further path prefixes that keep the entry highlighted (the planner tab of "Woche" lives at /plan) */
 	alsoActive?: string[];
 	/** badge source rendered by the sidebar */
@@ -101,6 +101,7 @@ export const NAV_GROUPS: NavGroup[] = [
 			{ href: '/time', label: 'nav.time', prefix: true, icon: 'clock' },
 			{ href: '/week', label: 'nav.week', prefix: true, icon: 'week', alsoActive: ['/plan'] },
 			{ href: '/calendar', label: 'nav.calendar', prefix: true, icon: 'calendar' },
+			{ href: '/stats', label: 'nav.stats', prefix: true, icon: 'chart' },
 			{ href: '/reports', label: 'nav.reports', prefix: true, icon: 'book' }
 		]
 	},
@@ -190,6 +191,10 @@ export function breadcrumbs(pathname: string): Crumb[] {
 		return trail;
 	}
 	const label = ALL_LABELS.get(`/${parts[0]}`);
+	if (label && pathname === '/time/cancelled') {
+		trail.push({ label, href: '/time' }, { label: 'trash.title' });
+		return trail;
+	}
 	if (label && pathname === '/vacation/planner') {
 		trail.push({ label, href: '/vacation' }, { label: 'planner.title' });
 		return trail;

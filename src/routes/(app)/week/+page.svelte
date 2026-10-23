@@ -17,11 +17,14 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
-	import { isoWeekLabel, isoWeekNumber, mondayOfIsoWeek, startOfWeek, todayLocal } from '#lib/time/dates.js';
+	import { formatDateNumeric, isoWeekLabel, isoWeekNumber, mondayOfIsoWeek, startOfWeek, todayLocal } from '#lib/time/dates.js';
 	import { formatDelta, formatDuration } from '#lib/time/format.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
+	import { absenceRuns, absenceWarning, hasOpenAbsence } from '#lib/week/absences.js';
+	import { recalledWeek, rememberWeek } from '#lib/week/last-week.js';
+	import { ABSENCE_CLASSES, absenceKindLabel } from '#lib/planning/labels.js';
 	import { isEmptyWeek, summarySentence } from '#lib/week/overview.js';
 	import Briefcase from '@lucide/svelte/icons/briefcase';
 	import CalendarRange from '@lucide/svelte/icons/calendar-range';
@@ -44,9 +47,17 @@
 	const today = $derived(todayLocal(timeZone));
 	const currentMonday = $derived(startOfWeek(today));
 	const requested = $derived(page.url.searchParams.get('week') ?? '');
-	const monday = $derived(mondayOfIsoWeek(requested) ?? currentMonday);
+	// The URL names the week when it can; without ?week the last viewed week of this tab is restored (P12).
+	const explicit = $derived(mondayOfIsoWeek(requested));
+	const recalled = $derived(requested === '' ? recalledWeek() : null);
+	const monday = $derived(explicit ?? mondayOfIsoWeek(recalled ?? '') ?? currentMonday);
 	const isoWeek = $derived(isoWeekLabel(monday));
 	const isCurrent = $derived(monday === currentMonday);
+
+	$effect(() => {
+		if (explicit) rememberWeek(isoWeekLabel(explicit));
+		else if (recalled && monday !== currentMonday) void goto(`/week?week=${isoWeekLabel(monday)}`, { replace: true });
+	});
 
 	let load = $state<LoadState>({ status: 'loading' });
 	let week = $state<TimeWeek | null>(null);
@@ -84,6 +95,8 @@
 	const sentence = $derived(summary ? summarySentence(summary, isCurrent, isoWeekNumber(monday)) : '');
 	const longestWeekday = $derived(summary?.longestDay ? weekdayLabel(days.find((d) => d.date === summary.longestDay!.date)?.weekday ?? 1) : '');
 	const planDiff = $derived(workedHours - plannedToDate);
+	const runs = $derived(absenceRuns(days));
+	const openAbsence = $derived(hasOpenAbsence(days));
 </script>
 
 <PageHeader title={t('weekview.title')} description={t('weekview.description')} />
@@ -135,6 +148,29 @@
 					<li class="min-w-0 *:h-full"><DayCard {day} {timeZone} /></li>
 				{/each}
 			</ol>
+		{/if}
+
+		{#if runs.length > 0}
+			<Panel title={t('weekview.absences_title')} description={openAbsence ? t('weekview.absences_open_hint') : undefined} data-testid="week-absences">
+				<ul class="flex flex-col gap-2" aria-label={t('weekview.absences_label')}>
+					{#each runs as run, i (i)}
+						{@const warning = absenceWarning(run.status)}
+						<li class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[15px]" data-testid="week-absence-run" data-status={run.status}>
+							<span class="inline-flex h-6 items-center rounded-full px-2.5 text-xs font-medium {ABSENCE_CLASSES[run.kind]}">{absenceKindLabel(run.kind)}</span>
+							<span class="tabular-nums">{run.from === run.to ? formatDateNumeric(run.from) : `${formatDateNumeric(run.from)} – ${formatDateNumeric(run.to)}`}</span>
+							<span class="text-muted-foreground">{t(run.counted === 1 ? 'weekview.absence.days_one' : 'weekview.absence.days_other', { count: String(run.counted).replace('.', ',') })}</span>
+							<span class="text-muted-foreground">{t(`absence.status.${run.status}`)}</span>
+							{#if warning}<StatusChip tone="warning" dot={false}>{warning}</StatusChip>{/if}
+						</li>
+					{/each}
+				</ul>
+				{#if moduleStore.enabled('planning')}
+					<div class="mt-4 flex flex-wrap gap-2">
+						<Button size="sm" variant="outline" href="/vacation/planner" data-testid="week-absence-planner">{t('weekview.absence.planner_link')}</Button>
+						{#if openAbsence}<Button size="sm" variant="outline" href="/absences?year={monday.slice(0, 4)}" data-testid="week-absence-request">{t('weekview.absence.request_link')}</Button>{/if}
+					</div>
+				{/if}
+			</Panel>
 		{/if}
 
 		<p class="text-[15px] text-foreground" data-testid="week-sentence">{sentence}</p>

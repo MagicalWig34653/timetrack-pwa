@@ -10,7 +10,9 @@
 	import { formatDateShort, isoWeekNumber } from '#lib/time/dates.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { tick } from 'svelte';
+	import type { WeekBalance } from '#lib/planning/week-balance.js';
 	import DayChips from './DayChips.svelte';
+	import WeekBalanceLabel from './WeekBalanceLabel.svelte';
 
 	/**
 	 * Month/week grid (tablet and desktop) and week list (phone) with pointer drag (select, move, resize), roving keyboard
@@ -34,6 +36,7 @@
 		rangeMode,
 		absenceById,
 		menuFor,
+		balanceOf,
 		op = $bindable(null),
 		onpick,
 		ondrag,
@@ -59,6 +62,8 @@
 		rangeMode: boolean;
 		absenceById: (id: string) => Absence | undefined;
 		menuFor: (date: string, target: Element) => MenuEntry[] | null;
+		/** hour difference of a week against its Soll (shown under the KW number) */
+		balanceOf: (week: string[]) => WeekBalance | null;
 		op?: DragOp | null;
 		onpick: (date: string, mods: { shift: boolean; meta: boolean }) => void;
 		ondrag: (range: DateRange, additive: boolean) => void;
@@ -75,6 +80,7 @@
 	let suppressClick = false;
 
 	const compact = $derived(variant === 'month');
+	const phoneBalance = $derived(balanceOf(phoneWeek));
 	const isOtherMonth = (date: string) => variant === 'month' && date.slice(0, 7) !== monthOf;
 
 	function dateAt(x: number, y: number): string | null {
@@ -194,7 +200,7 @@
 >
 	<thead>
 		<tr>
-			<th scope="col" class="w-9 border-b px-1 py-1.5 text-left text-[11px] font-normal text-muted-foreground"><abbr title={t('cal.week_number')} class="no-underline">{t('cal.week_short')}</abbr></th>
+			<th scope="col" class="w-[5.5rem] border-b px-1 py-1.5 text-left text-[11px] font-normal text-muted-foreground"><abbr title={t('cal.week_number')} class="no-underline">{t('cal.week_short')}</abbr></th>
 			{#each [1, 2, 3, 4, 5, 6, 7] as weekday (weekday)}
 				<th scope="col" class="border-b px-1 py-1.5 text-left text-xs font-medium text-muted-foreground">{weekdayLabel(weekday)}</th>
 			{/each}
@@ -202,8 +208,12 @@
 	</thead>
 	<tbody>
 		{#each weeks as week (week[0])}
+			{@const balance = balanceOf(week)}
 			<tr>
-				<th scope="row" class="border border-r-0 px-1 py-1.5 text-left align-top text-[11px] font-normal text-muted-foreground tabular-nums" data-testid="week-number" aria-label={t('cal.week_n', { n: isoWeekNumber(week[0]) })}>{isoWeekNumber(week[0])}</th>
+				<th scope="row" class="border border-r-0 px-1 py-1.5 text-left align-top text-[11px] font-normal text-muted-foreground tabular-nums" data-testid="week-number" aria-label={t('cal.week_n', { n: isoWeekNumber(week[0]) })}>
+					{isoWeekNumber(week[0])}
+					{#if balance}<WeekBalanceLabel {balance} week={isoWeekNumber(week[0])} class="mt-0.5" />{/if}
+				</th>
 				{#each week as date (date)}
 					{@const info = infoOf(date)}
 					<td class="{variant === 'week' ? 'h-60' : 'h-28'} border p-0 align-top">
@@ -234,6 +244,12 @@
 </table>
 
 <!-- week list (phone) -->
+{#if phoneBalance}
+	<p class="mb-2 flex items-baseline gap-2 text-xs text-muted-foreground sm:hidden" data-testid="phone-week-balance">
+		<span>{t('cal.week_n', { n: isoWeekNumber(phoneWeek[0]) })}</span>
+		<WeekBalanceLabel balance={phoneBalance} week={isoWeekNumber(phoneWeek[0])} class="text-xs" />
+	</p>
+{/if}
 <ul class="flex flex-col gap-2 sm:hidden" data-testid="week-days" style={rangeMode ? 'touch-action: none' : ''}>
 	{#each phoneWeek as date (date)}
 		{@const info = infoOf(date)}

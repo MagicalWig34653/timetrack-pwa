@@ -472,6 +472,7 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 200, body: { enabled: oidc.enabled, name: oidc.name } };
 		}
 		if (path === '/api/v1/mock/mail' && method === 'POST') return mail.hook(body);
+		if (path === '/api/v1/mock/trash' && method === 'POST') return time.hookTrash(body);
 		if (path === '/api/v1/mock/accounts' && method === 'POST') {
 			// test hook, not part of the contract: add accounts, fail the next deletion, age sessions (reauth_required)
 			if (typeof body.failDeletion === 'boolean') failDeletion = body.failDeletion;

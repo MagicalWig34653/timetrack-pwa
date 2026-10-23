@@ -63,6 +63,16 @@ export const deWeek = {
 	'weekview.sentence.holiday_one': '{count} Feiertag',
 	'weekview.sentence.holiday_other': '{count} Feiertage',
 
+	'weekview.absences_title': 'Abwesenheiten in dieser Woche',
+	'weekview.absences_label': 'Abwesenheiten der Woche',
+	'weekview.absences_open_hint': 'Geplanter oder beantragter Urlaub ist noch nicht verbindlich.',
+	'weekview.absence.not_requested': 'noch nicht beantragt',
+	'weekview.absence.not_approved': 'beantragt, noch nicht genehmigt',
+	'weekview.absence.days_one': '{count} Tag',
+	'weekview.absence.days_other': '{count} Tage',
+	'weekview.absence.planner_link': 'Urlaub planen',
+	'weekview.absence.request_link': 'Urlaub beantragen',
+
 	'weekview.days_label': 'Die sieben Tage der Woche',
 	'weekview.mark.work': 'Arbeit',
 	'weekview.mark.school': 'Schule',

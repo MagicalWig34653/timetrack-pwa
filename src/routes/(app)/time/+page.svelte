@@ -127,4 +127,5 @@
 		<div><dt class="text-muted-foreground">{t('week.total_delta')}</dt><dd class="text-lg font-semibold tabular-nums {totals.delta < 0 ? 'text-destructive' : ''}">{formatDelta(totals.delta)}</dd></div>
 	</dl>
 	<p class="mt-3 text-xs text-muted-foreground">{t('week.note')}</p>
+	<p class="mt-2 text-xs"><a class="underline underline-offset-4" href="/time/cancelled" data-testid="cancelled-link">{t('trash.link')}</a></p>
 {/if}

@@ -226,6 +226,97 @@ export interface Segment {
 	revisions?: number;
 }
 
+/** Contract v0.28.0 (W3): cancelled segments and their permanent removal. */
+export interface CancelledSegment {
+	segment: Segment;
+	cancelledAt: string | null;
+	cancelReason: string | null;
+}
+
+export interface CancelledSegmentPage {
+	items: CancelledSegment[];
+	total: number;
+	limit: number;
+	offset: number;
+}
+
+export interface PurgeSummary {
+	dryRun: boolean;
+	segments: number;
+	revisions: number;
+	suggestions: number;
+	timerEvents: number;
+	automationEvents: number;
+}
+
+/** Selection of `DELETE /time/segments/cancelled`; at least one of ids/from/to/all is required. */
+export interface PurgeSelection {
+	ids?: string[];
+	from?: string;
+	to?: string;
+	all?: boolean;
+	dryRun?: boolean;
+}
+
+export type StatisticsGranularity = 'day' | 'week' | 'month';
+
+export interface StatisticsKinds {
+	work: number;
+	school: number;
+	travel: number;
+}
+
+export interface StatisticsBucket {
+	label: string;
+	from: string;
+	to: string;
+	days: number;
+	targetSeconds: number;
+	targetToDateSeconds: number;
+	actualSeconds: number;
+	creditSeconds: number;
+	evaluatedWorkSeconds: number;
+	rawWorkSeconds: number;
+	roundingSeconds: number;
+	deltaSeconds: number;
+	overtimeSeconds: number;
+	undertimeSeconds: number;
+	balanceSeconds?: number | null;
+	balanceAsOf?: string | null;
+	kindSeconds: StatisticsKinds;
+	absences: { vacation: number; sick: number; excused: number; holiday: number; school: number };
+	absenceDays: number;
+	breakSeconds: number;
+	breakDeductionSeconds: number;
+	workDays: number;
+	provisional: boolean;
+}
+
+/** Contract v0.28.0: `GET /time/statistics`. */
+export interface TimeStatistics {
+	from: string;
+	to: string;
+	granularity: StatisticsGranularity;
+	basis: 'evaluated' | 'raw';
+	timezone: string;
+	accountStart?: string | null;
+	openingBalanceSeconds?: number | null;
+	buckets: StatisticsBucket[];
+	totals: {
+		targetSeconds: number;
+		targetToDateSeconds: number;
+		actualSeconds: number;
+		creditSeconds: number;
+		deltaSeconds: number;
+		overtimeSeconds: number;
+		undertimeSeconds: number;
+		breakSeconds: number;
+		breakDeductionSeconds: number;
+		kindSeconds: StatisticsKinds;
+		absenceDays: number;
+	};
+}
+
 export type DayMarkSource = 'none' | 'explicit' | 'absence' | 'holiday';
 
 export interface DayEvaluation {

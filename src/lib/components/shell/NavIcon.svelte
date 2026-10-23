@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Book from '@lucide/svelte/icons/book-open';
 	import Bulb from '@lucide/svelte/icons/lightbulb';
+	import Chart from '@lucide/svelte/icons/chart-column';
 	import Calendar from '@lucide/svelte/icons/calendar-days';
 	import Clock from '@lucide/svelte/icons/clock';
 	import Download from '@lucide/svelte/icons/download';
@@ -18,7 +19,7 @@
 	import type { NavItem } from '#lib/nav.js';
 
 	let { name }: { name: NavItem['icon'] } = $props();
-	const icons = { house: House, clock: Clock, week: Week, calendar: Calendar, book: Book, plane: Plane, absence: Absence, share: Share, bulb: Bulb, download: Download, upload: Upload, invite: Invite, users: Users, modules: Modules, storage: Storage, mail: Mail };
+	const icons = { house: House, clock: Clock, week: Week, calendar: Calendar, book: Book, chart: Chart, plane: Plane, absence: Absence, share: Share, bulb: Bulb, download: Download, upload: Upload, invite: Invite, users: Users, modules: Modules, storage: Storage, mail: Mail };
 	const Icon = $derived(icons[name]);
 </script>
 
