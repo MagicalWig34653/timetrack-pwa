@@ -15,6 +15,8 @@ const sw = self as unknown as ServiceWorkerGlobalScope;
 const CACHE = cacheNameFor(version);
 const SHELL = '/index.html';
 const OFFLINE_PATH = '/offline';
+// self-contained static fallback (static/offline.html, precached) for when even the SPA shell is missing from the cache
+const OFFLINE_HTML = '/offline.html';
 // manifest paths are relative to the base path (no leading slash); the app is served from the origin root
 const absolute = (path: string) => '/' + path.replace(/^\/+/, '');
 const PRECACHE = [...new Set([...immutable.map((entry) => absolute(entry.path)), ...assets.map((entry) => absolute(entry.path)), SHELL])];
@@ -69,16 +71,21 @@ async function navigate(request: Request, url: URL): Promise<Response> {
 	try {
 		return await fetch(request);
 	} catch {
-		const shell = await (await caches.open(CACHE)).match(SHELL);
+		const cache = await caches.open(CACHE);
+		const shell = await cache.match(SHELL);
 		if (url.pathname === OFFLINE_PATH && shell) return shell;
-		return Response.redirect(sw.location.origin + OFFLINE_PATH, 302);
+		if (shell) return Response.redirect(sw.location.origin + OFFLINE_PATH, 302);
+		// No shell cached (install never completed, cache evicted): never redirect into a loop, show the static page instead.
+		const fallback = await cache.match(OFFLINE_HTML);
+		return fallback ?? new Response('Offline', { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8' } });
 	}
 }
 
 async function cacheFirst(request: Request): Promise<Response> {
 	const cache = await caches.open(CACHE);
 	const pathname = new URL(request.url).pathname;
-	const hit = await cache.match(request);
+	// icons and the manifest are linked with ?v=<n> (cache busting); the precache holds them by path
+	const hit = await cache.match(request, { ignoreSearch: PRECACHED.has(pathname) });
 	if (hit && isUsableAssetResponse(pathname, hit.ok, hit.headers.get('content-type'))) return hit;
 	if (hit) await cache.delete(request);
 	const response = await fetch(request);

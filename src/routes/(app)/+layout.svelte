@@ -4,6 +4,8 @@
 	import X from '@lucide/svelte/icons/x';
 	import { focusTrap } from '#lib/a11y/focus-trap.js';
 	import { t } from '#lib/i18n/index.js';
+	import ErrorPage from '#lib/components/app/ErrorPage.svelte';
+	import { newErrorId } from '#lib/errors/describe.js';
 	import ModuleDisabled from '#lib/components/app/ModuleDisabled.svelte';
 	import HelpDialog from '#lib/components/shell/HelpDialog.svelte';
 	import SidebarNav from '#lib/components/shell/SidebarNav.svelte';
@@ -102,7 +104,15 @@
 			{#if blockedBy}
 				<ModuleDisabled module={blockedBy} />
 			{:else}
-				{@render children()}
+				<!-- A render/effect error in one page must not blank the shell: show the error panel with a retry (E1). Reset per route. -->
+				{#key page.url.pathname}
+					<svelte:boundary onerror={(error) => console.error(error)}>
+						{@render children()}
+						{#snippet failed(_error, reset)}
+							<ErrorPage status={500} errorId={newErrorId()} onretry={reset} />
+						{/snippet}
+					</svelte:boundary>
+				{/key}
 			{/if}
 		</main>
 	</div>

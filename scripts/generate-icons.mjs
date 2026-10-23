@@ -18,6 +18,7 @@ const targets = [
 	{ file: 'icons/icon-512.png', size: 512, svg: icon },
 	{ file: 'icons/icon-mask.png', size: 512, svg: fullBleed },
 	{ file: 'icons/apple-180.png', size: 180, svg: fullBleed },
+	{ file: 'favicon-16.png', size: 16, svg: favicon },
 	{ file: 'favicon-32.png', size: 32, svg: favicon }
 ];
 const icoSizes = [16, 32, 48];

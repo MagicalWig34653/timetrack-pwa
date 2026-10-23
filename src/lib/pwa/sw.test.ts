@@ -132,13 +132,25 @@ describe('fetch', () => {
 		expect(await (await asset)!.text()).toBe('icon');
 
 		vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('offline'))));
+		cacheStore.set('/index.html', new Response('shell'));
 		const nav = await run('https://app.example/time', { mode: 'navigate' });
 		const res = await nav!;
 		expect(res.status).toBe(302);
 		expect(res.headers.get('Location')).toBe('https://app.example/offline');
-		cacheStore.set('/index.html', new Response('shell'));
 		const offlinePage = await run('https://app.example/offline', { mode: 'navigate' });
 		expect(await (await offlinePage)!.text()).toBe('shell');
+	});
+
+	it('serves the static offline page instead of redirecting when the SPA shell is not cached', async () => {
+		cacheStore.delete('/index.html');
+		cacheStore.set('/offline.html', new Response('<h1>Keine Verbindung</h1>'));
+		vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('offline'))));
+		const res = await (await run('https://app.example/time', { mode: 'navigate' }))!;
+		expect(res.status).toBe(200);
+		expect(await res.text()).toContain('Keine Verbindung');
+		cacheStore.delete('/offline.html');
+		const bare = await (await run('https://app.example/time', { mode: 'navigate' }))!;
+		expect(bare.status).toBe(503);
 		vi.unstubAllGlobals();
 	});
 });

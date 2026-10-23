@@ -2,7 +2,11 @@
 // for information about these interfaces
 declare global {
 	namespace App {
-		// interface Error {}
+		/** `errorId` is set by hooks.client.ts for unexpected errors and shown on the error page (no stack traces). */
+		interface Error {
+			message: string;
+			errorId?: string;
+		}
 		// interface Locals {}
 		// interface PageData {}
 		// interface PageState {}

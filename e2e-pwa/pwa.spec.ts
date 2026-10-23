@@ -38,7 +38,7 @@ test('favicons are served as images and linked from the page', async ({ request,
 	}
 	await page.goto('/');
 	const links = await page.locator('head link[rel~="icon"], head link[rel="apple-touch-icon"]').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
-	expect(links).toEqual(expect.arrayContaining(['/favicon.svg', '/favicon-32.png', '/favicon.ico', '/icons/apple-180.png']));
+	expect(links).toEqual(expect.arrayContaining(['/favicon.svg?v=2', '/favicon-16.png?v=2', '/favicon-32.png?v=2', '/favicon.ico?v=2', '/icons/apple-180.png?v=2']));
 });
 
 test('manifest declares the app and every icon exists with the declared size', async ({ request, page }) => {
@@ -52,8 +52,12 @@ test('manifest declares the app and every icon exists with the declared size', a
 	const sizes = manifest.icons.map((i: { sizes: string; purpose?: string }) => `${i.sizes}:${i.purpose ?? 'any'}`);
 	expect(sizes).toEqual(expect.arrayContaining(['192x192:any', '512x512:any', '512x512:maskable']));
 	for (const icon of manifest.icons) {
-		const file = path.join(build, icon.src);
+		const file = path.join(build, icon.src.split('?')[0]);
 		expect(fs.existsSync(file), icon.src).toBe(true);
+		if (icon.type === 'image/svg+xml') {
+			expect((await request.get(icon.src)).headers()['content-type']).toContain('image/svg+xml');
+			continue;
+		}
 		const [w, h] = icon.sizes.split('x').map(Number);
 		expect(pngSize(file)).toEqual({ width: w, height: h });
 		const served = await request.get(icon.src);
@@ -62,8 +66,8 @@ test('manifest declares the app and every icon exists with the declared size', a
 	expect(pngSize(path.join(build, 'icons/apple-180.png'))).toEqual({ width: 180, height: 180 });
 
 	await page.goto('/login');
-	await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
-	await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', /\/icons\/apple-180\.png$/);
+	await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest?v=2');
+	await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', /\/icons\/apple-180\.png\?v=2$/);
 	await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
 	expect(await page.locator('meta[name="theme-color"]').count()).toBeGreaterThan(0);
 });
@@ -91,7 +95,7 @@ test('registers, precaches the shell, shows /offline when the network is down an
 	const names = Object.keys(cached);
 	expect(names).toHaveLength(1);
 	expect(names[0]).toMatch(/^tt-static-/);
-	expect(cached[names[0]]).toEqual(expect.arrayContaining(['/index.html', '/manifest.webmanifest', '/icons/icon-192.png']));
+	expect(cached[names[0]]).toEqual(expect.arrayContaining(['/index.html', '/offline.html', '/manifest.webmanifest', '/icons/icon-192.png']));
 	expect(cached[names[0]].some((p) => p.startsWith('/_app/immutable/'))).toBe(true);
 	expect(cached[names[0]].some((p) => p.startsWith('/api') || p.startsWith('/oauth') || p.startsWith('/mcp'))).toBe(false);
 

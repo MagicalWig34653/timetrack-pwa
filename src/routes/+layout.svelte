@@ -2,7 +2,6 @@
 	import './layout.css';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import favicon from '#lib/assets/favicon.svg';
 	import ContextMenuHost from '#lib/components/app/ContextMenuHost.svelte';
 	import PwaBanners from '#lib/components/app/PwaBanners.svelte';
 	import { theme } from '#lib/theme/theme.svelte.js';
@@ -20,10 +19,6 @@
 		return stop;
 	});
 </script>
-
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
 
 <PwaBanners />
 {@render children()}

@@ -1,0 +1,28 @@
+// German texts for the designed error pages (E1): 404, 403, 401, unexpected errors, offline.
+export const deErrors = {
+	'errorpage.not_found_title': 'Seite nicht gefunden',
+	'errorpage.not_found_text': 'Diese Adresse gibt es nicht (mehr). Vielleicht ist der Link veraltet oder falsch getippt.',
+	'errorpage.forbidden_title': 'Kein Zugriff',
+	'errorpage.forbidden_text': 'Für diese Seite fehlt dir die Berechtigung. Frag bei Bedarf eine Administratorin oder einen Administrator.',
+	'errorpage.unauthorized_title': 'Bitte erneut anmelden',
+	'errorpage.unauthorized_text': 'Deine Sitzung ist abgelaufen oder ungültig.',
+	'errorpage.server_title': 'Der Server antwortet gerade nicht richtig',
+	'errorpage.server_text': 'Das liegt nicht an dir. Versuche es gleich noch einmal.',
+	'errorpage.unexpected_title': 'Etwas ist schiefgelaufen',
+	'errorpage.unexpected_text': 'Die Seite konnte nicht angezeigt werden. Ein erneuter Versuch hilft oft.',
+	'errorpage.offline_title': 'Keine Verbindung',
+	'errorpage.offline_text': 'Du bist offline. Sobald die Verbindung wieder da ist, kannst du es erneut versuchen. Änderungen werden offline nicht gespeichert.',
+	'errorpage.requested': 'Angeforderte Adresse',
+	'errorpage.status': 'Statuscode',
+	'errorpage.error_id': 'Fehler-ID',
+	'errorpage.retry': 'Erneut versuchen',
+	'errorpage.reload': 'Neu laden',
+	'errorpage.sign_in': 'Zur Anmeldung',
+	'errorpage.links': 'Zurück zu',
+	'errorpage.link_today': 'Heute',
+	'errorpage.link_calendar': 'Kalender',
+	'errorpage.link_time': 'Zeit',
+	'errorpage.link_week': 'Woche',
+	'errorpage.report_hint': 'Gib die Fehler-ID an, wenn du den Fehler meldest.',
+	'errorpage.boundary_title': 'Dieser Bereich konnte nicht angezeigt werden'
+} as const;

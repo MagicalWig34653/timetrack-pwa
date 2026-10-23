@@ -98,7 +98,7 @@ export function isIosDevice(userAgent: string, maxTouchPoints: number): boolean 
 }
 
 /** True for the SPA shell and other documents; only these may be HTML. */
-const isDocumentPath = (pathname: string) => pathname === '/index.html' || pathname === '/offline' || !/\.[A-Za-z0-9]+$/.test(pathname);
+const isDocumentPath = (pathname: string) => pathname === '/index.html' || pathname === '/offline' || pathname === '/offline.html' || !/\.[A-Za-z0-9]+$/.test(pathname);
 
 /**
  * Guards the cache against the "HTML answered for an asset" failure (a server falling back to the SPA shell for a
