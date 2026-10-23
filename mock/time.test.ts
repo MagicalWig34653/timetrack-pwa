@@ -176,3 +176,58 @@ describe('mock time API', () => {
 		expect(await code(api.revokeTriggerLink(created.id))).toBe('404:not_found');
 	});
 });
+
+describe('mock cancelled segments and statistics (contract 0.28.0)', () => {
+	const make = async (day: string, from = '06', to = '08') => {
+		const s = await api.createSegment({ kind: 'work', startedAt: `${day}T${from}:00:00Z`, endedAt: `${day}T${to}:00:00Z` });
+		await api.voidSegment(s.id, 'test');
+		return s;
+	};
+
+	it('lists, restores and purges only cancelled segments', async () => {
+		const a = await make('2026-09-01');
+		const b = await make('2026-09-02');
+		const listed = await api.listCancelledSegments('2026-09-01T00:00:00Z', '2026-10-01T00:00:00Z');
+		expect(listed.map((c) => c.segment.id)).toEqual([b.id, a.id]);
+		expect((await api.restoreSegment(a.id)).voided).toBe(false);
+		expect(await code(api.restoreSegment(a.id))).toBe('409:segment_not_cancelled');
+		expect(await code(api.purgeSegment(a.id))).toBe('409:segment_not_cancelled');
+		expect((await api.purgeSegment(b.id)).segments).toBe(1);
+		expect(await api.listCancelledSegments('2026-09-01T00:00:00Z', '2026-10-01T00:00:00Z')).toHaveLength(0);
+	});
+
+	it('refuses to restore into an occupied time', async () => {
+		const a = await make('2026-09-03');
+		await api.createSegment({ kind: 'work', startedAt: '2026-09-03T07:00:00Z', endedAt: '2026-09-03T09:00:00Z' });
+		expect(await code(api.restoreSegment(a.id))).toBe('409:segment_overlap');
+	});
+
+	it('bulk purge: dry run counts, ids and all delete, a non-cancelled id fails the request', async () => {
+		const a = await make('2026-08-03');
+		await make('2026-08-04');
+		const active = await api.createSegment({ kind: 'work', startedAt: '2026-08-05T06:00:00Z', endedAt: '2026-08-05T08:00:00Z' });
+		expect(await api.purgeCancelled({ all: true, dryRun: true })).toMatchObject({ dryRun: true, segments: 2 });
+		expect(await api.listCancelledSegments()).toHaveLength(2);
+		expect(await code(api.purgeCancelled({ ids: [a.id, active.id] }))).toBe('409:segment_not_cancelled');
+		expect((await api.purgeCancelled({ ids: [a.id] })).segments).toBe(1);
+		expect((await api.purgeCancelled({ all: true })).segments).toBe(1);
+		expect(await api.listSegments('2026-08-05T00:00:00Z', '2026-08-06T00:00:00Z')).toHaveLength(1);
+		expect(await code(api.purgeCancelled({}))).toBe('400:purge_scope_required');
+	});
+
+	it('the hook simulates a server without the endpoints', async () => {
+		await fetch('/api/v1/mock/trash', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ purge: false, restore: false }) });
+		expect(await code(api.purgeCancelled({ all: true, dryRun: true }))).toBe('404:not_found');
+	});
+
+	it('statistics: weekly buckets agree with the week endpoint and the account', async () => {
+		const stats = await api.getStatistics('2026-10-05', '2026-10-18', 'week', 'evaluated');
+		expect(stats.buckets.map((b) => b.label)).toEqual(['2026-W41', '2026-W42']);
+		const week = await api.getTimeWeek('2026-W42');
+		const w42 = stats.buckets[1];
+		expect(w42.targetSeconds).toBe(week.summary.targetSeconds);
+		expect(w42.actualSeconds + w42.creditSeconds).toBe(week.summary.workSeconds + week.summary.creditSeconds);
+		expect(await code(api.getStatistics('2026-10-18', '2026-10-05', 'week', 'raw'))).toBe('400:bad_request');
+		expect(await code(api.getStatistics('2020-01-01', '2026-10-05', 'day', 'raw'))).toBe('400:range_too_large');
+	});
+});

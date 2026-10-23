@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket P12 (Wochensaldo, Statistik, stornierte Einträge, Woche; 23.10.2026, Branch p12-stats-trash-week, nicht gemergt)
+Kalender zeigt unter der KW die Differenz zum Wochensoll (laufende Woche neutral „noch X offen“). Neue Seiten `/stats` (Diagramme als eigene SVG, Datenschicht austauschbar) und `/time/cancelled` (Wiederherstellen, endgültig löschen einzeln/mehrfach/alle mit getipptem Wort; Endpunkte nach Entwurf, Funktionserkennung, Mock). `/week` merkt die letzte Woche (sessionStorage) und zeigt Abwesenheiten mit Warnung für geplant/beantragt. Details: `docs/handoffs/P12.md`.
+
 ## Paket J1 (Layout-Sprung in den Einstellungen, 23.10.2026, Branch j1-layout-jump, nicht gemergt)
 Ursache: Scrollleiste erschien/verschwand je nach Seitenhöhe (Inhalt sprang 15 px) → `scrollbar-gutter: stable` global. `/admin/mail` stand in der Einstellungsnavigation, öffnete aber ohne sie → gemeinsames `SettingsShell` auch dort. Einstellungsnavigation ist jetzt unter der Kopfzeile sticky und scrollt selbst. Mock-E2E `e2e-mock/layout-stability.spec.ts` misst Navigation und Inhaltsspalte über alle Einstellungsseiten (Desktop, hoch, Telefon). Details: `docs/handoffs/J1.md`.
 ## Paket P11 (grafischer Wochenplaner, 23.10.2026, Branch p11-week-planner, nicht gemergt)

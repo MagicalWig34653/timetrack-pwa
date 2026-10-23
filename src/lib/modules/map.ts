@@ -9,6 +9,7 @@ export const CORE_ROUTES = [
 	'/',
 	'/time',
 	'/week',
+	'/stats',
 	'/notifications',
 	'/login',
 	'/invite',

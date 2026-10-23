@@ -1,6 +1,8 @@
 // Mock of the time tracking endpoints in contracts/openapi.yaml v0.2.0 (work models, places, segments, timer,
 // day evaluations, time account, suggestions, device tokens, automation events). The backend implements these in C6.
-import { addDays, DEFAULT_TIMEZONE, localDateOf, todayLocal, zonedTimeToInstant } from '../src/lib/time/dates.ts';
+import { segmentFigures } from '../src/lib/stats/aggregate.ts';
+import { bucketKey } from '../src/lib/stats/aggregate.ts';
+import { addDays, DEFAULT_TIMEZONE, isoWeekLabel, localDateOf, todayLocal, zonedTimeToInstant } from '../src/lib/time/dates.ts';
 import type {
 	DayMarkKind,
 	DeviceToken,
@@ -66,6 +68,13 @@ const SEGMENT_KINDS = ['work', 'travel', 'school'];
 
 export function createTimeMock(clock: () => number) {
 	const states = new Map<string, TimeState>();
+	/** Test hook (not part of the contract): switch the P12 purge/restore endpoints off to simulate an older server. */
+	const trash = { purge: true, restore: true };
+	const hookTrash = (body: { purge?: boolean; restore?: boolean }) => {
+		if (typeof body.purge === 'boolean') trash.purge = body.purge;
+		if (typeof body.restore === 'boolean') trash.restore = body.restore;
+		return { status: 200, body: { ...trash } };
+	};
 	/** Set by the API mock: how absences and holidays change a day (planning data lives in another module). */
 	let dayContext: (accountId: string, date: string) => DerivedDayContext | null = () => null;
 
@@ -187,6 +196,79 @@ export function createTimeMock(clock: () => number) {
 			adjustmentSeconds,
 			provisional: asOf >= today
 		};
+	}
+
+	/** Contract v0.28.0 `GET /time/statistics`, computed from the day evaluations like the backend does. */
+	function statistics(state: TimeState, query: URLSearchParams): TimeResponse {
+		const from = query.get('from');
+		const to = query.get('to');
+		const granularity = (query.get('granularity') ?? 'week') as 'day' | 'week' | 'month';
+		const basis = query.get('basis') ?? 'evaluated';
+		if (!isDate(from) || !isDate(to) || to < from || !['day', 'week', 'month'].includes(granularity) || !['evaluated', 'raw'].includes(basis)) return fail(400, 'bad_request');
+		const dates = daysBetween(from, to);
+		if (dates.length > 1100) return fail(400, 'range_too_large');
+		const today = todayLocal(DEFAULT_TIMEZONE, new Date(clock()));
+		const opening = state.adjustments.find((a) => a.kind === 'opening');
+		const openingBalance = opening && opening.date <= addDays(from, -1) ? account(state, addDays(from, -1)).balanceSeconds : null;
+		const labelOf = (key: string) => (granularity === 'day' ? key : granularity === 'month' ? key.slice(0, 7) : isoWeekLabel(key));
+		const buckets = new Map<string, any>();
+		const totals = { targetSeconds: 0, targetToDateSeconds: 0, actualSeconds: 0, creditSeconds: 0, deltaSeconds: 0, overtimeSeconds: 0, undertimeSeconds: 0, breakSeconds: 0, breakDeductionSeconds: 0, kindSeconds: { work: 0, school: 0, travel: 0 }, absenceDays: 0 };
+		let running = openingBalance ?? 0;
+		for (const date of dates) {
+			const key = bucketKey(date, granularity);
+			let b = buckets.get(key);
+			if (!b) {
+				b = { label: labelOf(key), from: date, to: date, days: 0, targetSeconds: 0, targetToDateSeconds: 0, actualSeconds: 0, creditSeconds: 0, evaluatedWorkSeconds: 0, rawWorkSeconds: 0, roundingSeconds: 0, deltaSeconds: 0, overtimeSeconds: 0, undertimeSeconds: 0, balanceSeconds: null, balanceAsOf: null, kindSeconds: { work: 0, school: 0, travel: 0 }, absences: { vacation: 0, sick: 0, excused: 0, holiday: 0, school: 0 }, absenceDays: 0, breakSeconds: 0, breakDeductionSeconds: 0, workDays: 0, provisional: false };
+				buckets.set(key, b);
+			}
+			const ev = evaluate(state, date);
+			b.to = date;
+			b.days += 1;
+			b.targetSeconds += ev.targetSeconds;
+			if (date > today) continue;
+			const rounding = ev.startAdjustSeconds + ev.endAdjustSeconds;
+			const actual = basis === 'raw' ? ev.evaluatedWorkSeconds - rounding : ev.evaluatedWorkSeconds;
+			const delta = actual + ev.creditSeconds - ev.targetSeconds;
+			const f = segmentFigures(segmentsOfDay(state, date));
+			b.targetToDateSeconds += ev.targetSeconds;
+			b.actualSeconds += actual;
+			b.creditSeconds += ev.creditSeconds;
+			b.evaluatedWorkSeconds += ev.evaluatedWorkSeconds;
+			b.rawWorkSeconds += ev.rawWorkSeconds;
+			b.roundingSeconds += rounding;
+			b.deltaSeconds += delta;
+			if (delta > 0) b.overtimeSeconds += delta;
+			else b.undertimeSeconds += delta;
+			b.kindSeconds.work += f.work;
+			b.kindSeconds.travel += f.travel;
+			b.kindSeconds.school += f.school;
+			b.breakSeconds += f.gaps;
+			b.breakDeductionSeconds += ev.breakDeductionSeconds;
+			if (ev.evaluatedWorkSeconds > 0) b.workDays += 1;
+			b.provisional = b.provisional || ev.provisional;
+			const weight = ev.targetOverrideSeconds != null ? 0.5 : 1;
+			const mark = ev.mark ?? 'none';
+			if (mark === 'vacation' || mark === 'sick' || mark === 'excused' || mark === 'holiday') b.absences[mark] += weight;
+			else if (mark === 'school_credit') b.absences.school += 1;
+			b.absenceDays += mark === 'vacation' || mark === 'sick' || mark === 'excused' ? weight : 0;
+			if (opening && date >= opening.date) running += delta;
+			b.balanceSeconds = opening && date >= opening.date ? running + (openingBalance === null ? opening.seconds : 0) : null;
+			b.balanceAsOf = date;
+			totals.targetSeconds += ev.targetSeconds;
+			totals.targetToDateSeconds += ev.targetSeconds;
+			totals.actualSeconds += actual;
+			totals.creditSeconds += ev.creditSeconds;
+			totals.deltaSeconds += delta;
+			if (delta > 0) totals.overtimeSeconds += delta;
+			else totals.undertimeSeconds += delta;
+			totals.breakSeconds += f.gaps;
+			totals.breakDeductionSeconds += ev.breakDeductionSeconds;
+			totals.kindSeconds.work += f.work;
+			totals.kindSeconds.travel += f.travel;
+			totals.kindSeconds.school += f.school;
+			totals.absenceDays += mark === 'vacation' || mark === 'sick' || mark === 'excused' ? weight : 0;
+		}
+		return ok({ from, to, granularity, basis, timezone: DEFAULT_TIMEZONE, accountStart: opening?.date ?? null, openingBalanceSeconds: openingBalance, buckets: [...buckets.values()], totals });
 	}
 
 	function findOverlap(state: TimeState, startedAt: number, endedAt: number | null, ignoreId?: string): Segment | undefined {
@@ -418,6 +500,52 @@ export function createTimeMock(clock: () => number) {
 				return ok(newSegment(state, body, 'manual'), 201);
 			}
 		}
+		// Contract v0.28.0 (W3): cancelled segments.
+		if (route === 'time/segments/cancelled' && method === 'GET') {
+			const limit = Number(query.get('limit') ?? 50);
+			const offset = Number(query.get('offset') ?? 0);
+			if (!(limit >= 1 && limit <= 200) || !(offset >= 0)) return fail(400, 'bad_request');
+			const from = query.get('from') ? Date.parse(query.get('from')!) : -Infinity;
+			const to = query.get('to') ? Date.parse(query.get('to')!) : Infinity;
+			const all = state.segments
+				.filter((s) => s.voided && Date.parse(s.startedAt) >= from && Date.parse(s.startedAt) < to)
+				.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+			return ok({ items: all.slice(offset, offset + limit).map((segment) => ({ segment, cancelledAt: segment.startedAt, cancelReason: 'Mock' })), total: all.length, limit, offset });
+		}
+		if (route === 'time/segments/cancelled' && method === 'DELETE') {
+			if (!trash.purge) return fail(404, 'not_found');
+			const ids = query.get('ids') ? query.get('ids')!.split(',') : null;
+			const from = query.get('from') ? Date.parse(query.get('from')!) : null;
+			const to = query.get('to') ? Date.parse(query.get('to')!) : null;
+			const everything = query.get('all') === 'true';
+			if (!ids && from === null && to === null && !everything) return fail(400, 'purge_scope_required');
+			if (ids && state.segments.some((s) => ids.includes(s.id) && !s.voided)) return fail(409, 'segment_not_cancelled');
+			const eligible = state.segments.filter((s) => {
+				if (!s.voided) return false;
+				if (everything) return true;
+				if (ids && !ids.includes(s.id)) return false;
+				const start = Date.parse(s.startedAt);
+				return (from === null || start >= from) && (to === null || start < to);
+			});
+			const dryRun = query.get('dryRun') === 'true';
+			if (!dryRun) {
+				const gone = new Set(eligible.map((s) => s.id));
+				state.segments = state.segments.filter((s) => !gone.has(s.id));
+			}
+			return ok({ dryRun, segments: eligible.length, revisions: 0, suggestions: 0, timerEvents: 0, automationEvents: 0 });
+		}
+		if (route === 'time/statistics' && method === 'GET') return statistics(state, query);
+		if ((m = route.match(/^time\/segments\/([^/]+)\/restore$/)) && method === 'POST') {
+			if (!trash.restore) return fail(404, 'not_found');
+			const segment = state.segments.find((s) => s.id === m![1]);
+			if (!segment) return fail(404, 'not_found');
+			if (!segment.voided) return fail(409, 'segment_not_cancelled');
+			const end = segment.endedAt ? Date.parse(segment.endedAt) : null;
+			if (findOverlap(state, Date.parse(segment.startedAt), end, segment.id)) return fail(409, 'segment_overlap');
+			segment.voided = false;
+			segment.version += 1;
+			return ok(segment);
+		}
 		if ((m = route.match(/^time\/segments\/([^/]+)$/))) {
 			const segment = state.segments.find((s) => s.id === m![1]);
 			if (!segment) return fail(404, 'not_found');
@@ -448,6 +576,11 @@ export function createTimeMock(clock: () => number) {
 				segment.version += 1;
 				segment.revisions = (segment.revisions ?? 0) + 1;
 				return ok(segment);
+			}
+			if (method === 'DELETE' && query.get('permanent') === 'true') {
+				if (!segment.voided) return fail(409, 'segment_not_cancelled');
+				state.segments = state.segments.filter((s) => s.id !== segment.id);
+				return ok({ dryRun: false, segments: 1, revisions: 0, suggestions: 0, timerEvents: 0, automationEvents: 0 });
 			}
 			if (method === 'DELETE') {
 				const reason = query.get('reason');
@@ -671,5 +804,5 @@ export function createTimeMock(clock: () => number) {
 	const setDayContext = (fn: (accountId: string, date: string) => DerivedDayContext | null) => {
 		dayContext = fn;
 	};
-	return { handle, seedDemo, automationEvent, states, modelsOf, evaluateFor, setDayContext };
+	return { handle, seedDemo, automationEvent, states, modelsOf, evaluateFor, setDayContext, hookTrash };
 }

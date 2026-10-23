@@ -17,6 +17,7 @@
 		confirmLabel,
 		tone = 'default',
 		typedHandle,
+		typedLabel,
 		busy = false,
 		error = '',
 		warning = '',
@@ -30,6 +31,8 @@
 		confirmLabel: string;
 		tone?: 'default' | 'danger';
 		typedHandle?: string;
+		/** replaces the default "enter the username" label (e.g. when a word is typed) */
+		typedLabel?: string;
 		busy?: boolean;
 		error?: string;
 		/** non-error hint such as "retry" after a partial deletion */
@@ -78,7 +81,7 @@
 			{#if typedHandle !== undefined}
 				<Field
 					id="confirm-handle"
-					label={t('confirm.type_label', { handle: typedHandle })}
+					label={typedLabel ?? t('confirm.type_label', { handle: typedHandle })}
 					hint={t('confirm.type_hint')}
 					bind:value={typed}
 					autocomplete="off"

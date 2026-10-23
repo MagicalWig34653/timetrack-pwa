@@ -68,6 +68,12 @@ import type {
 	TriggerLinkInput,
 	Place,
 	PlaceInput,
+	CancelledSegment,
+	CancelledSegmentPage,
+	PurgeSelection,
+	PurgeSummary,
+	StatisticsGranularity,
+	TimeStatistics,
 	Segment,
 	SegmentCorrection,
 	SegmentInput,
@@ -465,6 +471,36 @@ export const api = {
 		request<Segment>('PATCH', `/time/segments/${id}`, input, { 'If-Match': String(ifMatchVersion) }),
 	voidSegment: (id: string, reason: string) =>
 		request<void>('DELETE', `/time/segments/${id}?reason=${encodeURIComponent(reason)}`),
+	/** Contract v0.28.0: cancelled segments, newest first; all pages are loaded (200 per request). */
+	listCancelledSegments: async (from?: string, to?: string) => {
+		const items: CancelledSegment[] = [];
+		for (let offset = 0; ; ) {
+			const query = new URLSearchParams({ limit: '200', offset: String(offset) });
+			if (from) query.set('from', from);
+			if (to) query.set('to', to);
+			const page = await request<CancelledSegmentPage>('GET', `/time/segments/cancelled?${query}`);
+			items.push(...page.items);
+			offset += page.items.length;
+			if (page.items.length === 0 || offset >= page.total) return items;
+		}
+	},
+	/** Contract v0.28.0: permanently deletes one cancelled segment (409 segment_not_cancelled otherwise). */
+	purgeSegment: (id: string) => request<PurgeSummary>('DELETE', `/time/segments/${id}?permanent=true`),
+	/** Contract v0.28.0: bulk deletion of cancelled segments; `dryRun` only counts. */
+	purgeCancelled: (selection: PurgeSelection) => {
+		const query = new URLSearchParams();
+		if (selection.ids) query.set('ids', selection.ids.join(','));
+		if (selection.from) query.set('from', selection.from);
+		if (selection.to) query.set('to', selection.to);
+		if (selection.all) query.set('all', 'true');
+		if (selection.dryRun) query.set('dryRun', 'true');
+		return request<PurgeSummary>('DELETE', `/time/segments/cancelled?${query}`);
+	},
+	/** Contract v0.28.0: lifts the cancellation (409 segment_overlap when the time is taken meanwhile). */
+	restoreSegment: (id: string) => request<Segment>('POST', `/time/segments/${id}/restore`, {}),
+	/** Contract v0.28.0: bucketed statistics series (at most 1100 days). */
+	getStatistics: (from: string, to: string, granularity: StatisticsGranularity, basis: 'evaluated' | 'raw') =>
+		request<TimeStatistics>('GET', `/time/statistics?from=${from}&to=${to}&granularity=${granularity}&basis=${basis}`),
 	currentTimer: () => request<Segment | null>('GET', '/time/timer'),
 	startTimer: (input: { clientEventId: string; kind?: SegmentKind; placeId?: string | null }) =>
 		request<Segment>('POST', '/time/timer/start', input),

@@ -14,6 +14,7 @@ import { deTrigger } from './de-trigger';
 import { deTransfer } from './de-transfer';
 import { deVacationForm } from './de-vacation-form';
 import { deVacationPlanner } from './de-vacation-planner';
+import { deP12 } from './de-p12';
 import { deWeek } from './de-week';
 import { deWeekGrid } from './de-weekgrid';
 import { deWorktime } from './de-worktime';
@@ -40,6 +41,7 @@ export const de = {
 	...deWorktime,
 	...deWeek,
 	...deWeekGrid,
+	...deP12,
 	'app.name': 'Timetrack',
 
 	'common.loading': 'Wird geladen …',

@@ -21,6 +21,8 @@
 	import { absenceInputOf, createAbsenceOp, deleteAbsenceOp, deletePlanOp, moveAbsenceInput, pasteTargets, putPlanOp, updateAbsenceOp, type Operation } from '#lib/planning/operations.js';
 	import { addRange, emptySelection, rangeDates, selectionRuns, selectOne, selectRangeTo, shiftRange, toggleDate, type DateRange, type Selection } from '#lib/planning/range-select.js';
 	import { combine, UndoStack } from '#lib/planning/undo.js';
+	import { weekBalance } from '#lib/planning/week-balance.js';
+	import WeekBalanceLabel from '#lib/components/planning/WeekBalanceLabel.svelte';
 	import { addDays, formatDateLong, formatDateNumeric, isoWeekNumber, isValidDate, todayLocal } from '#lib/time/dates.js';
 	import { formatDuration } from '#lib/time/format.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
@@ -153,6 +155,7 @@
 	const selectedSet = $derived(new Set(selection.dates));
 	const focusDate = $derived(selection.anchor);
 	const absenceById = (id: string) => absences.find((a) => a.id === id);
+	const balanceOf = (week: string[]) => weekBalance(week, days, today);
 
 	function describe(info: DayInfo): string {
 		const parts: string[] = [formatDateLong(info.date), workStateLabel(stateOf(info))];
@@ -621,6 +624,7 @@
 				{rangeMode}
 				{absenceById}
 				{menuFor}
+				{balanceOf}
 				bind:op
 				onpick={pick}
 				ondrag={dragSelect}
@@ -633,6 +637,13 @@
 
 		<aside bind:this={panelEl} class="mt-4 min-[1400px]:sticky min-[1400px]:top-20 min-[1400px]:mt-0 min-[1400px]:max-h-[calc(100dvh-6rem)] min-[1400px]:overflow-y-auto" aria-label={t('cal.inspector')} data-testid="inspector">
 			{#if focusDate}
+				{@const focusBalance = balanceOf(weekOf(focusDate))}
+				{#if focusBalance}
+					<p class="mb-2 flex items-baseline gap-2 text-xs text-muted-foreground" data-testid="inspector-week-balance">
+						<span>{t('cal.week_balance_inspector', { n: isoWeekNumber(focusDate) })}</span>
+						<WeekBalanceLabel balance={focusBalance} week={isoWeekNumber(focusDate)} class="text-xs" />
+					</p>
+				{/if}
 				<DayDetail date={focusDate} {places} refresh={reloadToken} onchanged={() => reloadToken++} onclose={() => (selection = emptySelection)} />
 			{:else}
 				<p class="text-sm text-muted-foreground">{t('calendar.pick_day')}</p>

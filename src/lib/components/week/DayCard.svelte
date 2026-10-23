@@ -2,7 +2,8 @@
 	import type { TimeWeekDay } from '#lib/api/types.js';
 	import StatusChip from '#lib/components/app/StatusChip.svelte';
 	import { t } from '#lib/i18n/index.js';
-	import { planModeLabel } from '#lib/planning/labels.js';
+	import { ABSENCE_CLASSES, absenceKindLabel, planModeLabel } from '#lib/planning/labels.js';
+	import { absenceWarning, chipAbsences } from '#lib/week/absences.js';
 	import { formatDateNumeric, localTimeOf } from '#lib/time/dates.js';
 	import { formatDelta, formatDuration } from '#lib/time/format.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
@@ -37,6 +38,16 @@
 		<span class="inline-flex h-5 items-center gap-1 rounded-full px-2 text-xs font-medium whitespace-nowrap {MARK_CLASSES[day.mark]}" data-testid="day-mark">
 			<MarkIcon mark={day.mark} class="size-3" />{weekMarkLabel(day.mark)}{#if halfDay}<span class="font-normal"> ½</span>{/if}
 		</span>
+		{#each chipAbsences(day) as absence, i (i)}
+			{@const warning = absenceWarning(absence.status)}
+			<span
+				class="inline-flex min-h-5 items-center gap-1 rounded-full px-2 text-xs font-medium {warning ? 'bg-amber-500/15 text-amber-900 dark:text-amber-200' : ABSENCE_CLASSES[absence.kind]}"
+				data-testid="day-absence"
+				data-status={absence.status}
+			>
+				{absenceKindLabel(absence.kind)}{#if absence.halfDay}<span class="font-normal">&nbsp;½</span>{/if}{#if warning}<span class="font-normal">:&nbsp;{warning}</span>{/if}
+			</span>
+		{/each}
 		{#if day.isToday}<StatusChip tone="accent" dot={false}>{t('weekview.today')}</StatusChip>{/if}
 		{#if day.provisional && !day.isFuture}<StatusChip tone="neutral">{t('weekview.provisional')}</StatusChip>{/if}
 	</span>
