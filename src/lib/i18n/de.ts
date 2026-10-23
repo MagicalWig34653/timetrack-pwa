@@ -15,6 +15,7 @@ import { deTransfer } from './de-transfer';
 import { deVacationForm } from './de-vacation-form';
 import { deVacationPlanner } from './de-vacation-planner';
 import { deWeek } from './de-week';
+import { deWeekGrid } from './de-weekgrid';
 import { deWorktime } from './de-worktime';
 
 // German UI texts. Keys are English; values are the only user-visible strings.
@@ -38,6 +39,7 @@ export const de = {
 	...deVacationPlanner,
 	...deWorktime,
 	...deWeek,
+	...deWeekGrid,
 	'app.name': 'Timetrack',
 
 	'common.loading': 'Wird geladen …',

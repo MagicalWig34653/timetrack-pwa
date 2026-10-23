@@ -1,0 +1,32 @@
+/* Colour per plan mode (P11): --pm is the strong colour (edge, dot), --pm-soft the block fill. Colour is never the only
+   signal, every block and chip also carries the mode label. Same hues as PLAN_CLASSES in the calendar. */
+[data-plan-mode='office'] {
+	--pm: #059669;
+}
+[data-plan-mode='home'] {
+	--pm: #0891b2;
+}
+[data-plan-mode='customer'] {
+	--pm: #ea580c;
+}
+[data-plan-mode='school'] {
+	--pm: #4f46e5;
+}
+[data-plan-mode='off'] {
+	--pm: #71717a;
+}
+.dark [data-plan-mode='office'] {
+	--pm: #34d399;
+}
+.dark [data-plan-mode='home'] {
+	--pm: #22d3ee;
+}
+.dark [data-plan-mode='customer'] {
+	--pm: #fb923c;
+}
+.dark [data-plan-mode='school'] {
+	--pm: #818cf8;
+}
+.dark [data-plan-mode='off'] {
+	--pm: #a1a1aa;
+}

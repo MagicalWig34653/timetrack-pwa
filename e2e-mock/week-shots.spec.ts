@@ -73,10 +73,10 @@ for (const [name, viewport] of [['phone', { width: 390, height: 844 }], ['deskto
 			await page.goto(`/week?week=${isoWeek(addDays(today, 140))}`);
 			await expect(page.getByTestId('week-empty')).toBeVisible();
 			await shot('week-overview-empty');
-			await page.goto(`/plan?week=${isoWeek(addDays(today, 7))}`);
+			await page.goto(`/plan?week=${isoWeek(addDays(today, 7))}&view=list`);
 			await expect(page.getByTestId('week-planner')).toBeVisible();
 			await shot('plan-filled');
-			await page.goto(`/plan?week=${isoWeek(nextNext)}`);
+			await page.goto(`/plan?week=${isoWeek(nextNext)}&view=list`);
 			await expect(page.getByTestId('week-planner')).toBeVisible();
 			await page.getByTestId('plan-standard').click();
 			await shot('plan-blocked-standard');
