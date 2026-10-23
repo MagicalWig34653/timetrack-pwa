@@ -2,12 +2,14 @@
 	import { goto, beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.js';
-	import type { PlanWeek, TimeWeekSummary } from '#lib/api/types.js';
+	import type { Place, PlanWeek, TimeWeekSummary } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import Panel from '#lib/components/app/Panel.svelte';
 	import StatusChip from '#lib/components/app/StatusChip.svelte';
 	import Toast from '#lib/components/app/Toast.svelte';
+	import FollowWeeksDialog from '#lib/components/week/FollowWeeksDialog.svelte';
 	import PlanRow from '#lib/components/week/PlanRow.svelte';
+	import PlannerBoard from '#lib/components/week/PlannerBoard.svelte';
 	import WeekNav from '#lib/components/week/WeekNav.svelte';
 	import WeekSkeleton from '#lib/components/week/WeekSkeleton.svelte';
 	import WeekTabs from '#lib/components/week/WeekTabs.svelte';
@@ -18,6 +20,8 @@
 	import { formatDuration } from '#lib/time/format.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
+	import { followEntries } from '#lib/week/follow.js';
+	import { DraftHistory } from '#lib/week/history.js';
 	import {
 		clearWeek,
 		copyWeek,
@@ -35,6 +39,9 @@
 		type WindowSuggestion
 	} from '#lib/week/plan-draft.js';
 	import Copy from '@lucide/svelte/icons/copy';
+	import CalendarRange from '@lucide/svelte/icons/calendar-range';
+	import LayoutList from '@lucide/svelte/icons/layout-list';
+	import Layers from '@lucide/svelte/icons/layers';
 	import Eraser from '@lucide/svelte/icons/eraser';
 	import Equal from '@lucide/svelte/icons/equal';
 	import Save from '@lucide/svelte/icons/save';
@@ -58,6 +65,57 @@
 	let showProblems = $state(false);
 	let toast = $state('');
 	let toastTimer: ReturnType<typeof setTimeout> | undefined;
+	let places = $state<Place[]>([]);
+	let followOpen = $state(false);
+	let followBusy = $state(false);
+	let followError = $state('');
+	let followAnchor = $state<DOMRect | null>(null);
+	let followTrigger = $state<HTMLElement | null>(null);
+
+	// Grid (P11) or the form list of K1; the choice is remembered per browser, ?view= wins.
+	const VIEW_KEY = 'tt.plan.view';
+	function storedView(): 'grid' | 'list' {
+		try {
+			return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
+		} catch {
+			return 'grid';
+		}
+	}
+	const initialQuery = page.url.searchParams.get('view');
+	let view = $state<'grid' | 'list'>(initialQuery === 'list' || initialQuery === 'grid' ? initialQuery : storedView());
+	function pickView(next: 'grid' | 'list') {
+		view = next;
+		try {
+			localStorage.setItem(VIEW_KEY, next);
+		} catch {
+			/* optional */
+		}
+	}
+
+	// Unsaved edits are undoable in memory; list edits and loads start a fresh history.
+	const history = new DraftHistory();
+	let historyTick = $state(0);
+	const canUndo = $derived.by(() => (historyTick >= 0 ? history.canUndo : false));
+	const canRedo = $derived.by(() => (historyTick >= 0 ? history.canRedo : false));
+	const undoLabel = $derived.by(() => (historyTick >= 0 ? history.undoLabel : null));
+	const redoLabel = $derived.by(() => (historyTick >= 0 ? history.redoLabel : null));
+	function commit(label: string, next: DayDraft[]) {
+		history.record(label, drafts, next);
+		drafts = next;
+		historyTick++;
+	}
+	function undo() {
+		const step = history.undo();
+		if (step) drafts = step.drafts;
+		historyTick++;
+		if (step) showToast(t('wg.undone', { label: step.label }));
+	}
+	function redo() {
+		const step = history.redo();
+		if (step) drafts = step.drafts;
+		historyTick++;
+		if (step) showToast(t('wg.redone', { label: step.label }));
+	}
 
 	const dirty = $derived(week !== null && !draftsEqual(drafts, baseline));
 	const days = $derived(week?.days ?? []);
@@ -100,6 +158,8 @@
 			drafts = result.days.map(draftFromDay);
 			baseline = result.days.map(draftFromDay);
 			suggestion = suggested;
+			history.clear();
+			historyTick++;
 			load = { status: 'ready' };
 		} catch (error) {
 			if (target === isoWeek) load = toLoadState(error);
@@ -108,6 +168,12 @@
 
 	$effect(() => {
 		void fetchWeek(isoWeek);
+	});
+	$effect(() => {
+		void api.listPlaces().then(
+			(list) => (places = list),
+			() => (places = [])
+		);
 	});
 
 	// Leaving with unsaved changes asks first; a reload or tab close gets the browser's own prompt.
@@ -119,19 +185,23 @@
 
 	function setDraft(index: number, next: DayDraft) {
 		drafts[index] = next;
+		history.clear();
+		historyTick++;
 	}
 	function setMode(index: number, mode: DayDraft['mode']) {
 		drafts[index] = withMode(drafts[index], mode, suggestion, days[index].targetSeconds);
+		history.clear();
+		historyTick++;
 	}
 
 	function applyStandard() {
-		drafts = standardWeek(days, drafts, suggestion);
+		commit(t('weekplan.action_standard'), standardWeek(days, drafts, suggestion));
 	}
 	function applySame() {
-		drafts = sameForWorkdays(days, drafts);
+		commit(t('weekplan.action_same'), sameForWorkdays(days, drafts));
 	}
 	function applyClear() {
-		drafts = clearWeek(days, drafts);
+		commit(t('weekplan.action_clear'), clearWeek(days, drafts));
 	}
 	async function applyCopy() {
 		saveError = '';
@@ -141,15 +211,47 @@
 				showToast(t('weekplan.copy_empty'));
 				return;
 			}
-			drafts = copyWeek(previous, days, drafts);
+			commit(t('weekplan.action_copy'), copyWeek(previous, days, drafts));
 		} catch (error) {
 			saveError = errorMessage(error);
 		}
 	}
 	function discard() {
-		drafts = baseline.map((draft) => ({ ...draft }));
+		commit(t('weekplan.discard'), baseline.map((draft) => ({ ...draft })));
 		showProblems = false;
 		saveError = '';
+	}
+
+	function openFollow(event: MouseEvent) {
+		followTrigger = event.currentTarget as HTMLElement;
+		followAnchor = followTrigger.getBoundingClientRect();
+		followError = '';
+		followOpen = true;
+	}
+
+	/** Writes the shown plan onto the next weeks; blocked days and (unless asked) existing plans stay as they are. */
+	async function applyFollow(input: { weeks: number; overwrite: boolean }) {
+		followBusy = true;
+		followError = '';
+		let written = 0;
+		let skipped = 0;
+		try {
+			for (let n = 1; n <= input.weeks; n++) {
+				const label = isoWeekLabel(addDays(monday, 7 * n));
+				const target = await api.getPlanWeek(label);
+				const plan = followEntries(drafts, target, input.overwrite);
+				skipped += plan.skippedBlocked + plan.skippedExisting;
+				if (plan.entries.length === 0) continue;
+				await api.putPlanWeek(label, { replace: false, days: plan.entries });
+				written += plan.entries.length;
+			}
+			followOpen = false;
+			showToast(t('wg.follow_done', { days: written, skipped }));
+		} catch (error) {
+			followError = errorMessage(error);
+		} finally {
+			followBusy = false;
+		}
 	}
 
 	async function save() {
@@ -166,6 +268,8 @@
 			week = saved;
 			drafts = saved.days.map(draftFromDay);
 			baseline = saved.days.map(draftFromDay);
+			history.clear();
+			historyTick++;
 			showProblems = false;
 			showToast(t('weekplan.saved'));
 		} catch (error) {
@@ -175,12 +279,14 @@
 		}
 	}
 
+	const viewButton =
+		'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 	const differenceText = $derived(
 		totals.differenceSeconds === 0 ? t('weekplan.diff_equal') : t(totals.differenceSeconds < 0 ? 'weekplan.diff_under' : 'weekplan.diff_over', { time: formatDuration(Math.abs(totals.differenceSeconds)) })
 	);
 </script>
 
-<PageHeader title={t('weekplan.title')} description={t('weekplan.description')}>
+<PageHeader title={t('weekplan.title')} description={view === 'grid' ? undefined : t('weekplan.description')}>
 	{#snippet primary()}
 		<span class="flex items-center gap-3">
 			<span class="text-sm {dirty ? 'text-foreground' : 'text-muted-foreground'}" data-testid="plan-dirty" data-dirty={dirty}>{dirty ? t('weekplan.dirty') : t('weekplan.clean')}</span>
@@ -207,6 +313,23 @@
 		{#if isPast}<Alert variant="warning">{t('weekplan.past_hint')}</Alert>{/if}
 		{#if saveError}<Alert variant="destructive" data-testid="plan-error">{saveError}</Alert>{/if}
 
+		{#if view === 'grid'}
+			<!-- Compact week sum above the grid: the grid itself needs the height. -->
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="plan-total">
+				<p class="text-[15px] font-semibold tabular-nums" data-testid="plan-total-text">
+					{t('weekplan.total_text', { planned: formatDuration(totals.plannedSeconds), target: formatDuration(totals.targetSeconds) })}
+				</p>
+				<StatusChip tone={totals.differenceSeconds === 0 ? 'success' : totals.differenceSeconds < 0 ? 'warning' : 'accent'} dot={false}>
+					<span data-testid="plan-diff">{differenceText}</span>
+				</StatusChip>
+				<div class="h-1.5 w-32 overflow-hidden rounded-full bg-muted max-sm:hidden" aria-hidden="true"><div class="h-full rounded-full bg-ui-accent" style="width: {progress}%"></div></div>
+				<p class="text-[13px] text-muted-foreground max-2xl:hidden" data-testid="plan-suggestion">
+					{suggestion.source === 'history'
+						? t('weekplan.suggestion_history', { start: suggestion.start, end: suggestion.end, break: suggestion.breakMinutes })
+						: t('weekplan.suggestion_fallback', { start: suggestion.start, break: suggestion.breakMinutes })}
+				</p>
+			</div>
+		{:else}
 		<Panel data-testid="plan-total">
 			<div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
 				<div class="min-w-0">
@@ -226,21 +349,54 @@
 					: t('weekplan.suggestion_fallback', { start: suggestion.start, break: suggestion.breakMinutes })}
 			</p>
 		</Panel>
+		{/if}
 
-		<div class="flex flex-wrap gap-2" role="group" aria-label={t('weekplan.actions_label')}>
-			<Button variant="outline" size="sm" onclick={applyStandard} data-testid="plan-standard"><WandSparkles />{t('weekplan.action_standard')}</Button>
-			<Button variant="outline" size="sm" onclick={applyCopy} data-testid="plan-copy"><Copy />{t('weekplan.action_copy')}</Button>
-			<Button variant="outline" size="sm" onclick={applySame} data-testid="plan-same"><Equal />{t('weekplan.action_same')}</Button>
-			<Button variant="outline" size="sm" onclick={applyClear} data-testid="plan-clear"><Eraser />{t('weekplan.action_clear')}</Button>
-			{#if dirty}<Button variant="ghost" size="sm" onclick={discard} data-testid="plan-discard">{t('weekplan.discard')}</Button>{/if}
+		<div class="flex items-center gap-2 max-sm:flex-nowrap max-sm:overflow-x-auto sm:flex-wrap">
+			<div class="flex gap-2 max-sm:flex-nowrap sm:flex-wrap" role="group" aria-label={t('weekplan.actions_label')}>
+				<Button variant="outline" size="sm" onclick={applyStandard} data-testid="plan-standard"><WandSparkles />{t('weekplan.action_standard')}</Button>
+				<Button variant="outline" size="sm" onclick={applyCopy} data-testid="plan-copy"><Copy />{t('weekplan.action_copy')}</Button>
+				<Button variant="outline" size="sm" onclick={openFollow} data-testid="plan-follow"><Layers />{t('wg.follow_action')}</Button>
+				<Button variant="outline" size="sm" onclick={applySame} data-testid="plan-same"><Equal />{t('weekplan.action_same')}</Button>
+				<Button variant="outline" size="sm" onclick={applyClear} data-testid="plan-clear"><Eraser />{t('weekplan.action_clear')}</Button>
+				{#if dirty}<Button variant="ghost" size="sm" onclick={discard} data-testid="plan-discard">{t('weekplan.discard')}</Button>{/if}
+			</div>
+			<div class="ml-auto inline-flex rounded-lg bg-muted p-0.5" role="group" aria-label={t('wg.view_label')}>
+				<button type="button" class={viewButton} aria-pressed={view === 'grid'} onclick={() => pickView('grid')} data-testid="view-grid"><CalendarRange class="size-4" />{t('wg.view_grid')}</button>
+				<button type="button" class={viewButton} aria-pressed={view === 'list'} onclick={() => pickView('list')} data-testid="view-list"><LayoutList class="size-4" />{t('wg.view_list')}</button>
+			</div>
 		</div>
 
-		<ul class="flex flex-col gap-2.5" data-testid="plan-rows">
-			{#each days as day, index (day.date)}
-				<PlanRow {day} draft={drafts[index]} {showProblems} onmode={(mode) => setMode(index, mode)} onchange={(next) => setDraft(index, next)} />
-			{/each}
-		</ul>
+		{#if view === 'grid'}
+			<PlannerBoard
+				{week}
+				{drafts}
+				{commit}
+				{undo}
+				{redo}
+				{canUndo}
+				{canRedo}
+				{undoLabel}
+				{redoLabel}
+				{suggestion}
+				{places}
+				{today}
+				{timeZone}
+				{monday}
+				onstandard={applyStandard}
+				oncopylast={applyCopy}
+			/>
+		{:else}
+			<ul class="flex flex-col gap-2.5" data-testid="plan-rows">
+				{#each days as day, index (day.date)}
+					<PlanRow {day} draft={drafts[index]} {showProblems} onmode={(mode) => setMode(index, mode)} onchange={(next) => setDraft(index, next)} />
+				{/each}
+			</ul>
+		{/if}
 	</div>
+{/if}
+
+{#if followOpen}
+	<FollowWeeksDialog busy={followBusy} error={followError} anchor={followAnchor} returnFocus={followTrigger} onsubmit={applyFollow} onclose={() => (followOpen = false)} />
 {/if}
 
 <Toast message={toast} />

@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket P11 (grafischer Wochenplaner, 23.10.2026, Branch p11-week-planner, nicht gemergt)
+`/plan` zeigt ein Zeitraster (Mo–So, 05–23 Uhr): Blöcke malen (Pinsel mit Art und Ort, Radierer), verschieben, Länge ändern, Alt-kopieren, Mehrfachauswahl, Kontextmenü, Tastatur, lokales Undo/Redo, Standardwoche/Letzte Woche/Auf Folgewochen kopieren, Hinweise nach `arbzg-adult-de`, Ghost der tatsächlichen Zeiten, Phone mit Tagesansicht. K1-Formularliste bleibt als Ansicht „Liste“. Backend unverändert; ein Plan pro Tag (kein Teilen/Überlappen). Details und Backend-Wünsche: `docs/handoffs/P11.md`.
+
 ## Paket E1 (Favicon und Fehlerseiten, 23.10.2026, Branch e1-favicon-errors, nicht gemergt)
 Ursache des gelegentlich falschen Favicons: das Root-Layout setzte per `<svelte:head>` das Svelte-Vorlagen-Icon (`lib/assets/favicon.svg`) nach den Links aus `app.html`. Entfernt; ein Icon-Satz (SVG, PNG 16/32, ICO 16/32/48, Apple-Touch 180, Manifest mit any/maskable) mit `?v=2` als Cache-Busting, Service Worker ignoriert die Query für Vorcache-Treffer, Test `static-assets.test.ts` gegen Vorlagen-Reste. Gestaltete Fehlerseiten (`ErrorPage`, `+error.svelte` auf Wurzel- und (app)-Ebene, 404/403/401/5xx/offline, Fehler-ID über `hooks.client.ts`, `svelte:boundary` je Route) und `static/offline.html` als Service-Worker-Rückfall ohne gecachte Hülle. Details, Backend-Befund zur statischen Auslieferung und offene Punkte: `docs/handoffs/E1.md`.
 

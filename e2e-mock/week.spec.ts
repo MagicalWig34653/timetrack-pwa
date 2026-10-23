@@ -77,7 +77,7 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
 	// 2032-W12 = 15.-21.03.2032: Wednesday vacation; 2032-W13 contains Karfreitag (26.03.)
 	await call(page, 'POST', '/absences', { kind: 'vacation', startDate: '2032-03-17', endDate: '2032-03-17', status: 'approved' });
-	await page.goto('/plan?week=2032-W12');
+	await page.goto('/plan?week=2032-W12&view=list');
 	await expect(page.getByTestId('week-planner')).toBeVisible();
 	await expect(page.getByTestId('plan-blocked-2032-03-17')).toContainText('Urlaub eingetragen.');
 	await expect(page.locator('#plan-mode-2032-03-17')).toBeDisabled();
@@ -124,7 +124,7 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	await expect(page.getByTestId('week-day-2032-03-15').getByTestId('bar-planned')).toBeVisible();
 
 	// copy last week into the week with the holiday: Karfreitag stays blocked and empty
-	await page.goto('/plan?week=2032-W13');
+	await page.goto('/plan?week=2032-W13&view=list');
 	await expect(page.getByTestId('plan-blocked-2032-03-26')).toContainText('Feiertag');
 	await page.getByTestId('plan-copy').click();
 	await expect(page.locator('#plan-mode-2032-03-22')).toHaveValue('home');
@@ -145,7 +145,7 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	await expect(page.getByTestId('week-kw')).toHaveText('KW 14');
 
 	// clear and save the first week again
-	await page.goto('/plan?week=2032-W12');
+	await page.goto('/plan?week=2032-W12&view=list');
 	await page.getByTestId('plan-clear').click();
 	await page.getByTestId('plan-save').click();
 	await expect(page.getByTestId('toast')).toHaveText('Woche gespeichert.');
