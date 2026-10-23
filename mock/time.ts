@@ -429,6 +429,14 @@ export function createTimeMock(clock: () => number) {
 				const endedAt = 'endedAt' in body ? body.endedAt : segment.endedAt;
 				if (!isInstant(startedAt) || (endedAt != null && !isInstant(endedAt))) return fail(400, 'bad_request');
 				if (endedAt != null && Date.parse(endedAt) <= Date.parse(startedAt)) return fail(400, 'bad_request');
+				// Contract 0.27.0: `endedAt: null` on a finished segment reopens it (guards: cancelled, other running, later segment).
+				const reopening = 'endedAt' in body && body.endedAt === null && segment.endedAt !== null;
+				if (reopening) {
+					if (segment.voided) return fail(409, 'conflict');
+					if (running(state)) return fail(409, 'timer_already_running');
+					const oldEnd = Date.parse(segment.endedAt!);
+					if (state.segments.some((s) => s.id !== segment.id && !s.voided && Date.parse(s.startedAt) >= oldEnd)) return fail(409, 'segment_overlap');
+				}
 				if (findOverlap(state, Date.parse(startedAt), endedAt ? Date.parse(endedAt) : null, segment.id)) {
 					return fail(409, 'segment_overlap');
 				}

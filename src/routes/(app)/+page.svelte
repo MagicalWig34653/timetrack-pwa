@@ -24,6 +24,7 @@
 	import { sessionStore } from '#lib/session.svelte.js';
 	import { dayBounds, formatDateLong, todayLocal } from '#lib/time/dates.js';
 	import { formatDelta, formatDuration } from '#lib/time/format.js';
+	import { continuableSegment } from '#lib/time/continue.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { onMount } from 'svelte';
@@ -54,6 +55,7 @@
 
 	const timeZone = $derived(zoneStore.value);
 	const today = $derived(todayLocal(timeZone, new Date(now)));
+	const continuable = $derived(running ? null : continuableSegment(segments));
 
 	/**
 	 * `full` also reloads the slow, non-critical parts (time account, suggestions, places). The 60 s poll only
@@ -161,7 +163,7 @@
 			</p>
 		{/if}
 
-		<TimerCard {running} {places} {now} {timeZone} onchange={onTimerChange} />
+		<TimerCard {running} {places} {now} {timeZone} last={continuable} onchange={onTimerChange} />
 
 		<Card>
 			<CardHeader>

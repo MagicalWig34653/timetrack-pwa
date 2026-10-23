@@ -16,13 +16,15 @@
 	import { Select } from '#lib/components/ui/select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
-	import { dayBounds } from '#lib/time/dates.js';
+	import { continuableSegment, continueErrorMessage, continueSegment, gapSeconds } from '#lib/time/continue.js';
+	import { dayBounds, todayLocal } from '#lib/time/dates.js';
 	import { formatDuration, parseDuration } from '#lib/time/format.js';
 	import { DAY_MARKS, markLabel } from '#lib/time/labels.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Plus from '@lucide/svelte/icons/plus';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { onMount, untrack } from 'svelte';
 
@@ -103,10 +105,34 @@
 		return () => clearInterval(tick);
 	});
 
+	// "Fortführen" only for the latest finished segment of today while no timer runs (the server reopens only that one).
+	const continuable = $derived(date === todayLocal(timeZone, new Date(now)) ? continuableSegment(segments) : null);
+	let continueError = $state('');
+
+	async function continueFromMenu(segment: Segment) {
+		continueError = '';
+		try {
+			const outcome = await continueSegment(segment);
+			await saved(
+				outcome.mode === 'reopened'
+					? t('timer.continued')
+					: t('timer.continue_fallback', { duration: formatDuration(gapSeconds(segment, Date.now())) })
+			);
+		} catch (error) {
+			continueError = continueErrorMessage(error);
+			await refresh();
+		}
+	}
+
 	/** Same actions as the buttons of a row, reachable by right-click, long press or the context-menu key. */
 	function menuFor(segment: Segment): MenuEntry[] | null {
 		if (segment.voided) return null;
+		const entries: MenuEntry[] = [];
+		if (continuable?.id === segment.id) {
+			entries.push({ id: 'continue', label: t('day_detail.continue'), icon: RotateCcw, onselect: () => void continueFromMenu(segment) }, { separator: true });
+		}
 		return [
+			...entries,
 			{ id: 'correct', label: t('day_detail.correct'), icon: Pencil, onselect: () => { editingId = segment.id; voidingId = null; adding = false; } },
 			{ id: 'void', label: t('day_detail.void'), icon: Trash2, danger: true, onselect: () => { voidingId = segment.id; voidReason = ''; editingId = null; adding = false; } },
 			{ separator: true },
@@ -192,6 +218,7 @@
 {:else}
 	<div class="flex flex-col gap-4">
 		{#if notice}<Alert variant="success">{notice}</Alert>{/if}
+		{#if continueError}<Alert variant="destructive">{continueError}</Alert>{/if}
 
 		<Card>
 			<CardHeader>
