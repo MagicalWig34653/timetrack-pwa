@@ -142,6 +142,8 @@
 	}
 	html {
 		@apply font-sans;
+		/* reserve the scrollbar track so long and short pages have the same content width (no jump when switching pages) */
+		scrollbar-gutter: stable;
 		-webkit-text-size-adjust: 100%;
 	}
 	body {
