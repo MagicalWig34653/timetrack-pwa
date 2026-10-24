@@ -31,6 +31,24 @@ export function safeRelativeUrl(value: unknown): string | null {
 	}
 }
 
+/** Offline fallback URL that remembers the requested page (`/offline?from=<path>`). */
+export function offlineUrlFor(requested: string): string {
+	const target = returnTargetFromParam(requested);
+	return target ? `/offline?from=${encodeURIComponent(target)}` : '/offline';
+}
+
+/**
+ * Validates the `from` parameter of the offline page: a same-origin relative path that is not the offline page itself
+ * (no loop). Anything else yields null, so the parameter can never act as an open redirect.
+ */
+export function returnTargetFromParam(value: unknown): string | null {
+	const safe = safeRelativeUrl(value);
+	if (!safe) return null;
+	const path = safe.split(/[?#]/)[0];
+	if (path === '/offline' || path === '/offline.html' || path.startsWith('/offline/')) return null;
+	return safe;
+}
+
 export interface PushPayload {
 	title: string;
 	body: string;

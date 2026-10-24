@@ -67,6 +67,7 @@ export const deP12 = {
 	'stats.retry': 'Erneut versuchen',
 	'stats.empty_title': 'Keine Daten im Zeitraum',
 	'stats.empty_text': 'Sobald Zeiten erfasst sind, erscheinen hier die Auswertungen.',
+	'stats.account_unavailable': 'Der Kontostand ist auf diesem Server nicht verfügbar, daher gibt es keinen Kontoverlauf.',
 	'stats.unavailable': 'Die Statistik braucht eine Serverversion mit Zeiterfassung.',
 	'stats.table_toggle': 'Als Tabelle anzeigen',
 	'stats.table_hide': 'Tabelle ausblenden',

@@ -7,8 +7,10 @@ import {
 	isInterceptable,
 	isIosDevice,
 	isOldCache,
+	offlineUrlFor,
 	parsePushPayload,
 	PUSH_FALLBACK,
+	returnTargetFromParam,
 	safeRelativeUrl
 } from './core';
 import { shouldRegisterServiceWorker } from './pwa.svelte';
@@ -41,6 +43,21 @@ describe('safeRelativeUrl', () => {
 			expect(safeRelativeUrl(bad), String(bad)).toBeNull();
 		}
 		expect(safeRelativeUrl('/' + 'a'.repeat(600))).toBeNull();
+	});
+});
+
+describe('offline return target', () => {
+	it('keeps the requested path and query in the offline URL', () => {
+		expect(offlineUrlFor('/time')).toBe('/offline?from=%2Ftime');
+		expect(offlineUrlFor('/week?week=2026-W43')).toBe('/offline?from=%2Fweek%3Fweek%3D2026-W43');
+		expect(returnTargetFromParam('/week?week=2026-W43')).toBe('/week?week=2026-W43');
+	});
+	it('rejects external, malformed and self-referencing targets', () => {
+		for (const bad of ['https://evil.example/', '//evil.example', '/\\evil.example', 'javascript:alert(1)', 'time', '', null, '/offline', '/offline?from=%2Fx', '/offline.html']) {
+			expect(returnTargetFromParam(bad), String(bad)).toBeNull();
+		}
+		expect(offlineUrlFor('//evil.example')).toBe('/offline');
+		expect(offlineUrlFor('/offline')).toBe('/offline');
 	});
 });
 

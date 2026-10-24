@@ -1,0 +1,9 @@
+# Handoff X1-review – Codex-Review-Funde (Planer, Statistik, Offline)
+
+Branch `x1-review-fixes` (nicht gemergt, nicht gepusht). Alle drei Funde waren real.
+
+1. **Planer (hoch)**: `save()` ersetzte nach der Antwort `drafts` und Verlauf komplett durch die gesendete Serverversion; Änderungen während des Speicherns gingen verloren. Neu: `src/lib/week/save-merge.ts` (`settleSave`) vergleicht den gesendeten mit dem aktuellen Entwurf. Bei Änderungen bleiben Entwurf und Undo-Verlauf erhalten, nur Basis (Serverstand) und `week` wandern, der Plan bleibt „ungespeichert“. Wochenwechsel während des Speicherns überschreibt nichts. Tests: `save-merge.test.ts`, Mock-E2E `e2e-mock/x1.spec.ts` (PUT wird angehalten, zweite Änderung, bleibt erhalten und dirty).
+2. **Statistik (mittel)**: `daySource` (Fallback ohne `/time/statistics`) macht Tage, nachgeladene Segmente und Abwesenheiten zu Pflichtquellen (Fehler wird sichtbar). Segmente werden nur geladen, wenn Tage sie nicht einbetten. Nur der Kontostand ist optional: fehlender Endpunkt (404/405/501) setzt `StatsData.balanceAvailable=false`, die Seite zeigt „–“ und einen Hinweis statt einer Linie ab 0; andere Fehler werden angezeigt. Tests: `day-source.test.ts`.
+3. **Offline (niedrig)**: Service Worker leitet auf `/offline?from=<Pfad+Query>`; `offlineUrlFor`/`returnTargetFromParam` in `lib/pwa/core.ts` (nur gleiche Herkunft, relativ, kein `/offline`-Loop). Die Offline-Seite kehrt per Knopf und beim `online`-Ereignis dorthin zurück, sonst `/`. Tests: `core.test.ts`, `sw.test.ts`, Mock-E2E.
+
+Prüfung: `npm run check` 0 Fehler, `npm test` 1098 grün, Mock-E2E x1, p12, week-grid einzeln grün. Im Gesamtlauf schlug `p12` (Papierkorb-Zähler 5 vs 12) fehl, weil Specs den gemeinsamen Mock-Zustand teilen; einzeln grün. Der PWA-E2E (`test:e2e:pwa`, echter Service Worker) wurde nicht ausgeführt.

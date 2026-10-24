@@ -5,6 +5,9 @@ Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-o
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.
 Frühere Paketstände und Details: `docs/handoffs/*.md` (L1 bis L23, P1, X1).
 
+## Paket X1-review (Codex-Review-Funde; 24.10.2026, Branch x1-review-fixes, nicht gemergt)
+Planer behält Änderungen während des Speicherns, Statistik-Fallback zeigt Fehler/„Kontostand nicht verfügbar“ statt falscher Nullwerte, Offline-Seite kehrt zur angefragten Seite zurück. Details: `docs/handoffs/X1-review.md`.
+
 ## Paket P12 (Wochensaldo, Statistik, stornierte Einträge, Woche; 23.10.2026, Branch p12-stats-trash-week, nicht gemergt)
 Kalender zeigt unter der KW die Differenz zum Wochensoll (laufende Woche neutral „noch X offen“). Neue Seiten `/stats` (Diagramme als eigene SVG, Datenschicht austauschbar) und `/time/cancelled` (Wiederherstellen, endgültig löschen einzeln/mehrfach/alle mit getipptem Wort; Endpunkte nach Entwurf, Funktionserkennung, Mock). `/week` merkt die letzte Woche (sessionStorage) und zeigt Abwesenheiten mit Warnung für geplant/beantragt. Details: `docs/handoffs/P12.md`.
 

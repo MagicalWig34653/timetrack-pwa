@@ -68,7 +68,7 @@
 				if (query.from !== range.from || query.to !== range.to || query.granularity !== granularity || query.rounded !== rounded) return;
 				data = result;
 				const last = result.points.at(-1);
-				endBalance = last ? last.balanceSeconds : result.openingBalanceSeconds;
+				endBalance = !result.balanceAvailable ? null : last ? last.balanceSeconds : result.openingBalanceSeconds;
 				load = { status: 'ready' };
 			} catch (e) {
 				load = toLoadState(e);
@@ -165,7 +165,11 @@
 
 			<div class="grid gap-4 lg:grid-cols-2">
 				<Panel class="lg:col-span-2">
-					<Chart title={t('stats.chart.account')} description={t('stats.chart.account_desc')} categories={labels} series={accountSeries} type="line" format={fmtDeltaHours} ticks={hourTicks} axisFormat={(v) => `${Math.round(v)} h`} testid="chart-account" legend={false} />
+					{#if data.balanceAvailable}
+						<Chart title={t('stats.chart.account')} description={t('stats.chart.account_desc')} categories={labels} series={accountSeries} type="line" format={fmtDeltaHours} ticks={hourTicks} axisFormat={(v) => `${Math.round(v)} h`} testid="chart-account" legend={false} />
+					{:else}
+						<p class="text-sm text-muted-foreground" data-testid="chart-account-unavailable">{t('stats.account_unavailable')}</p>
+					{/if}
 				</Panel>
 				<Panel>
 					<Chart title={t('stats.chart.soll_ist')} description={t('stats.chart.soll_ist_desc')} categories={labels} series={sollIstSeries} type="bars" format={fmtHours} axisFormat={(v) => `${Math.round(v)} h`} testid="chart-soll-ist" />

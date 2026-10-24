@@ -22,6 +22,7 @@
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { followEntries } from '#lib/week/follow.js';
 	import { DraftHistory } from '#lib/week/history.js';
+	import { settleSave } from '#lib/week/save-merge.js';
 	import {
 		clearWeek,
 		copyWeek,
@@ -264,11 +265,20 @@
 		}
 		saving = true;
 		try {
-			const saved = await api.putPlanWeek(isoWeek, weekRequest(drafts));
+			const target = isoWeek;
+			const sent = $state.snapshot(drafts) as DayDraft[];
+			const saved = await api.putPlanWeek(target, weekRequest(sent));
+			// another week was opened meanwhile: its own load owns the state now
+			if (target !== isoWeek) {
+				showToast(t('weekplan.saved'));
+				return;
+			}
+			// edits made while the request was in flight stay (and stay unsaved); only the server version moves
+			const settled = settleSave(sent, $state.snapshot(drafts) as DayDraft[], saved.days.map(draftFromDay));
 			week = saved;
-			drafts = saved.days.map(draftFromDay);
-			baseline = saved.days.map(draftFromDay);
-			history.clear();
+			drafts = settled.drafts;
+			baseline = settled.baseline;
+			if (!settled.keepHistory) history.clear();
 			historyTick++;
 			showProblems = false;
 			showToast(t('weekplan.saved'));

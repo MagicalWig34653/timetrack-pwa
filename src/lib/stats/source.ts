@@ -20,20 +20,38 @@ export interface StatsSource {
 	load(query: StatsQuery): Promise<StatsData>;
 }
 
-/** Computes the series from existing endpoints: time/days (chunks of 93 days), absences and the time account. */
+const isMissingEndpoint = (error: unknown) => {
+	const status = (error as { status?: number }).status;
+	return status === 404 || status === 405 || status === 501;
+};
+
+/**
+ * Computes the series from existing endpoints: time/days (chunks of 93 days), absences and the time account.
+ * Days, segments (when the days do not embed them) and absences are required: a failure surfaces as an error instead of
+ * a plausible but wrong chart. Only the account balance is optional: a server without the account endpoint yields
+ * `balanceAvailable: false` (the balance is then not shown), never a line starting at zero.
+ */
 export const daySource: StatsSource = {
 	async load(query) {
-		const [rawDays, segments, absences, opening] = await Promise.all([
-			api.listDays(query.from, query.to),
+		const rawDays = await api.listDays(query.from, query.to);
+		const needsSegments = rawDays.some((d) => !d.segments && d.segmentIds.length > 0);
+		const [segments, absences, opening] = await Promise.all([
 			// not every server embeds `segments` into the day evaluations: load them once for the whole range as fallback
-			api.listSegments(`${addDays(query.from, -1)}T00:00:00Z`, `${addDays(query.to, 2)}T00:00:00Z`).catch(() => []),
-			api.listAbsences(query.from, query.to).catch(() => []),
-			// balance before the first day; a server without the account endpoint starts the line at zero
-			api.getTimeAccount(addDays(query.from, -1)).then((a) => a.balanceSeconds).catch(() => 0)
+			needsSegments ? api.listSegments(`${addDays(query.from, -1)}T00:00:00Z`, `${addDays(query.to, 2)}T00:00:00Z`) : Promise.resolve([] as Segment[]),
+			api.listAbsences(query.from, query.to),
+			// balance before the first day
+			api.getTimeAccount(addDays(query.from, -1)).then(
+				(a) => a.balanceSeconds as number | null,
+				(error) => {
+					if (isMissingEndpoint(error)) return null;
+					throw error;
+				}
+			)
 		]);
 		const byId = new Map(segments.map((seg) => [seg.id, seg]));
 		const days = rawDays.map((d) => (d.segments ? d : { ...d, segments: d.segmentIds.map((id) => byId.get(id)).filter((seg): seg is Segment => !!seg) }));
-		return aggregate({ days, absences, openingBalanceSeconds: opening, granularity: query.granularity, rounded: query.rounded, today: query.today, timeZone: query.timeZone });
+		const data = aggregate({ days, absences, openingBalanceSeconds: opening ?? 0, granularity: query.granularity, rounded: query.rounded, today: query.today, timeZone: query.timeZone });
+		return { ...data, balanceAvailable: opening !== null };
 	}
 };
 
@@ -95,6 +113,7 @@ export function fromStatistics(stats: TimeStatistics, monthly: TimeStatistics, t
 			days: stats.buckets.reduce((sum, b) => sum + (b.targetToDateSeconds > 0 || b.actualSeconds > 0 ? b.days : 0), 0)
 		},
 		openingBalanceSeconds: stats.openingBalanceSeconds ?? 0,
+		balanceAvailable: stats.openingBalanceSeconds != null || stats.buckets.some((b) => b.balanceSeconds != null),
 		empty: t.targetToDateSeconds === 0 && t.actualSeconds + t.creditSeconds === 0
 	};
 }
@@ -114,8 +133,7 @@ export const apiSource: StatsSource = {
 			]);
 			return fromStatistics(stats, monthly ?? stats, query.today, times);
 		} catch (error) {
-			const status = (error as { status?: number }).status;
-			if (status === 404 || status === 405 || status === 501) return daySource.load(query);
+			if (isMissingEndpoint(error)) return daySource.load(query);
 			throw error;
 		}
 	}

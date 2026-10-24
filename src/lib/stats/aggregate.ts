@@ -52,6 +52,8 @@ export interface StatsData {
 	};
 	/** account balance before the first day */
 	openingBalanceSeconds: number;
+	/** false when the server cannot tell the account balance: the balance must then be shown as unavailable, not as 0 */
+	balanceAvailable: boolean;
 	/** true when there is nothing to show (no Soll and no time) */
 	empty: boolean;
 	/** the same range per month, always present (absence chart) */
@@ -187,6 +189,7 @@ function build(input: AggregateInput): Omit<StatsData, 'monthly'> {
 		points: elapsed,
 		totals: { ...totals, avgStartMinutes: mean(allStarts), avgEndMinutes: mean(allEnds) },
 		openingBalanceSeconds: input.openingBalanceSeconds,
+		balanceAvailable: true,
 		empty: totals.targetSeconds === 0 && totals.actualSeconds === 0
 	};
 }

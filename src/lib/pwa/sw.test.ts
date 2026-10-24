@@ -136,8 +136,10 @@ describe('fetch', () => {
 		const nav = await run('https://app.example/time', { mode: 'navigate' });
 		const res = await nav!;
 		expect(res.status).toBe(302);
-		expect(res.headers.get('Location')).toBe('https://app.example/offline');
-		const offlinePage = await run('https://app.example/offline', { mode: 'navigate' });
+		expect(res.headers.get('Location')).toBe('https://app.example/offline?from=%2Ftime');
+		const withQuery = await (await run('https://app.example/week?week=2026-W43', { mode: 'navigate' }))!;
+		expect(withQuery.headers.get('Location')).toBe('https://app.example/offline?from=%2Fweek%3Fweek%3D2026-W43');
+		const offlinePage = await run('https://app.example/offline?from=%2Ftime', { mode: 'navigate' });
 		expect(await (await offlinePage)!.text()).toBe('shell');
 	});
 
