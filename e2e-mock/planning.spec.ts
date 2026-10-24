@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Planning, vacation and sharing pages against the in-repo mock API (`npm run dev:mock`), serially on one server.

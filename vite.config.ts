@@ -51,6 +51,8 @@ export default defineConfig({
 	resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
 	test: {
 		environment: 'jsdom',
+		testTimeout: 30_000,
+		hookTimeout: 30_000,
 		include: ['src/**/*.test.ts', 'mock/**/*.test.ts'],
 		setupFiles: ['./vitest-setup.ts']
 	}

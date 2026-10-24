@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Only runs when SCREENSHOT_DIR is set; used for the manual layout review (390 px phone and desktop, light and dark).

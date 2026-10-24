@@ -106,10 +106,10 @@ test('registers, precaches the shell, shows /offline when the network is down an
 
 	await context.setOffline(true);
 	await page.goto('/time').catch(() => {});
-	await expect(page).toHaveURL(/\/offline$/);
+	await expect(page).toHaveURL(/\/offline(\?from=.*)?$/);
 	await expect(page.getByTestId('offline-text')).toHaveText('Du bist offline. Änderungen werden nicht gespeichert.');
 	await expect(page.getByTestId('offline-banner')).toContainText('Offline – Änderungen werden nicht gespeichert');
-	await context.setOffline(false);
+	await page.close({ runBeforeUnload: false });
 	await context.close();
 });
 
@@ -151,6 +151,7 @@ async function workerRegistrationId(context: BrowserContext, page: Page) {
 }
 
 test('push: enable on this device with granted permission, list, test, and a delivered push shows a notification', async ({ browser, baseURL }) => {
+	test.setTimeout(120_000);
 	const { context, page } = await loginAsAdmin(browser);
 	await context.grantPermissions(['notifications'], { origin: baseURL });
 	const worker = await workerRegistrationId(context, page);

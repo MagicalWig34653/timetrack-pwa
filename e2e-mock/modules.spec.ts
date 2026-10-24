@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Module switches (ADR-0012) against the mock. Serial: the mock server keeps its state, every test restores it.

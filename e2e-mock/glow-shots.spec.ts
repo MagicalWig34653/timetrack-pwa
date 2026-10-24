@@ -1,4 +1,5 @@
-import { test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Review screenshots for the glass and glow work (G1); only runs with SCREENSHOT_DIR.

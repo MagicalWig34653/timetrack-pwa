@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Package P12 against the in-repo mock: week balance in the calendar, statistics, cancelled entries, /week memory and absences.

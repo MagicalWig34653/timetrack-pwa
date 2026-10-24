@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // X1 review fixes against the in-repo mock API.

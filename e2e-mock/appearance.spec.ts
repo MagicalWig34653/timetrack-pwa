@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin, newAuthenticatorContext } from './helpers';
 
 // Package P2: accent and colour scheme belong to the account (ADR-0020), localStorage is the instant-apply cache.

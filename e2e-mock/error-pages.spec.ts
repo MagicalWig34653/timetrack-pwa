@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Designed error pages (E1). Screenshots only with SCREENSHOT_DIR. Light/dark x phone/desktop.

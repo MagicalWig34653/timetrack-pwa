@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Hilfe > "Version und Build" (ADR-0023 of the backend repository). Screenshots only with SCREENSHOT_DIR.

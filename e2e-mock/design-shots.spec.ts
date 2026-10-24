@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test } from './test';
 import { loginAsAdmin, newAuthenticatorContext } from './helpers';
 
 // Review screenshots for the design language; only runs with SCREENSHOT_DIR (light/dark x 390/1280 px).

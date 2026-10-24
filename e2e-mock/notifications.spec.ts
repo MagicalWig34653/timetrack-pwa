@@ -1,7 +1,8 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
-// Notification center and settings against the mock (package L16). Serial: the mock server keeps its state.
+// Notification center and settings against the mock (package L16). Tests in this file share its isolated state.
 test.describe.configure({ mode: 'serial' });
 
 /** Calls a mock-only hook (POST /api/v1/mock/<name>) from inside the page, with the session's CSRF token. */
@@ -53,7 +54,7 @@ test('bell shows the unread count, the center lists items and navigates to the r
 
 test('mark all read, delete, unread filter and load more', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser);
-	// 3 items from the previous test are still in the (serial) mock state: 25 new ones make 28
+	// Three items from the previous test remain in this file's mock state.
 	await hook(page, 'notify', { kind: 'pending_suggestions', count: 25, ageMinutes: 1000 });
 	await page.goto('/notifications');
 	const items = page.getByTestId('notification-list').getByRole('listitem');

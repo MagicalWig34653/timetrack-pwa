@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { readFieldValues } from '../src/lib/vacation-form/pdf';
 import { makeFlatPdf, makeFormPdf } from '../src/lib/vacation-form/test-pdf';
 import { loginAsAdmin } from './helpers';

@@ -13,6 +13,7 @@ const hooks = process.env.TEST_HOOKS === '1';
 const types = {
 	'.html': 'text/html; charset=utf-8',
 	'.js': 'text/javascript; charset=utf-8',
+	'.mjs': 'text/javascript; charset=utf-8',
 	'.css': 'text/css; charset=utf-8',
 	'.json': 'application/json',
 	'.webmanifest': 'application/manifest+json',
@@ -28,11 +29,21 @@ let bump = 0;
 let handleNodeRequest;
 let api;
 let prefixes = [];
+let resetMock = () => {};
 if (withMock) {
 	const { createMockApi } = await import('../mock/api.ts');
 	({ handleNodeRequest } = await import('../mock/node-handler.ts'));
 	({ MOCK_PREFIXES: prefixes } = await import('../mock/node-handler.ts'));
-	api = createMockApi({ oidc: false });
+	const { resolveBuildInfo } = await import('./build-info.ts');
+	const mockOptions = {
+		seedAttachments: true,
+		pwaBuild: resolveBuildInfo(),
+		modulesDisabled: (process.env.MOCK_MODULES_DISABLED ?? '').split(',').map((value) => value.trim()).filter(Boolean),
+		oidc: process.env.MOCK_OIDC === '0' ? false : { name: process.env.MOCK_OIDC_NAME || 'Mock-IdP' }
+	};
+	const freshMock = () => createMockApi(mockOptions);
+	api = freshMock();
+	resetMock = () => { api = freshMock(); };
 }
 
 http
@@ -40,6 +51,11 @@ http
 		const url = new URL(req.url ?? '/', 'http://localhost');
 		if (hooks && url.pathname === '/__test/bump' && req.method === 'POST') {
 			bump += 1;
+			res.statusCode = 204;
+			return res.end();
+		}
+		if (hooks && withMock && url.pathname === '/__test/reset' && req.method === 'POST') {
+			resetMock();
 			res.statusCode = 204;
 			return res.end();
 		}

@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Design language (ADR-0014) against the mock: shell, accent system, dark mode, transparency fallbacks, 390 px layout.

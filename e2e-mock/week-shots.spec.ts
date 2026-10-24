@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Review screenshots of the week pages (package K1); only runs with SCREENSHOT_DIR. Light/dark x phone/desktop.

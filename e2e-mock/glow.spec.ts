@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Package G1: glass surfaces (backdrop blur on every floating surface) and the glow levels (Leuchteffekt).

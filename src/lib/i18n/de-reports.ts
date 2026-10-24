@@ -36,7 +36,7 @@ export const deReports = {
 
 	// entries
 	'reports.day.add': 'Eintrag hinzufügen',
-	'reports.day.add_label': 'Eintrag für {date} hinzufügen',
+	'reports.day.add_label': 'Eintrag hinzufügen für {date}',
 	'reports.day.empty': 'Keine Einträge',
 	'reports.day.total': 'Summe {duration} h',
 	'reports.entry.draft_badge': 'KI-Entwurf',

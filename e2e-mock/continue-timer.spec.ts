@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // "Fortführen" (package W2, backend contract 0.27.0) against the in-repo mock. Screenshots only with SCREENSHOT_DIR.

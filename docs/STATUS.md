@@ -1,5 +1,23 @@
 # Stand der PWA – 17.10.2026 (Pakete bis P2, W1; Dokumentationsabgleich D3)
 
+## Paket CX2 (Stabilität, Lizenzbeilage, Barrierefreiheit; Branch `cx2-stability`, 24.10.2026)
+
+Der Mock-E2E-Befehl baut jetzt die PWA mit Mock-Modus und startet den statischen
+Build mit Mock-API. Ein Setup lädt die Anmeldeseite vorab; ein automatisches
+Fixture setzt den API-Zustand vor jeder Spec-Datei zurück; Tests derselben Datei
+teilen ihren Zustand. Ein Worker und 120 Sekunden
+Testlimit bleiben fest. Vitest erhält 30 Sekunden für Tests und Hooks; der
+umgebungsabhängige Push-E2E erhält 120 Sekunden.
+
+Der Build erzeugt `THIRD-PARTY-NOTICES.txt` (im Hilfe-Dialog verlinkt) aus
+Paketmetadaten und Lizenzdateien. Details und Lizenzgrenze bei axe:
+`docs/LIZENZEN.md`. Eine axe-Spec prüft Anmeldung, Heute, Zeit, Berichtsheft,
+Urlaub und Profil auf WCAG A/AA-Regeln. Befunde konnten in dieser Sandbox noch
+nicht im Browser gemessen oder behoben werden, da lokale TCP-Listener und der
+Chromium-Prozess vom Betriebssystem mit `EPERM` abgewiesen werden. Handoff und
+Prüfstand: `docs/handoffs/CX2.md`. Der Commit ist ebenfalls blockiert, weil die
+Git-Indexdatei dieses Worktrees außerhalb der beschreibbaren Wurzel liegt.
+
 Projektstatus: Alpha. Das Repository ist seit 17.10.2026 öffentlich (AGPL-3.0-only). Die PWA läuft im Stand P2 auf der privaten Live-Testinstanz des Betreibers (ausgerollt 16.10. abends); eine Produktionsinstanz wird eingerichtet. Seit P2 gab es nur CI-/Dokumentationsänderungen (W1, D3), keine Änderungen an `src/`.
 
 Kanonisches Projektgedächtnis liegt im Backend-Repo (`../timetrack-backend/docs/STATUS.md`, ARBEITSPLAN.md, ADRs). Dieses Dokument beschreibt den tatsächlichen Stand der PWA.

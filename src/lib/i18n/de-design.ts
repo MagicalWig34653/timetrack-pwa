@@ -27,6 +27,7 @@ export const deDesign = {
 	'help.item_settings': 'Einstellungen: Arbeitsmodell, Orte, Module, Hinweise und Darstellung.',
 	'help.item_search': 'Die Suche in der Seitenleiste springt direkt zu einer Einstellung.',
 	'help.mcp': 'KI-Anbindung einrichten',
+	'help.licenses': 'Lizenzen von Drittanbietern',
 
 	'version.title': 'Version und Build',
 	'version.intro': 'Diese Angaben helfen bei Fehlermeldungen. „Image-ID“ ist der Git-Commit, aus dem das Image gebaut wurde.',

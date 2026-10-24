@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin, seededWorkDays } from './helpers';
 
 // Week planner time grid (package P11) against the in-repo mock API. Serial: the mock state lives in one server process.

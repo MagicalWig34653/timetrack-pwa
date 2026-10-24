@@ -13,7 +13,7 @@ export default defineConfig({
 	timeout: 60_000,
 	reporter: [['list']],
 	webServer: {
-		command: `MOCK=1 TEST_HOOKS=1 node scripts/serve-build.mjs build ${port}`,
+		command: `MOCK=1 TEST_HOOKS=1 node --import ./scripts/ts-extension-loader.mjs scripts/serve-build.mjs build ${port}`,
 		url: `http://localhost:${port}/login`,
 		reuseExistingServer: false,
 		timeout: 60_000

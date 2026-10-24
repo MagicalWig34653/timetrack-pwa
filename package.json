@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "node scripts/generate-licenses.mjs && vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.service-worker.json --noEmit",
@@ -14,11 +14,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
-    "test:e2e:mock": "playwright test -c playwright.mock.config.ts",
+    "test:e2e:mock": "VITE_MOCK=1 npm run build && playwright test -c playwright.mock.config.ts",
     "test:e2e:pwa": "npm run build && playwright test -c playwright.pwa.config.ts",
     "icons": "node scripts/generate-icons.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@fontsource-variable/inter": "^5.3.0",
     "@lucide/svelte": "^1.56.0",
     "@playwright/test": "^1.64.0",

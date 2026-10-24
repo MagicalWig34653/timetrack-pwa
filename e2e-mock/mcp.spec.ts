@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin, newAuthenticatorContext } from './helpers';
 
 // MCP/OAuth UI against the mock (package L15). The "client" is the in-app page /mock-oauth, which registers itself,

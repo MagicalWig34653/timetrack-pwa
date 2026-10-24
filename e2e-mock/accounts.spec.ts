@@ -1,5 +1,6 @@
 import fs from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin, newAuthenticatorContext } from './helpers';
 
 // Account administration and privacy (ADR-0016) against the mock. Serial: the mock server keeps its state.

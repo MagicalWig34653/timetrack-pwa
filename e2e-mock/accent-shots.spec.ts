@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Review screenshots of the accent picker (AC2); only runs with SCREENSHOT_DIR.

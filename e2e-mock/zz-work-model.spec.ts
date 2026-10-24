@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // File name sorts last on purpose: the spec adds a version far in the future, which would collide with import specs that create

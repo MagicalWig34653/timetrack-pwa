@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { type Browser, type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin, newAuthenticatorContext } from './helpers';
 
 // Profile page and guided setup (P1, ADR-0019) against the mock. Serial: the mock server keeps its state.

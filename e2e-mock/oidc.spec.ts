@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Optional OIDC against the in-repo mock (provider = in-app page /mock-idp). Serial: the mock server keeps its state.

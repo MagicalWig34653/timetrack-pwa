@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Package P5 on the dev mock: calendar tile backgrounds, absence list filters, attachment preview.

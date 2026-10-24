@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Review screenshots of package P12 (calendar week balance, statistics, cancelled entries, /week absences); only with SCREENSHOT_DIR.

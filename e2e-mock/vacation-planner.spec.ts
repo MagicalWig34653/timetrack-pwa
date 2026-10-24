@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // Vacation planner (V2) against the in-repo mock API. Relative to "today" because the mock seeds its demo data that way.

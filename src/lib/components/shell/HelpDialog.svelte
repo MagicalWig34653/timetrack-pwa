@@ -39,6 +39,7 @@
 		</ul>
 		{#if open}<VersionInfo />{/if}
 		<div class="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+			<Button variant="outline" href="/THIRD-PARTY-NOTICES.txt" target="_blank" rel="noopener noreferrer">{t('help.licenses')}</Button>
 			{#if moduleStore.enabled('mcp')}
 				<Button variant="outline" href="/settings/mcp-help" onclick={() => (open = false)}>{t('help.mcp')}</Button>
 			{/if}
