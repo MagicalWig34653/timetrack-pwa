@@ -2,7 +2,7 @@
 
 `npm run build` erzeugt `static/THIRD-PARTY-NOTICES.txt` aus den installierten
 Paketmetadaten und Lizenzdateien. Die Datei wird mit dem PWA-Build ausgeliefert
-und ist im Hilfe-Dialog verlinkt. Der Generator umfasst die Laufzeitabhängigkeiten
+und ist im Hilfe-Dialog verlinkt. Der Generator umfasst die Laufzeitabhängigkeiten, alle in `src/` importierten (gebündelten) Pakete auch aus den devDependencies
 (`pdf-lib`, `pdfjs-dist` und die transitiven Pakete) sowie die ausgelieferte
 Inter-Schrift (OFL-1.1). `pdfjs-dist` 6.4.299 enthält im npm-Paket keine eigene
 NOTICE-Datei; die Beilage übernimmt daher den Lizenzhinweis aus dem Kopf der

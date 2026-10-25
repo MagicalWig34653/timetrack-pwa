@@ -54,6 +54,8 @@ export interface StatsData {
 	openingBalanceSeconds: number;
 	/** false when the server cannot tell the account balance: the balance must then be shown as unavailable, not as 0 */
 	balanceAvailable: boolean;
+	/** false when absences could not be loaded because the planning module is disabled (shown as unavailable) */
+	absencesAvailable?: boolean;
 	/** true when there is nothing to show (no Soll and no time) */
 	empty: boolean;
 	/** the same range per month, always present (absence chart) */

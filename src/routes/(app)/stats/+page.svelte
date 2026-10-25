@@ -160,7 +160,7 @@
 				<KpiCard title={t('stats.kpi.avg_start')} value={data.totals.avgStartMinutes === null ? '–' : clockText(data.totals.avgStartMinutes)} icon={Clock} testid="stats-avg-start" />
 				<KpiCard title={t('stats.kpi.avg_end')} value={data.totals.avgEndMinutes === null ? '–' : clockText(data.totals.avgEndMinutes)} icon={Clock} testid="stats-avg-end" />
 				<KpiCard title={t('stats.kpi.breaks')} value={formatDuration(data.totals.breakSeconds)} icon={Coffee} testid="stats-breaks" />
-				<KpiCard title={t('stats.kpi.absences')} value={String(data.totals.absenceDays).replace('.', ',')} icon={Plane} testid="stats-absences" />
+				<KpiCard title={t('stats.kpi.absences')} value={data.absencesAvailable === false ? '–' : String(data.totals.absenceDays).replace('.', ',')} icon={Plane} testid="stats-absences" />
 			</section>
 
 			<div class="grid gap-4 lg:grid-cols-2">
@@ -197,7 +197,12 @@
 					{/if}
 				</Panel>
 				<Panel>
+					{#if data.absencesAvailable === false}
+						<h3 class="text-sm font-medium">{t('stats.chart.absences')}</h3>
+						<p class="mt-2 text-sm text-muted-foreground" data-testid="chart-absences-unavailable">{t('stats.absences_unavailable')}</p>
+					{:else}
 					<Chart title={t('stats.chart.absences')} description={t('stats.chart.absences_desc')} categories={monthLabels} series={absenceSeries} type="stacked" format={(v) => t('stats.days', { count: String(v).replace('.', ',') })} axisFormat={(v) => String(v)} testid="chart-absences" />
+					{/if}
 				</Panel>
 				<Panel>
 					<Chart title={t('stats.chart.times')} description={t('stats.chart.times_desc')} categories={labels} series={timesSeries} type="line" format={(v) => clockText(Math.round(v))} ticks={(lo, hi) => { const step = 60; const out: number[] = []; for (let v = Math.floor(lo / step) * step; v <= hi + step; v += step) out.push(v); return out.length > 7 ? out.filter((_, i) => i % 2 === 0) : out; }} axisFormat={(v) => clockText(Math.round(v))} testid="chart-times" />

@@ -1,5 +1,12 @@
 # Stand der PWA – 17.10.2026 (Pakete bis P2, W1; Dokumentationsabgleich D3)
 
+## Paket X4 (Review-Fixes Statistik und Lizenzbeilage; Branch `x4-review-fixes`, 25.10.2026)
+
+Statistik-Fallback ohne `/time/statistics`: Ein 404 `module_disabled` von `/absences` (Planungsmodul aus) gilt als leere
+Abwesenheitsliste (`absencesAvailable: false`, Anzeige „Abwesenheiten nicht verfügbar“), alle anderen Fehler bleiben
+sichtbar. `THIRD-PARTY-NOTICES.txt` enthält jetzt auch gebündelte devDependencies (`@lucide/svelte`, `cn`,
+`tailwind-variants`, `svelte`, `clsx` …), ermittelt aus den Importen in `src/`. Details: `docs/handoffs/X4.md`.
+
 ## Paket CX2 (Stabilität, Lizenzbeilage, Barrierefreiheit; Branch `cx2-stability`, 24.10.2026)
 
 Der Mock-E2E-Befehl baut jetzt die PWA mit Mock-Modus und startet den statischen

@@ -91,6 +91,7 @@ export const deP12 = {
 	'stats.chart.kinds': 'Verteilung nach Art',
 	'stats.chart.kinds_desc': 'Arbeit, Fahrt und Schule im Zeitraum.',
 	'stats.chart.absences': 'Abwesenheiten',
+	'stats.absences_unavailable': 'Abwesenheiten nicht verfügbar',
 	'stats.chart.absences_desc': 'Urlaub, Krankheit und weitere Abwesenheitstage je Monat.',
 	'stats.chart.times': 'Beginn und Ende',
 	'stats.chart.times_desc': 'Durchschnittlicher Tagesbeginn und durchschnittliches Tagesende je Zeitabschnitt.',

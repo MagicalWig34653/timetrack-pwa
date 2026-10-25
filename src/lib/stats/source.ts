@@ -1,5 +1,5 @@
-import { api } from '#lib/api/client.js';
-import type { Segment, StatisticsBucket, TimeStatistics } from '#lib/api/types.js';
+import { api, ApiError } from '#lib/api/client.js';
+import type { Absence, Segment, StatisticsBucket, TimeStatistics } from '#lib/api/types.js';
 import { addDays } from '#lib/time/dates.js';
 import { aggregate, bucketKey, bucketLabel, type Granularity, type StatsData, type StatsPoint } from './aggregate.js';
 
@@ -27,7 +27,7 @@ const isMissingEndpoint = (error: unknown) => {
 
 /**
  * Computes the series from existing endpoints: time/days (chunks of 93 days), absences and the time account.
- * Days, segments (when the days do not embed them) and absences are required: a failure surfaces as an error instead of
+ * Days and segments (when the days do not embed them) are required, absences too except for a disabled planning module (404 `module_disabled`, `absencesAvailable: false`): a failure surfaces as an error instead of
  * a plausible but wrong chart. Only the account balance is optional: a server without the account endpoint yields
  * `balanceAvailable: false` (the balance is then not shown), never a line starting at zero.
  */
@@ -35,10 +35,17 @@ export const daySource: StatsSource = {
 	async load(query) {
 		const rawDays = await api.listDays(query.from, query.to);
 		const needsSegments = rawDays.some((d) => !d.segments && d.segmentIds.length > 0);
-		const [segments, absences, opening] = await Promise.all([
+		const [segments, absenceResult, opening] = await Promise.all([
 			// not every server embeds `segments` into the day evaluations: load them once for the whole range as fallback
 			needsSegments ? api.listSegments(`${addDays(query.from, -1)}T00:00:00Z`, `${addDays(query.to, 2)}T00:00:00Z`) : Promise.resolve([] as Segment[]),
-			api.listAbsences(query.from, query.to),
+			// the planning module may be disabled: then the absences are unavailable (empty), every other error stays visible
+			api.listAbsences(query.from, query.to).then(
+				(list) => ({ list, available: true }),
+				(error) => {
+					if (error instanceof ApiError && error.status === 404 && error.code === 'module_disabled') return { list: [] as Absence[], available: false };
+					throw error;
+				}
+			),
 			// balance before the first day
 			api.getTimeAccount(addDays(query.from, -1)).then(
 				(a) => a.balanceSeconds as number | null,
@@ -50,8 +57,8 @@ export const daySource: StatsSource = {
 		]);
 		const byId = new Map(segments.map((seg) => [seg.id, seg]));
 		const days = rawDays.map((d) => (d.segments ? d : { ...d, segments: d.segmentIds.map((id) => byId.get(id)).filter((seg): seg is Segment => !!seg) }));
-		const data = aggregate({ days, absences, openingBalanceSeconds: opening ?? 0, granularity: query.granularity, rounded: query.rounded, today: query.today, timeZone: query.timeZone });
-		return { ...data, balanceAvailable: opening !== null };
+		const data = aggregate({ days, absences: absenceResult.list, openingBalanceSeconds: opening ?? 0, granularity: query.granularity, rounded: query.rounded, today: query.today, timeZone: query.timeZone });
+		return { ...data, balanceAvailable: opening !== null, absencesAvailable: absenceResult.available };
 	}
 };
 

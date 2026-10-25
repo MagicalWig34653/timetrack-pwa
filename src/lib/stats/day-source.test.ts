@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { api } from '#lib/api/client.js';
+import { api, ApiError } from '#lib/api/client.js';
 import { daySource } from './source.js';
 
 // The fallback source (server without GET /time/statistics) must not turn failed required queries into plausible charts.
@@ -19,6 +19,20 @@ describe('daySource', () => {
 	it('fails when absences cannot be loaded instead of charting none', async () => {
 		stub({ listAbsences: failure(500) });
 		await expect(daySource.load(query)).rejects.toThrow();
+	});
+	it('treats a disabled planning module (404 module_disabled) as unavailable absences', async () => {
+		stub({ listAbsences: async () => { throw new ApiError(404, 'module_disabled'); } });
+		const data = await daySource.load(query);
+		expect(data.absencesAvailable).toBe(false);
+		expect(data.totals.absenceDays).toBe(0);
+	});
+	it('keeps other 404 absence errors visible', async () => {
+		stub({ listAbsences: async () => { throw new ApiError(404, 'not_found'); } });
+		await expect(daySource.load(query)).rejects.toThrow();
+	});
+	it('reports absences as available when they load', async () => {
+		stub({});
+		expect((await daySource.load(query)).absencesAvailable).toBe(true);
 	});
 	it('fails when required segments cannot be loaded', async () => {
 		stub({ listDays: async () => [day('2026-10-05', ['a'])], listSegments: failure(500) });
