@@ -30,9 +30,9 @@ export function generateLicenseNotices(root) {
 		const license = files.find((file) => LICENSE_FILE.test(file));
 		if (!license) throw new Error(`Missing license file for ${name}`);
 		sections.push(`\n${'='.repeat(72)}\nPackage: ${name}\nVersion: ${metadata.version}\nSPDX: ${metadata.license ?? 'unknown'}\nLicense file: ${license}\n`);
-		sections.push(fs.readFileSync(path.join(directory, license), 'utf8').trim());
+		sections.push(fs.readFileSync(path.join(directory, license), 'utf8').replace(/\r\n/g, '\n').trim());
 		const notice = files.find((file) => NOTICE_FILE.test(file));
-		if (notice) sections.push(`\nNOTICE (${notice}):\n${fs.readFileSync(path.join(directory, notice), 'utf8').trim()}`);
+		if (notice) sections.push(`\nNOTICE (${notice}):\n${fs.readFileSync(path.join(directory, notice), 'utf8').replace(/\r\n/g, '\n').trim()}`);
 		if (name === 'pdfjs-dist' && !notice) {
 			// The npm distribution has no separate NOTICE file; retain the notice from its shipped JavaScript header.
 			const source = fs.readFileSync(path.join(directory, 'build/pdf.mjs'), 'utf8');
