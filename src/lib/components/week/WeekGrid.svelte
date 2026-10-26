@@ -1,7 +1,7 @@
 <script lang="ts">
 	import './planner-colors.css';
 	import { contextMenu, contextmenu, type MenuEntry } from '#lib/a11y/context-menu.svelte.js';
-	import type { Place, PlanMode, PlanWeekDay, SegmentKind } from '#lib/api/types.js';
+	import type { AbsenceStatus, Place, PlanMode, PlanWeekDay, SegmentKind } from '#lib/api/types.js';
 	import { t } from '#lib/i18n/index.js';
 	import { exceedsThreshold } from '#lib/planning/drag.js';
 	import { planModeLabel } from '#lib/planning/labels.js';
@@ -62,6 +62,7 @@
 		nowMinute,
 		suggestion,
 		holidayNames,
+		vacation = {},
 		onpaint,
 		onquick,
 		onmove,
@@ -88,6 +89,8 @@
 		nowMinute: number | null;
 		suggestion: WindowSuggestion;
 		holidayNames: Record<string, string>;
+		/** vacation status per date (planned/requested/approved/taken) */
+		vacation?: Record<string, AbsenceStatus>;
 		onpaint: (dates: string[], range: MinuteRange) => void;
 		onquick: (date: string, minute: number) => void;
 		onmove: (sources: string[], deltaDays: number, deltaMinutes: number, copy: boolean) => boolean;
@@ -621,7 +624,11 @@
 				{@const draft = drafts[i]}
 				<div class="wg-allday" data-testid="allday-{day.date}">
 					{#if day.blockedBy}
-						<span class="wg-chip {markClass(day.blockedBy)}" title={holidayNames[day.date] ?? ''}>{day.blockedBy === 'holiday' && holidayNames[day.date] ? holidayNames[day.date] : t(`weekview.mark.${day.blockedBy}`)}</span>
+						<span class="wg-chip {markClass(day.blockedBy)}" title={holidayNames[day.date] ?? ''} data-testid="blocked-chip-{day.date}">{day.blockedBy === 'holiday' && holidayNames[day.date] ? holidayNames[day.date] : t(`weekview.mark.${day.blockedBy}`)}{#if day.blockedBy === 'vacation' && vacation[day.date]} ({t(`absence.status.${vacation[day.date]}`)}){/if}</span>
+					{:else if vacation[day.date]}
+						<span class="wg-chip {markClass('vacation')} wg-chip-open" data-testid="vacation-chip-{day.date}" data-status={vacation[day.date]}>{t('weekview.mark.vacation')} ({t(`absence.status.${vacation[day.date]}`)})</span>
+					{:else if holidayNames[day.date]}
+						<span class="wg-chip {markClass('holiday')}" data-testid="holiday-chip-{day.date}">{holidayNames[day.date]}</span>
 					{:else if draft.mode !== '' && !rangeOf(draft)}
 						<button type="button" class="wg-chip wg-chip-plan" data-nodrag data-plan-mode={draft.mode} onclick={() => onedit(day.date)} data-testid="chip-{day.date}">
 							<span class="wg-dot"></span>{planModeLabel(draft.mode as PlanMode)}{draft.mode === 'off' ? '' : ` · ${t('wg.no_times')}`}
@@ -666,7 +673,7 @@
 					{@const day = days[i]}
 					{@const band = sollBand(i)}
 					{@const range = blocksOf(i)}
-					<div class="wg-col" data-date={day.date} data-today={day.date === today} data-blocked={day.blockedBy ?? undefined} data-off={day.targetSeconds === 0 && day.blockedBy === null ? '' : undefined} data-testid="col-{day.date}">
+					<div class="wg-col" data-date={day.date} data-today={day.date === today} data-blocked={day.blockedBy ?? undefined} data-vacation={!day.blockedBy && vacation[day.date] ? vacation[day.date] : undefined} data-off={day.targetSeconds === 0 && day.blockedBy === null ? '' : undefined} data-testid="col-{day.date}">
 						{#if band}<div class="wg-soll" style="top: {band.top}px; height: {band.height}px" aria-hidden="true"></div>{/if}
 
 						{#if showActuals}
@@ -979,6 +986,14 @@
 			auto,
 			100% var(--hh);
 		cursor: not-allowed;
+	}
+	/* planned or requested vacation that does not block the day yet: lighter dashed hatching, still editable */
+	.wg-col[data-vacation] {
+		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, #0ea5e9 14%, transparent) 0 6px, transparent 6px 14px);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, #0ea5e9 35%, transparent);
+	}
+	.wg-chip-open {
+		border: 1px dashed currentColor;
 	}
 	.wg-soll {
 		position: absolute;

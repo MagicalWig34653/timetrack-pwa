@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { contextMenu, type MenuEntry } from '#lib/a11y/context-menu.svelte.js';
 	import { api } from '#lib/api/client.js';
-	import type { LegalProfile, Place, PlanMode, PlanWeek, WorkModel } from '#lib/api/types.js';
+	import type { AbsenceStatus, LegalProfile, Place, PlanMode, PlanWeek, WorkModel } from '#lib/api/types.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { planModeLabel, PLAN_MODES } from '#lib/planning/labels.js';
@@ -181,6 +181,29 @@
 				if (current) actuals = {};
 			}
 		})();
+		return () => (current = false);
+	});
+
+	/** Vacation per day of the week (planned, requested or approved), for the all-day chip and the hatching of the column. */
+	let vacation = $state<Record<string, AbsenceStatus>>({});
+	$effect(() => {
+		const from = monday;
+		let current = true;
+		void api
+			.listAbsences(from, addDays(from, 6))
+			.then((list) => {
+				if (!current) return;
+				const rank: Record<string, number> = { taken: 4, approved: 3, requested: 2, planned: 1 };
+				const result: Record<string, AbsenceStatus> = {};
+				for (const absence of list) {
+					if (absence.kind !== 'vacation' || !(absence.status in rank)) continue;
+					for (let d = absence.startDate < from ? from : absence.startDate; d <= absence.endDate && d <= addDays(from, 6); d = addDays(d, 1)) {
+						if (!result[d] || rank[absence.status] > rank[result[d]]) result[d] = absence.status;
+					}
+				}
+				vacation = result;
+			})
+			.catch(() => (vacation = {}));
 		return () => (current = false);
 	});
 
@@ -485,6 +508,7 @@
 		{nowMinute}
 		{suggestion}
 		{holidayNames}
+		{vacation}
 		onpaint={paint}
 		onquick={quick}
 		onmove={move}

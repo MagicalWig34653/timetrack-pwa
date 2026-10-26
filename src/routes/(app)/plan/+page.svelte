@@ -296,14 +296,7 @@
 	);
 </script>
 
-<PageHeader title={t('weekplan.title')} description={view === 'grid' ? undefined : t('weekplan.description')}>
-	{#snippet primary()}
-		<span class="flex items-center gap-3">
-			<span class="text-sm {dirty ? 'text-foreground' : 'text-muted-foreground'}" data-testid="plan-dirty" data-dirty={dirty}>{dirty ? t('weekplan.dirty') : t('weekplan.clean')}</span>
-			<Button onclick={save} disabled={saving || !dirty} aria-busy={saving} data-testid="plan-save"><Save />{saving ? t('weekplan.saving') : t('weekplan.save')}</Button>
-		</span>
-	{/snippet}
-</PageHeader>
+<PageHeader title={t('weekplan.title')} description={view === 'grid' ? undefined : t('weekplan.description')} />
 <WeekTabs current="plan" week={isoWeek} />
 <WeekNav {monday} {currentMonday} basePath="/plan" onpick={(picked) => goto(`/plan?week=${isoWeekLabel(picked)}`)} />
 
@@ -368,7 +361,6 @@
 				<Button variant="outline" size="sm" onclick={openFollow} data-testid="plan-follow"><Layers />{t('wg.follow_action')}</Button>
 				<Button variant="outline" size="sm" onclick={applySame} data-testid="plan-same"><Equal />{t('weekplan.action_same')}</Button>
 				<Button variant="outline" size="sm" onclick={applyClear} data-testid="plan-clear"><Eraser />{t('weekplan.action_clear')}</Button>
-				{#if dirty}<Button variant="ghost" size="sm" onclick={discard} data-testid="plan-discard">{t('weekplan.discard')}</Button>{/if}
 			</div>
 			<div class="ml-auto inline-flex rounded-lg bg-muted p-0.5" role="group" aria-label={t('wg.view_label')}>
 				<button type="button" class={viewButton} aria-pressed={view === 'grid'} onclick={() => pickView('grid')} data-testid="view-grid"><CalendarRange class="size-4" />{t('wg.view_grid')}</button>
@@ -402,6 +394,13 @@
 				{/each}
 			</ul>
 		{/if}
+
+		<!-- Save bar: stays at the bottom of the viewport while the week scrolls, so saving never needs a scroll back to the top. -->
+		<div class="sticky bottom-0 z-30 -mx-4 flex flex-wrap items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:mx-0 sm:rounded-lg sm:border" data-testid="plan-savebar">
+			<span class="mr-auto text-sm {dirty ? 'font-medium text-foreground' : 'text-muted-foreground'}" role="status" data-testid="plan-dirty" data-dirty={dirty}>{dirty ? t('weekplan.dirty') : t('weekplan.clean')}</span>
+			{#if dirty}<Button variant="ghost" onclick={discard} data-testid="plan-discard">{t('weekplan.discard')}</Button>{/if}
+			<Button onclick={save} disabled={saving || !dirty} aria-busy={saving} data-testid="plan-save"><Save />{saving ? t('weekplan.saving') : t('weekplan.save')}</Button>
+		</div>
 	</div>
 {/if}
 
