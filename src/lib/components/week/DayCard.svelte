@@ -10,6 +10,7 @@
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { balanceTone, barShares, dayAriaLabel, dayHours, MARK_CLASSES, weekMarkLabel } from '#lib/week/overview.js';
 	import TreePalm from '@lucide/svelte/icons/tree-palm';
+	import HolidayBadge from './HolidayBadge.svelte';
 	import MarkIcon from './MarkIcon.svelte';
 
 	/** One day of the week overview: weekday and date, mark, hours, worked/planned/target bar, balance, first start to last end. */
@@ -25,7 +26,9 @@
 	const hours = $derived(dayHours(day));
 	const bars = $derived(barShares(day));
 	const listed = $derived(vacation !== null);
-	const hideMark = $derived(day.mark === 'vacation' && (vacation?.length ?? 0) > 0);
+	// a named holiday on a holiday-marked day replaces the plain "Feiertag" chip; half company days and free days get the name next to the mark
+	const holidayChip = $derived(!!day.holidayName);
+	const hideMark = $derived((day.mark === 'vacation' && (vacation?.length ?? 0) > 0) || (day.mark === 'holiday' && holidayChip));
 	const halfDay = $derived(day.mark === 'vacation' && day.absences.some((a) => a.kind === 'vacation' && a.halfDay));
 	const showHours = $derived(hours > 0 || day.isToday || (!day.isFuture && day.mark === 'work' && day.targetSeconds > 0));
 	const showMode = $derived(!!day.planMode && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark));
@@ -54,6 +57,7 @@
 				<MarkIcon mark={day.mark} class="size-3" />{weekMarkLabel(day.mark)}{#if halfDay && !listed}<span class="font-normal"> ½</span>{/if}
 			</span>
 		{/if}
+		{#if day.holidayName}<HolidayBadge name={day.holidayName} treatment={day.companyDayTreatment ?? null} testid="day-holiday" />{/if}
 		{#each vacation ?? [] as entry (entry.id)}
 			<!-- icon only; the full text is a tooltip on hover and on keyboard focus of the card, and part of the card's aria-label -->
 			<span class="vac group/vac relative inline-flex h-5 items-center gap-0.5 rounded-full px-1.5 text-xs font-medium {entry.status === 'approved' ? MARK_CLASSES.vacation : 'vac-open ' + MARK_CLASSES.vacation}" data-testid="day-vacation" data-status={entry.status} data-half={entry.halfDay ? 'true' : undefined}>

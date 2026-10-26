@@ -2,7 +2,7 @@
 // They are composed from the time and planning mocks (day evaluations, account, absences, plan days), like the backend composes
 // them from the day evaluation, so the numbers always agree with /time/days and /time/account.
 import { addDays, DEFAULT_TIMEZONE, isoWeekday, isoWeekLabel, localMinutesOf, mondayOfIsoWeek, todayLocal } from '../src/lib/time/dates.ts';
-import type { Absence, DayEvaluation, PlanBlock, PlanDay, PlanWeek, PlanWeekDay, Segment, TimeAccount, TimeWeek, TimeWeekDay, WeekMark } from '../src/lib/api/types.ts';
+import type { Absence, CalendarDay, DayEvaluation, PlanBlock, PlanDay, PlanWeek, PlanWeekDay, Segment, TimeAccount, TimeWeek, TimeWeekDay, WeekMark } from '../src/lib/api/types.ts';
 import { normalizePlanBody, plannedSecondsOf } from './planning.ts';
 
 export interface WeekResponse {
@@ -87,6 +87,16 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 		const plans = new Map(planning ? get<PlanDay[]>(deps.planning, accountId, `plan/days?from=${monday}&to=${sunday}`, []).map((p) => [p.date, p]) : []);
 		const absences = planning ? get<Absence[]>(deps.planning, accountId, `absences?from=${monday}&to=${sunday}`, []) : [];
 
+		// holiday names and company-day treatment (contract 0.31.0/0.32.0), visible on free days too
+		const holidayByDate = new Map<string, { name: string; treatment: 'half' | 'full' | null }>();
+		if (planning) {
+			for (const year of new Set([Number(monday.slice(0, 4)), Number(sunday.slice(0, 4))])) {
+				for (const h of get<CalendarDay[]>(deps.planning, accountId, `calendar/holidays?year=${year}`, [])) {
+					if (h.kind !== 'holiday') continue;
+					for (let d = h.startDate; d <= h.endDate; d = addDays(d, 1)) holidayByDate.set(d, { name: h.name, treatment: h.companyTreatment ?? null });
+				}
+			}
+		}
 		const days: TimeWeekDay[] = evaluations.map((ev) => {
 			const own = segments.filter((s) => ev.segmentIds.includes(s.id)).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
 			let travel = 0;
@@ -111,6 +121,8 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 				date: ev.date,
 				weekday: isoWeekday(ev.date),
 				mark,
+				holidayName: holidayByDate.get(ev.date)?.name ?? null,
+				companyDayTreatment: holidayByDate.get(ev.date)?.treatment ?? null,
 				legalProfileId: ev.legalProfileId,
 				legalWarnings: ev.legalWarnings,
 				breakHints: ev.breakHints,

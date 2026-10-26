@@ -170,10 +170,10 @@ Favicon + App-Icons im Design der nativen App (F1, Branch `f1-icons`): `static/f
 | Befehl | Inhalt |
 | --- | --- |
 | `npm run check` | svelte-check + tsc des Service Workers (0 Fehler/Warnungen) |
-| `npm test` | vitest, 643 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung; Lead, Paket P2) |
+| `npm test` | vitest, 1149 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung; Lead, Paket P2) |
 | `npm run build` | statisches Build nach `build/` |
 | `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 181 Specs (inkl. Modul-, Arbeitszeit-, Konten-, Profil- und Darstellungs-Specs; Lead gegen frisch gebautes Backend, Paket P2) |
-| `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), 84 Specs (Lead, P2), inkl. `modules.spec.ts` und `worktime.spec.ts` |
+| `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), 174 Specs (Lead, P2; N4), inkl. `modules.spec.ts` und `worktime.spec.ts` |
 | `npm run test:e2e:pwa` | Produktionsbuild mit Mock-API: Manifest, Service Worker, Offline, Push; 6 Specs |
 
 Umgebungsvariablen: `E2E_BACKEND_DIR` (Backend-Checkout, Standard `../timetrack-backend`), `E2E_PORT` (Basisport, Standard 18090; weitere Instanzen +1 bis +10, Arbeitszeit-Tabelle +9, Konten +10, Profil +11 und +12, Profil-SMTP +13), `E2E_SKIP_BUILD=1` (vorhandenes Backend-Binary/Build nutzen), `E2E_MOCK_PORT` (Standard 5199).
@@ -198,3 +198,6 @@ Echtgeräte: Passkey auf Plattform-Authenticator, Installation als PWA (iOS/Andr
 
 ## Y1 (Import der Arbeitszeit-Tabelle als geführter Ablauf)
 Erkennungskarte mit Vorlage, Vorschau mit einem Hauptknopf, „Anpassen“ eingeklappt, Ergebnis mit Schritt „Arbeitsmodell anlegen“, leere Vorlage. Details und Zahlen: docs/handoffs/Y1.md (Branch `y1-import-ux`, nicht integriert).
+
+## N4-pwa (Betriebstage 24.12./31.12.)
+Einstellung Keine/Halber/Ganzer Tag plus eigene Regeln, Anzeige mit ½-Variante für halbe Betriebstage in Woche, Tag, Kalender und Planer (Vertrag 0.32.0). Details: docs/handoffs/N4-pwa.md (Branch `n4-company-days`, nicht integriert).

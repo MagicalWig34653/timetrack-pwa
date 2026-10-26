@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '#lib/i18n/index.js';
+	import { holidayHint } from '#lib/planning/company-days.js';
 	import type { DayInfo } from '#lib/planning/calendar.js';
 	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS } from '#lib/planning/labels.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
@@ -14,7 +15,7 @@
 <span class="flex min-w-0 flex-col gap-0.5 {text}">
 	{#if !hidden.has('holiday')}
 		{#each info.holidays as holiday (holiday.name + holiday.startDate)}
-			<span class="{chip} {HOLIDAY_CLASS}" data-chip="holiday">{holiday.name}</span>
+			<span class="{chip} {HOLIDAY_CLASS} {holiday.companyTreatment === 'half' ? 'border border-dashed border-current' : ''}" data-chip="holiday" data-treatment={holiday.companyTreatment ?? undefined} title={holidayHint(holiday.name, holiday.companyTreatment)}>{holiday.name}{#if holiday.companyTreatment === 'half'}<span aria-hidden="true"> ½</span><span class="sr-only">, {holidayHint(holiday.name, 'half')}</span>{/if}</span>
 		{/each}
 	{/if}
 	{#if !hidden.has('school_holiday')}

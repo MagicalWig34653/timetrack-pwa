@@ -109,6 +109,34 @@ const MAX_RANGE_DAYS = 366;
 
 export const DEFAULT_VACATION_SETTINGS: VacationSettings = { region: 'DE-ST', annualEntitlementHalfDays: 60, carryOverByYear: {}, carryOverExpiry: null };
 
+type CompanyRule = { month: number; day: number; treatment: 'none' | 'half' | 'full'; name?: string | null };
+const DEFAULT_COMPANY_NAMES: Record<string, string> = { '12-24': 'Heiligabend', '12-31': 'Silvester' };
+const ruleKey = (r: { month: number; day: number }) => `${String(r.month).padStart(2, '0')}-${String(r.day).padStart(2, '0')}`;
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** Contract 0.32.0: GET always lists 24.12. and 31.12.; the name falls back to Heiligabend/Silvester/Betriebsfreier Tag. */
+export function normalizedCompanyDays(rules: CompanyRule[] | undefined): (CompanyRule & { name: string })[] {
+	const list = [...(rules ?? [])];
+	for (const d of [{ month: 12, day: 24 }, { month: 12, day: 31 }]) if (!list.some((r) => r.month === d.month && r.day === d.day)) list.push({ ...d, treatment: 'none' });
+	return list
+		.map((r) => ({ month: r.month, day: r.day, treatment: r.treatment, name: r.name?.trim() || DEFAULT_COMPANY_NAMES[ruleKey(r)] || 'Betriebsfreier Tag' }))
+		.sort((a, b) => a.month - b.month || a.day - b.day);
+}
+
+/** Validation of PUT companyDays like the backend (400 on invalid/duplicate dates, 29.02., > 12 rules, unknown treatment, name > 80). */
+function validCompanyDays(value: any): value is CompanyRule[] {
+	if (!Array.isArray(value) || value.length > 12) return false;
+	const seen = new Set<string>();
+	for (const r of value) {
+		if (!r || !Number.isInteger(r.month) || !Number.isInteger(r.day) || r.month < 1 || r.month > 12 || r.day < 1 || r.day > DAYS_IN_MONTH[r.month - 1]) return false;
+		if (!['none', 'half', 'full'].includes(r.treatment)) return false;
+		if (r.name != null && (typeof r.name !== 'string' || r.name.length > 80)) return false;
+		if (seen.has(ruleKey(r))) return false;
+		seen.add(ruleKey(r));
+	}
+	return true;
+}
+
 export function createPlanningMock(deps: PlanningDeps) {
 	const states = new Map<string, PlanningState>();
 	const shares: StoredShare[] = [];
@@ -124,11 +152,26 @@ export function createPlanningMock(deps: PlanningDeps) {
 
 	const regionOf = (state: PlanningState) => state.settings?.region ?? DEFAULT_VACATION_SETTINGS.region;
 
+	/** Built-in holidays plus the company days with a treatment; a statutory holiday on the same date wins. */
+	function calendarFor(state: PlanningState, year: number, region = regionOf(state)): CalendarDay[] {
+		const builtin = holidaysFor(year, region);
+		const result: CalendarDay[] = [...builtin];
+		for (const rule of normalizedCompanyDays(state.settings?.companyDays)) {
+			if (rule.treatment === 'none') continue;
+			const date = `${year}-${ruleKey(rule)}`;
+			if (builtin.some((h) => h.kind === 'holiday' && h.startDate <= date && h.endDate >= date)) continue;
+			result.push({ id: null, startDate: date, endDate: date, name: rule.name, kind: 'holiday', source: 'builtin', companyTreatment: rule.treatment });
+		}
+		return result;
+	}
+	/** Company days of kind half on a date (they cost at most one half day of vacation and keep the mark work). */
+	const halfCompanyDay = (state: PlanningState, date: string) => calendarFor(state, Number(date.slice(0, 4))).some((h) => h.companyTreatment === 'half' && h.startDate === date);
+
 	/** Holiday dates of a region: built-in plus the account's own `holiday` custom days. */
 	function holidayDates(state: PlanningState, from: string, to: string): Set<string> {
 		const set = new Set<string>();
 		for (let year = Number(from.slice(0, 4)); year <= Number(to.slice(0, 4)); year++) {
-			for (const h of holidaysFor(year, regionOf(state))) set.add(h.startDate);
+			for (const h of calendarFor(state, year)) if (h.companyTreatment !== 'half') set.add(h.startDate);
 		}
 		for (const c of state.customDays) {
 			if (c.kind !== 'holiday') continue;
@@ -154,7 +197,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 			if (!workdays.includes(isoWeekday(date)) || holidays.has(date)) continue;
 			const single = a.startDate === a.endDate;
 			const half = single ? !!(a.halfDayStart || a.halfDayEnd) : (date === a.startDate && !!a.halfDayStart) || (date === a.endDate && !!a.halfDayEnd);
-			total += half ? 1 : 2;
+			total += half || halfCompanyDay(state, date) ? 1 : 2;
 		}
 		return total;
 	}
@@ -210,7 +253,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const models = deps.modelsOf(accountId);
 		const holidays = new Map<string, string>();
 		for (let year = Number(from.slice(0, 4)); year <= Number(to.slice(0, 4)); year++) {
-			for (const h of holidaysFor(year, regionOf(state))) if (h.kind === 'holiday') holidays.set(h.startDate, h.name);
+			for (const h of calendarFor(state, year)) if (h.kind === 'holiday' && h.companyTreatment !== 'half') holidays.set(h.startDate, h.name);
 		}
 		for (const c of state.customDays) if (c.kind === 'holiday') for (const d of daysBetween(c.startDate, c.endDate)) holidays.set(d, c.name);
 		const vacationDates = new Set<string>();
@@ -268,13 +311,14 @@ export function createPlanningMock(deps: PlanningDeps) {
 		if (!model || !model.workdays.includes(isoWeekday(date))) return null;
 		const state = stateOf(accountId);
 		if (holidayDates(state, date, date).has(date)) return { mark: 'holiday' };
+		const halfCompany = halfCompanyDay(state, date);
 		const absence = state.absences.find((a) => BOOKED.includes(a.status) && (a.kind === 'vacation' || a.kind === 'sick' || a.kind === 'excused') && a.startDate <= date && a.endDate >= date);
-		if (!absence) return null;
+		if (!absence) return halfCompany ? { mark: 'none', halfTarget: true } : null;
 		if (absence.kind === 'sick') return { mark: 'sick' };
 		if (absence.kind === 'excused') return { mark: 'excused' };
 		const single = absence.startDate === absence.endDate;
 		const half = single ? !!(absence.halfDayStart || absence.halfDayEnd) : (date === absence.startDate && !!absence.halfDayStart) || (date === absence.endDate && !!absence.halfDayEnd);
-		return half ? { mark: 'vacation', halfTarget: true } : { mark: 'vacation' };
+		return half && !halfCompany ? { mark: 'vacation', halfTarget: true } : { mark: 'vacation' };
 	}
 
 	function normalize(input: any): AbsenceInput | null {
@@ -398,7 +442,10 @@ export function createPlanningMock(deps: PlanningDeps) {
 
 		// --- vacation ---
 		if (route === 'vacation/settings') {
-			if (method === 'GET') return ok(state.settings ? { ...state.settings, configured: true } : { ...DEFAULT_VACATION_SETTINGS, carryOverByYear: {}, configured: false });
+			if (method === 'GET') {
+				const companyDays = normalizedCompanyDays(state.settings?.companyDays);
+				return ok(state.settings ? { ...state.settings, companyDays, configured: true } : { ...DEFAULT_VACATION_SETTINGS, carryOverByYear: {}, companyDays, configured: false });
+			}
 			if (method === 'PUT') {
 				const carry = body.carryOverByYear ?? {};
 				const expiry = body.carryOverExpiry ?? null;
@@ -407,10 +454,13 @@ export function createPlanningMock(deps: PlanningDeps) {
 					!Number.isInteger(body.annualEntitlementHalfDays) || body.annualEntitlementHalfDays < 0 ||
 					carry === null || typeof carry !== 'object' || Array.isArray(carry) ||
 					Object.entries(carry).some(([year, value]) => !/^\d{4}$/.test(year) || !Number.isInteger(value) || (value as number) < 0) ||
-					(expiry !== null && !/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(expiry))
+					(expiry !== null && !/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(expiry)) ||
+					(body.companyDays !== undefined && !validCompanyDays(body.companyDays))
 				) return fail(400, 'bad_request');
-				state.settings = { region: body.region, annualEntitlementHalfDays: body.annualEntitlementHalfDays, carryOverByYear: { ...carry }, carryOverExpiry: expiry };
-				return ok({ ...state.settings, configured: true });
+				// PUT without companyDays keeps the stored rules
+				const companyDays = body.companyDays !== undefined ? body.companyDays.map((r: CompanyRule) => ({ month: r.month, day: r.day, treatment: r.treatment, name: r.name?.trim() || null })) : state.settings?.companyDays;
+				state.settings = { region: body.region, annualEntitlementHalfDays: body.annualEntitlementHalfDays, carryOverByYear: { ...carry }, carryOverExpiry: expiry, ...(companyDays ? { companyDays } : {}) };
+				return ok({ ...state.settings, companyDays: normalizedCompanyDays(state.settings.companyDays), configured: true });
 			}
 		}
 		if (route === 'vacation/suggestions' && method === 'GET') return suggestions(accountId, query);
@@ -501,7 +551,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 			if (year === null) return fail(400, 'bad_request');
 			const region = query.get('region') ?? regionOf(state);
 			const custom = state.customDays.filter((c) => c.startDate <= `${year}-12-31` && c.endDate >= `${year}-01-01`);
-			return ok([...holidaysFor(year, region), ...custom].sort((a, b) => a.startDate.localeCompare(b.startDate)));
+			return ok([...calendarFor(state, year, region), ...custom].sort((a, b) => a.startDate.localeCompare(b.startDate)));
 		}
 		if (route === 'calendar/custom-days' && method === 'POST') {
 			if (

@@ -4,6 +4,7 @@
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
+	import HolidayBadge from '#lib/components/week/HolidayBadge.svelte';
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import type { DayInfo } from '#lib/planning/calendar.js';
 	import { absenceKindLabel, absenceStatusLabel, planModeLabel } from '#lib/planning/labels.js';
@@ -73,7 +74,7 @@
 		<dl class="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
 			{#each info.holidays as holiday (holiday.name + holiday.startDate)}
 				<dt class="text-muted-foreground">{t('calendar.holiday')}</dt>
-				<dd>{holiday.name}</dd>
+				<dd data-testid="panel-holiday" data-treatment={holiday.companyTreatment ?? undefined}>{#if holiday.companyTreatment}<HolidayBadge name={holiday.name} treatment={holiday.companyTreatment} testid="panel-holiday-badge" />{:else}{holiday.name}{/if}</dd>
 			{/each}
 			{#each info.schoolHolidays as holiday (holiday.name + holiday.startDate)}
 				<dt class="text-muted-foreground">{t('calendar.school_holiday')}</dt>

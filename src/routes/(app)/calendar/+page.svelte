@@ -13,6 +13,7 @@
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
+	import { holidayHint } from '#lib/planning/company-days.js';
 	import { addMonths, covers, dayInfo, dayWorkState, monthGrid, weekOf, yearsOf, type DayInfo } from '#lib/planning/calendar.js';
 	import { findConflicts, hasBlocking, severityByDate, type ConflictContext } from '#lib/planning/conflicts.js';
 	import type { DialogResult, DialogSeed } from '#lib/planning/dialog.js';
@@ -163,7 +164,7 @@
 
 	function describe(info: DayInfo): string {
 		const parts: string[] = [formatDateLong(info.date), workStateLabel(stateOf(info))];
-		for (const h of info.holidays) parts.push(`${t('calendar.holiday')} ${h.name}`);
+		for (const h of info.holidays) parts.push(`${t('calendar.holiday')} ${holidayHint(h.name, h.companyTreatment)}`);
 		for (const h of info.schoolHolidays) parts.push(h.name);
 		for (const a of info.absences) parts.push(absenceKindLabel(a.kind));
 		if (info.plan) parts.push(`${t('calendar.plan')} ${planModeLabel(info.plan.mode)}`);

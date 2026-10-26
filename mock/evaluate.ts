@@ -14,8 +14,9 @@ export interface EvalSegment {
 
 /** Effect of absences/holidays on a day (ADR-0005, derived by the planning mock). An explicit mark always wins. */
 export interface DerivedDayContext {
-	mark: 'holiday' | 'vacation' | 'sick' | 'excused';
-	/** half vacation day: the target is halved */
+	/** 'none' only together with halfTarget: a half company day keeps the mark work (ADR-0029) */
+	mark: 'holiday' | 'vacation' | 'sick' | 'excused' | 'none';
+	/** half vacation day or half company day: the target is halved */
 	halfTarget?: boolean;
 }
 
@@ -110,6 +111,8 @@ export function evaluateDay(input: {
 		const halved = derived?.halfTarget ? Math.round(baseTarget / 2) : 0;
 		target = prefs.targetOverrideSeconds ?? halved;
 		credit = prefs.creditSeconds ?? 0;
+	} else if (mark === 'none' && derived?.halfTarget) {
+		target = prefs.targetOverrideSeconds ?? Math.round(baseTarget / 2);
 	} else if (markCreditsSchool) {
 		credit = prefs.creditSeconds ?? schoolCredit;
 	} else if (schoolRule) {
@@ -161,8 +164,8 @@ export function evaluateDay(input: {
 		date,
 		modelId: model?.id ?? null,
 		mark,
-		markSource: explicit ? 'explicit' : derived ? (derived.mark === 'holiday' ? 'holiday' : 'absence') : 'none',
-		targetOverrideSeconds: mark === 'holiday' || mark === 'vacation' || mark === 'sick' || mark === 'excused' ? (prefs.targetOverrideSeconds ?? (derived?.halfTarget ? target : null)) : null,
+		markSource: explicit ? 'explicit' : derived && derived.mark !== 'none' ? (derived.mark === 'holiday' ? 'holiday' : 'absence') : 'none',
+		targetOverrideSeconds: mark === 'holiday' || mark === 'vacation' || mark === 'sick' || mark === 'excused' || (mark === 'none' && derived?.halfTarget) ? (prefs.targetOverrideSeconds ?? (derived?.halfTarget ? target : null)) : null,
 		skipFixedBreaks: !!prefs.skipFixedBreaks,
 		targetSeconds: target,
 		rawWorkSeconds,

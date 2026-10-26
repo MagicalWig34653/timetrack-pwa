@@ -9,6 +9,7 @@
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { type DayDraft, type DraftMode, draftProblem, plannedSecondsOf, STEP_MINUTES } from '#lib/week/plan-draft.js';
 	import { MARK_CLASSES } from '#lib/week/overview.js';
+	import HolidayBadge from './HolidayBadge.svelte';
 	import MarkIcon from './MarkIcon.svelte';
 
 	/** One day of the week planner: mode, start, end, break, note and the live planned hours. */
@@ -17,8 +18,11 @@
 		draft,
 		onmode,
 		onchange,
-		showProblems = false
+		showProblems = false,
+		holiday = null
 	}: {
+		/** name of a public, custom or company holiday on this day (calendar list); a half company day keeps the plan open */
+		holiday?: { name: string; treatment: 'half' | 'full' | null } | null;
 		day: PlanWeekDay;
 		draft: DayDraft;
 		onmode: (mode: DraftMode) => void;
@@ -111,9 +115,12 @@
 
 	{#if blocked && day.blockedBy}
 		<p class="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid="plan-blocked-{day.date}">
-			<span class="inline-flex h-5 items-center gap-1 rounded-full px-2 text-xs font-medium {MARK_CLASSES[markFor(day.blockedBy)]}"><MarkIcon mark={markFor(day.blockedBy)} class="size-3" />{t(`weekview.mark.${markFor(day.blockedBy)}`)}</span>
+			{#if day.blockedBy === 'holiday' && holiday}<HolidayBadge name={holiday.name} treatment={holiday.treatment} testid="plan-holiday-{day.date}" />{:else}<span class="inline-flex h-5 items-center gap-1 rounded-full px-2 text-xs font-medium {MARK_CLASSES[markFor(day.blockedBy)]}"><MarkIcon mark={markFor(day.blockedBy)} class="size-3" />{t(`weekview.mark.${markFor(day.blockedBy)}`)}</span>{/if}
 			<span class="text-muted-foreground">{t(`weekplan.blocked.${day.blockedBy}`)}{#if day.plan} {t('weekplan.blocked_plan_kept')}{/if}</span>
 		</p>
+	{:else if holiday}
+		<p class="mt-2 flex flex-wrap items-center gap-2 text-sm"><HolidayBadge name={holiday.name} treatment={holiday.treatment} testid="plan-holiday-{day.date}" /></p>
+		{#if showProblems && problem}<p class="mt-2 text-sm text-destructive" role="alert" data-testid="plan-problem-{day.date}">{t(`weekplan.problem.${problem}`)}</p>{/if}
 	{:else if showProblems && problem}
 		<p class="mt-2 text-sm text-destructive" role="alert" data-testid="plan-problem-{day.date}">{t(`weekplan.problem.${problem}`)}</p>
 	{/if}

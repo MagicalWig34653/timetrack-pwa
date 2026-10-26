@@ -28,6 +28,11 @@ describe('day card facts', () => {
 		expect(dayAriaLabel(day({ mark: 'vacation', isFuture: true, workSeconds: 0, balanceSeconds: null, plannedSeconds: 28_800 }))).toBe('Dienstag, 20.10.2026, Urlaub, geplant 8:00 Stunden');
 		expect(dayAriaLabel(day({ balanceSeconds: -5400, workSeconds: 22_320 }))).toContain('Saldo minus 1:30');
 	});
+	it('reads a half company day aloud although the mark stays work', () => {
+		const text = dayAriaLabel(day({ holidayName: 'Heiligabend', companyDayTreatment: 'half', date: '2026-12-24', weekday: 4 }));
+		expect(text).toContain('Heiligabend – halber Betriebstag, Soll halbiert');
+		expect(dayAriaLabel(day({ mark: 'holiday', holidayName: 'Silvester', companyDayTreatment: 'full' }))).toContain('Feiertag, Silvester – Betriebstag, wie ein Feiertag');
+	});
 	it('detects an empty week', () => {
 		const idle = Array.from({ length: 7 }, () => day({ segmentsCount: 0, workSeconds: 0, balanceSeconds: 0, isFuture: true }));
 		expect(isEmptyWeek(idle)).toBe(true);

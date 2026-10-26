@@ -1,6 +1,7 @@
 import { deAccounts } from './de-accounts';
 import { deCalendar } from './de-calendar';
 import { deCalendarFeeds } from './de-calendar-feeds';
+import { deCompanyDays } from './de-company-days';
 import { deDesign } from './de-design';
 import { deErrors } from './de-errors';
 import { deMail } from './de-mail';
@@ -27,6 +28,7 @@ export const de = {
 	...deAccounts,
 	...deCalendar,
 	...deCalendarFeeds,
+	...deCompanyDays,
 	...deDesign,
 	...deErrors,
 	...deMail,
