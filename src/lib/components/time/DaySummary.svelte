@@ -1,10 +1,12 @@
 <script lang="ts">
 	import type { DayEvaluation } from '#lib/api/types.js';
+	import { api } from '#lib/api/client.js';
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { formatDelta, formatDuration } from '#lib/time/format.js';
 	import { hintLabel, markLabel } from '#lib/time/labels.js';
+	import { onMount } from 'svelte';
 
 	let { evaluation, showHints = true, kpis = true }: { evaluation: DayEvaluation; showHints?: boolean; /** false when target/evaluated/delta are shown as KPI cards next to this summary */ kpis?: boolean } = $props();
 	const markedOff = $derived(evaluation.mark === 'holiday' || evaluation.mark === 'vacation' || evaluation.mark === 'sick' || evaluation.mark === 'excused');
@@ -15,6 +17,12 @@
 		!markedOff || !evaluation.markSource || evaluation.markSource === 'none' ? '' : t(`day.mark_source_${evaluation.markSource}` as 'day.mark_source_explicit')
 	);
 	const rounding = $derived(evaluation.startAdjustSeconds + evaluation.endAdjustSeconds);
+	let sources = $state<string[]>([]);
+	onMount(() => {
+		void api.listLegalProfiles().then((profiles) => {
+			sources = profiles.find((profile) => profile.id === (evaluation.legalProfileId ?? 'arbzg-adult-de'))?.sources ?? [];
+		}).catch(() => undefined);
+	});
 </script>
 
 <div class="flex flex-col gap-3" data-testid="day-summary">
@@ -47,13 +55,15 @@
 			</div>
 		{/if}
 	</dl>
-	{#if showHints && evaluation.breakHints.length > 0}
+	{#if showHints && (evaluation.breakHints.length > 0 || (evaluation.legalWarnings?.length ?? 0) > 0)}
 		<Alert data-testid="break-hints">
-			<p class="font-medium">{t('hint.title')}</p>
+			<p class="font-medium">{t('hint.all_title')}</p>
 			<ul class="mt-1 list-disc pl-5">
 				{#each evaluation.breakHints as hint (hint.code)}<li>{hintLabel(hint.code)}</li>{/each}
+				{#each evaluation.legalWarnings ?? [] as warning (warning.code)}<li>{t(`legal.warning.${warning.code}`)}</li>{/each}
 			</ul>
-			<p class="mt-2 text-xs text-muted-foreground">{t('hint.disclaimer')}</p>
+			<p class="mt-2 text-xs text-muted-foreground">{t('work_model.legal_disclaimer')}</p>
+			{#if sources.length > 0}<p class="mt-1 text-xs text-muted-foreground">{t('work_model.legal_sources')}: {#each sources as source (source)}<a class="mr-2 underline" href={source} target="_blank" rel="noopener noreferrer">{source}</a>{/each}</p>{/if}
 		</Alert>
 	{/if}
 </div>

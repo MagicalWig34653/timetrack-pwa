@@ -1,4 +1,10 @@
-# Stand der PWA – 17.10.2026 (Pakete bis P2, W1; Dokumentationsabgleich D3)
+# Stand der PWA – 26.10.2026 (Paket P15 im Worktree, uncommittet)
+
+## Paket P15 (Rechtsprofile, Zeitkonto-Anpassungen, Prüfmarkierungen)
+
+Die PWA lädt die Rechtsprofile aus Vertrag 0.30.1 und speichert die Wahl in datierten Arbeitsmodell-Versionen. Die Tagesansicht zeigt Pausen- und Rechtswarnungen, Quellen und den Hinweis „Informative Hinweise, keine Rechtsberatung“; Unterrichtsstunden lassen sich für das Jugendprofil erfassen. Der grafische Wochenplaner verwendet die geladenen Profilgrenzen. Die Zeitkonto-Seite listet Anfangsstand und Korrekturen paginiert und löscht einzelne Anpassungen nach Bestätigung. In der Zeitübersicht sind zu prüfende Tage filterbar; ein Segment lässt sich mit Revision als geprüft markieren. Mock, Unit-Tests und Mock-E2E-Spec `e2e-mock/p15.spec.ts` sind ergänzt. Details und Grenzen: `docs/handoffs/P15.md`.
+
+Prüfstand: `npm run check` erfolgreich (0 Fehler, 0 Warnungen); `npm test` erfolgreich (108 Dateien, 1109 Tests). Mock-E2E kann hier nicht ausgeführt werden: schon ein direkter Loopback-Bind-Test liefert `EPERM`. Änderungen bleiben uncommittet; der Lead übernimmt Commit und Backend-Projektdokumentation.
 
 ## Paket X4 (Review-Fixes Statistik und Lizenzbeilage; Branch `x4-review-fixes`, 25.10.2026)
 

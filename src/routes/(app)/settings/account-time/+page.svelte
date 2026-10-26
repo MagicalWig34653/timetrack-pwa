@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '#lib/api/client.js';
-	import type { TimeAccount } from '#lib/api/types.js';
+	import type { AccountAdjustmentPage, TimeAccount } from '#lib/api/types.js';
 	import Field from '#lib/components/app/Field.svelte';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import Unavailable from '#lib/components/time/Unavailable.svelte';
@@ -16,6 +16,10 @@
 
 	let load = $state<LoadState>({ status: 'loading' });
 	let account = $state<TimeAccount | null>(null);
+	let adjustments = $state<AccountAdjustmentPage | null>(null);
+	let hasOpening = $state(false);
+	let offset = $state(0);
+	let listError = $state('');
 	let notice = $state('');
 
 	let openingDate = $state('');
@@ -33,12 +37,35 @@
 	async function refresh() {
 		try {
 			const zone = await zoneStore.ensure();
-			account = await api.getTimeAccount();
+			[account, adjustments] = await Promise.all([api.getTimeAccount(), api.listAccountAdjustments(50, offset)]);
+			hasOpening = (account.openingSeconds !== 0) || adjustments.items.some((item) => item.kind === 'opening');
+			if (!hasOpening) {
+				for (let next = 0; next < adjustments.total; next += 100) {
+					const page = await api.listAccountAdjustments(100, next);
+					if (page.items.some((item) => item.kind === 'opening')) { hasOpening = true; break; }
+				}
+			}
 			if (!openingDate) openingDate = todayLocal(zone);
 			if (!correctionDate) correctionDate = todayLocal(zone);
 			load = { status: 'ready' };
 		} catch (error) {
 			load = toLoadState(error);
+		}
+	}
+
+	async function deleteAdjustment(id: string) {
+		if (pending || !window.confirm(t('account_time.delete_confirm'))) return;
+		pending = true;
+		listError = '';
+		try {
+			account = await api.deleteAccountAdjustment(id);
+			if (adjustments?.items.length === 1 && offset > 0) offset -= 50;
+			await refresh();
+			notice = t('account_time.deleted');
+		} catch (error) {
+			listError = errorMessage(error);
+		} finally {
+			pending = false;
 		}
 	}
 	onMount(refresh);
@@ -118,7 +145,7 @@
 			</CardContent>
 		</Card>
 
-		{#if !account.accountStart || account.openingSeconds === 0}
+		{#if !hasOpening}
 			<!-- accountStart may come from the first work model, so an explicit opening balance stays possible (server answers 409 opening_exists). -->
 			<Card>
 				<CardHeader>
@@ -154,6 +181,26 @@
 					<Field id="correction-reason" label={t('segment_form.reason')} bind:value={correctionReason} error={correctionErrors.reason} maxlength={200} disabled={pending} />
 					<div><Button type="submit" disabled={pending}>{t('account_time.correction_save')}</Button></div>
 				</form>
+			</CardContent>
+		</Card>
+		<Card>
+			<CardHeader><CardTitle>{t('account_time.history')}</CardTitle></CardHeader>
+			<CardContent class="flex flex-col gap-3">
+				{#if listError}<Alert variant="destructive">{listError}</Alert>{/if}
+				{#if adjustments?.total === 0}<p class="text-sm text-muted-foreground">{t('account_time.history_empty')}</p>{/if}
+				{#each adjustments?.items ?? [] as item (item.id)}
+					<div class="flex flex-wrap items-center gap-3 border-b pb-3 text-sm" data-testid="adjustment-row">
+						<div class="min-w-0 flex-1"><strong>{t(`account_time.kind.${item.kind}`)}</strong> · {formatDateNumeric(item.date)}<p class="text-muted-foreground">{item.reason}</p></div>
+						<span class="tabular-nums">{formatDelta(item.seconds)}</span>
+						<Button variant="outline" size="sm" onclick={() => deleteAdjustment(item.id)} disabled={pending}>{t('account_time.delete')}</Button>
+					</div>
+				{/each}
+				{#if adjustments && adjustments.total > 50}
+					<div class="flex gap-2">
+						<Button variant="outline" size="sm" onclick={() => { offset = Math.max(0, offset - 50); void refresh(); }} disabled={offset === 0 || pending}>{t('account_time.previous')}</Button>
+						<Button variant="outline" size="sm" onclick={() => { offset += 50; void refresh(); }} disabled={offset + 50 >= adjustments.total || pending}>{t('account_time.next')}</Button>
+					</div>
+				{/if}
 			</CardContent>
 		</Card>
 	</div>

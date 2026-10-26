@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api, ApiError } from '#lib/api/client.js';
-	import type { WorkModel, WorkModelPreview } from '#lib/api/types.js';
+	import type { LegalProfile, WorkModel, WorkModelPreview } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import Toast from '#lib/components/app/Toast.svelte';
 	import WorkModelCorrectionPanel, { type PreviewState } from '#lib/components/time/WorkModelCorrectionPanel.svelte';
@@ -28,6 +28,7 @@
 
 	let load = $state<LoadState>({ status: 'loading' });
 	let models = $state<WorkModel[]>([]);
+	let profiles = $state<LegalProfile[]>([]);
 	let form = $state<WorkModelFormValues>(defaultWorkModelForm(todayLocal(), 'Europe/Berlin'));
 	let errors = $state<WorkModelFormErrors>({});
 	let formError = $state('');
@@ -56,7 +57,7 @@
 	async function refresh() {
 		try {
 			await zoneStore.ensure();
-			models = await api.listWorkModels();
+			[models, profiles] = await Promise.all([api.listWorkModels(), api.listLegalProfiles()]);
 			load = { status: 'ready' };
 		} catch (error) {
 			load = toLoadState(error);
@@ -296,7 +297,7 @@
 							<WorkModelCorrectionPanel from={form.validFrom && !errors.validFrom ? form.validFrom : editing.validFrom} to={form.validTo || null} status={previewStatus} {preview} message={previewMessage} bind:confirmed disabled={pending} />
 						{/if}
 
-						<WorkModelFields bind:form {errors} {pending} mode={formMode} />
+						<WorkModelFields bind:form {errors} {pending} mode={formMode} {profiles} />
 
 						{#if prefilled && form.validFrom}
 							<Alert data-testid="work-model-prefilled">{t('work_model.prefilled', { date: formatDateNumeric(form.validFrom) })}</Alert>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { contextMenu, type MenuEntry } from '#lib/a11y/context-menu.svelte.js';
 	import { api } from '#lib/api/client.js';
-	import type { Place, PlanMode, PlanWeek } from '#lib/api/types.js';
+	import type { LegalProfile, Place, PlanMode, PlanWeek, WorkModel } from '#lib/api/types.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { planModeLabel, PLAN_MODES } from '#lib/planning/labels.js';
@@ -25,7 +25,7 @@
 		setBreakOn,
 		setModeOn
 	} from '#lib/week/grid-edit.js';
-	import { issuesByDate, LEGAL_PROFILE, weekIssues, type DayIssue } from '#lib/week/limits.js';
+	import { ADULT_PROFILE, issuesByDate, weekIssues, type DayIssue } from '#lib/week/limits.js';
 	import { type DayDraft, emptyDraft, formatClock, parseClock, plannedSecondsOf, type WindowSuggestion } from '#lib/week/plan-draft.js';
 	import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
 	import Copy from '@lucide/svelte/icons/copy';
@@ -86,6 +86,18 @@
 	} = $props();
 
 	const days = $derived(week.days);
+	let legalProfiles = $state<LegalProfile[]>([]);
+	let workModels = $state<WorkModel[]>([]);
+	onMount(() => {
+		void Promise.all([api.listLegalProfiles(), api.listWorkModels()]).then(([profiles, models]) => {
+			legalProfiles = profiles;
+			workModels = models;
+		}).catch(() => undefined);
+	});
+	function profileForDate(date: string): LegalProfile {
+		const model = workModels.find((item) => item.validFrom <= date && (!item.validTo || item.validTo >= date));
+		return legalProfiles.find((item) => item.id === (model?.legalProfileId ?? 'arbzg-adult-de')) ?? ADULT_PROFILE;
+	}
 
 	// ---- tool and brush --------------------------------------------------------------------------------------
 	let tool = $state<GridTool>('draw');
@@ -191,7 +203,7 @@
 	});
 
 	// ---- hints -----------------------------------------------------------------------------------------------
-	const issues = $derived(weekIssues(days, drafts));
+	const issues = $derived(weekIssues(days, drafts, profileForDate));
 	const issueMap = $derived(issuesByDate(issues));
 	function issueText(issue: DayIssue): string {
 		const day = days.find((d) => d.date === issue.date)!;
@@ -494,7 +506,7 @@
 					</li>
 				{/each}
 			</ul>
-			<p class="mt-2 text-xs text-muted-foreground">{t('wg.issues_note', { profile: LEGAL_PROFILE })}</p>
+			<p class="mt-2 text-xs text-muted-foreground">{t('work_model.legal_disclaimer')}</p>
 		</section>
 	{/if}
 

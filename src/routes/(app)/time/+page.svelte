@@ -33,6 +33,9 @@
 
 	let load = $state<LoadState>({ status: 'loading' });
 	let days = $state<DayEvaluation[]>([]);
+	let reviewOnly = $state(false);
+	const reviewCount = $derived(days.reduce((sum, day) => sum + (day.segments ?? []).filter((segment) => segment.needsReview).length, 0));
+	const visibleDays = $derived(reviewOnly ? days.filter((day) => day.segments?.some((segment) => segment.needsReview)) : days);
 
 	$effect(() => {
 		const from = weekStart;
@@ -81,10 +84,11 @@
 {:else if load.status === 'error'}
 	<Alert variant="destructive">{load.message}</Alert>
 {:else}
+	{#if reviewCount > 0}<Alert variant="warning" data-testid="review-banner">{t('segments.review_overview', { count: reviewCount })} <a class="underline" href="/time?week={weekStart}" onclick={(event) => { event.preventDefault(); reviewOnly = !reviewOnly; }}>{reviewOnly ? t('segments.show_all') : t('segments.show_review_only')}</a></Alert>{/if}
 	<Card>
 		<CardContent class="p-0">
 			<ul class="divide-y" data-testid="week-list">
-				{#each days as day (day.date)}
+				{#each visibleDays as day (day.date)}
 					<li>
 						<a
 							href="/time/{day.date}"
@@ -107,7 +111,8 @@
 								{/if}
 								{#if day.mark && day.mark !== 'none'}<Badge variant="outline">{markLabel(day.mark)}</Badge>{/if}
 								{#if day.provisional && day.date <= today}<Badge variant="secondary">{t('day.provisional')}</Badge>{/if}
-								{#if day.breakHints.length > 0}<Badge variant="outline">{t('week.hints', { count: day.breakHints.length })}</Badge>{/if}
+								{#if day.breakHints.length + (day.legalWarnings?.length ?? 0) > 0}<Badge variant="outline">{t('week.hints', { count: day.breakHints.length + (day.legalWarnings?.length ?? 0) })}</Badge>{/if}
+								{#if day.segments?.some((segment) => segment.needsReview)}<Badge variant="outline">{t('segments.needs_review')}</Badge>{/if}
 							</span>
 							<span class="text-right text-sm tabular-nums sm:order-3" title={t('day.target')}>
 								<span class="text-muted-foreground">{t('week.target_short')}</span> {formatDuration(day.targetSeconds)}

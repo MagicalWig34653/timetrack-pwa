@@ -18,6 +18,47 @@ afterEach(() => vi.unstubAllGlobals());
 const code = (promise: Promise<unknown>) => promise.then(() => 'ok', (e: ApiError) => `${e.status}:${e.code}`);
 
 describe('mock time API', () => {
+	it('lists legal profiles and keeps a profile change dated to the new model', async () => {
+		const profiles = await api.listLegalProfiles();
+		expect(profiles.map((profile) => profile.id)).toEqual(['arbzg-adult-de', 'jarbschg-minor-de']);
+		const [old] = await api.listWorkModels();
+		const changed = await api.createWorkModel({ ...old, validFrom: '2026-10-15', legalProfileId: 'jarbschg-minor-de' });
+		expect(changed.legalProfileId).toBe('jarbschg-minor-de');
+		expect((await api.getDay('2026-10-14')).legalProfileId).toBe('arbzg-adult-de');
+		expect((await api.getDay('2026-10-15')).legalProfileId).toBe('jarbschg-minor-de');
+	});
+
+	it('uses explicit lesson counts for a minor school day', async () => {
+		const [old] = await api.listWorkModels();
+		await api.createWorkModel({ ...old, validFrom: '2026-10-15', legalProfileId: 'jarbschg-minor-de' });
+		await api.createSegment({ kind: 'school', startedAt: '2026-10-15T07:00:00Z', endedAt: '2026-10-15T12:00:00Z' });
+		await api.setDayPreferences('2026-10-15', { schoolLessonCount: 6 });
+		const day = await api.getDay('2026-10-15');
+		expect(day.schoolLessonCount).toBe(6);
+		expect(day.creditSeconds).toBe(8 * 3600);
+	});
+
+	it('lists and deletes an individual account adjustment', async () => {
+		const before = await api.listAccountAdjustments();
+		expect(before.items[0].kind).toBe('opening');
+		await api.createAccountAdjustment({ kind: 'correction', date: '2026-10-13', seconds: -1800, reason: 'Test' });
+		const page = await api.listAccountAdjustments(1, 0);
+		expect(page).toMatchObject({ total: 2, limit: 1, offset: 0 });
+		expect(page.items[0].seconds).toBe(-1800);
+		const balance = await api.deleteAccountAdjustment(page.items[0].id);
+		expect(balance.adjustmentSeconds).toBe(0);
+		expect((await api.listAccountAdjustments()).total).toBe(1);
+		expect(await code(api.deleteAccountAdjustment(page.items[0].id))).toBe('404:not_found');
+	});
+
+	it('acknowledges a review marker with a revision and rejects stale versions', async () => {
+		const segment = (await api.getDay('2026-10-12')).segments![0];
+		await fetch('/api/v1/mock/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ segmentId: segment.id }) });
+		expect((await api.getDay('2026-10-12')).segments![0].needsReview).toBe(true);
+		const saved = await api.correctSegment(segment.id, { needsReview: false, reason: 'Geprüft' }, segment.version);
+		expect(saved).toMatchObject({ needsReview: false, version: segment.version + 1, revisions: 1 });
+		expect(await code(api.correctSegment(segment.id, { needsReview: false, reason: 'Geprüft' }, segment.version))).toBe('412:stale_version');
+	});
 	it('seeds a 38:30 h/week model with 7:42 daily target and quarter-hour rounding', async () => {
 		const [model] = await api.listWorkModels();
 		expect(model).toMatchObject({ weeklyTargetSeconds: 138600, workdays: [1, 2, 3, 4, 5], roundingEnabled: true, roundingMinutes: 15 });

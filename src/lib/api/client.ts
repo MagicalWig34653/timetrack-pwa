@@ -38,6 +38,8 @@ import type {
 	Absence,
 	AbsenceInput,
 	AccountAdjustmentInput,
+	AccountAdjustmentPage,
+	LegalProfile,
 	CalendarDay,
 	CustomDayInput,
 	IncomingShare,
@@ -447,6 +449,7 @@ export const api = {
 
 	// work models
 	listWorkModels: () => request<WorkModel[]>('GET', '/work-models'),
+	listLegalProfiles: () => request<LegalProfile[]>('GET', '/legal-profiles'),
 	createWorkModel: (input: WorkModelInput) => request<WorkModel>('POST', '/work-models', input),
 	/** Contract v0.16.0: replaces every editable field of one version (the evaluation of its days changes). */
 	correctWorkModel: (id: string, input: WorkModelInput, version?: number) =>
@@ -517,6 +520,9 @@ export const api = {
 		cachedRead(`account:${asOf ?? ''}`, () => request<TimeAccount>('GET', `/time/account${asOf ? `?asOf=${asOf}` : ''}`)),
 	createAccountAdjustment: (input: AccountAdjustmentInput) =>
 		request<TimeAccount>('POST', '/time/account/adjustments', input),
+	listAccountAdjustments: (limit = 50, offset = 0) =>
+		request<AccountAdjustmentPage>('GET', `/time/account/adjustments?limit=${limit}&offset=${offset}`),
+	deleteAccountAdjustment: (id: string) => request<TimeAccount>('DELETE', `/time/account/adjustments/${id}`),
 
 	// suggestions
 	listSuggestions: () => request<Suggestion[]>('GET', '/time/suggestions'),

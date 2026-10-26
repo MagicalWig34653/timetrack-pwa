@@ -20,6 +20,7 @@ export interface DerivedDayContext {
 }
 
 export interface DayPrefs {
+	schoolLessonCount?: number | null;
 	mark?: DayMarkKind;
 	creditSeconds?: number | null;
 	skipFixedBreaks?: boolean;
@@ -78,6 +79,7 @@ export function evaluateDay(input: {
 	prefs?: DayPrefs;
 	/** absence/holiday effect from the planning data; ignored when the user set an explicit mark */
 	derived?: DerivedDayContext | null;
+	minorSchoolCredit?: boolean;
 	now: number;
 }): DayEvaluation {
 	const { date, models, prefs = {}, now } = input;
@@ -97,8 +99,9 @@ export function evaluateDay(input: {
 	// School rule: enough school time on the day replaces the segment sum by the credit (assumption: it replaces all segments).
 	const schoolSeconds = intervals.filter((s) => s.kind === 'school').reduce((sum, s) => sum + (s.interval.end - s.interval.start) / SECOND, 0);
 	const threshold = model?.schoolFullDayThresholdSeconds ?? 10800;
-	const schoolCredit = model ? (model.schoolCreditSeconds ?? baseTarget) : 0;
-	const schoolRule = !!model && schoolSeconds > 0 && schoolSeconds >= threshold;
+	const minor = model?.legalProfileId === 'jarbschg-minor-de';
+	const schoolCredit = minor ? 8 * 3600 : model ? (model.schoolCreditSeconds ?? baseTarget) : 0;
+	const schoolRule = !!model && schoolSeconds > 0 && (minor ? !!input.minorSchoolCredit : schoolSeconds >= threshold);
 	const markCreditsSchool = mark === 'school_credit';
 
 	let target = baseTarget;
@@ -173,7 +176,10 @@ export function evaluateDay(input: {
 		evaluatedEnd: evaluatedEnd === null ? null : new Date(evaluatedEnd).toISOString(),
 		provisional,
 		segmentIds: segments.map((s) => s.id),
-		breakHints: breakHints(countingIntervals, breakDeductionSeconds)
+		breakHints: breakHints(countingIntervals, breakDeductionSeconds, model?.legalProfileId === 'jarbschg-minor-de'),
+		legalProfileId: model?.legalProfileId ?? 'arbzg-adult-de',
+		legalWarnings: [],
+		schoolLessonCount: prefs.schoolLessonCount ?? null
 	};
 }
 
@@ -181,17 +187,19 @@ export function evaluateDay(input: {
  * Hints only, based on actual (unrounded) times; no breaks are invented.
  * Assumptions: gaps shorter than 15 min do not count as break; a deducted fixed break counts as break time.
  */
-export function breakHints(countingIntervals: Interval[], fixedBreakSeconds = 0): { code: BreakHintCode }[] {
+export function breakHints(countingIntervals: Interval[], fixedBreakSeconds = 0, minor = false): { code: BreakHintCode }[] {
 	if (countingIntervals.length === 0) return [];
 	const merged = mergeIntervals(countingIntervals);
 	const workSeconds = merged.reduce((sum, i) => sum + (i.end - i.start), 0) / SECOND;
 	const gaps = merged.slice(1).map((m, index) => (m.start - merged[index].end) / SECOND);
 	const countedBreak = gaps.filter((g) => g >= 15 * 60).reduce((a, b) => a + b, 0) + fixedBreakSeconds;
 	const hints: BreakHintCode[] = [];
-	if (workSeconds > 9 * 3600 && countedBreak < 45 * 60) hints.push('break_missing_45');
-	else if (workSeconds > 6 * 3600 && countedBreak < 30 * 60) hints.push('break_missing_30');
+	if (minor && workSeconds > 6 * 3600 && countedBreak < 60 * 60) hints.push('break_missing_60');
+	else if (minor && workSeconds > 4.5 * 3600 && countedBreak < 30 * 60) hints.push('break_missing_30');
+	else if (!minor && workSeconds > 9 * 3600 && countedBreak < 45 * 60) hints.push('break_missing_45');
+	else if (!minor && workSeconds > 6 * 3600 && countedBreak < 30 * 60) hints.push('break_missing_30');
 	if (workSeconds > 6 * 3600 && gaps.some((g) => g > 0 && g < 15 * 60)) hints.push('break_part_too_short');
-	if (merged.some((i) => (i.end - i.start) / SECOND > 6 * 3600)) hints.push('work_over_6h_without_break');
+	if (merged.some((i) => (i.end - i.start) / SECOND > (minor ? 4.5 : 6) * 3600)) hints.push(minor ? 'work_over_4h30_without_break' : 'work_over_6h_without_break');
 	return hints.map((code) => ({ code }));
 }
 

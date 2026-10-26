@@ -95,9 +95,12 @@ export const deWeekGrid = {
 
 	'wg.issues': 'Hinweise zu den Arbeitszeitgrenzen',
 	'wg.issues_note': 'Hinweise nach dem Rechtsprofil {profile}; sie hindern das Speichern nicht.',
-	'wg.issue.daily_max': '{day}: {time} Std. netto, mehr als 10 Stunden am Tag.',
+	'wg.issue.daily_max': '{day}: {time} Std. netto, über der Tagesgrenze des Rechtsprofils.',
+	'wg.issue.weekly_max': '{day}: Die geplante Wochensumme überschreitet die Grenze des Rechtsprofils.',
+	'wg.issue.five_day_week': '{day}: Mehr als fünf geplante Arbeitstage in dieser Woche.',
+	'wg.issue.weekend_work': '{day}: Geplante Arbeit am Wochenende prüfen; Ausnahmen können gelten.',
 	'wg.issue.break_short': '{day}: Es fehlen {minutes} Min. Pause für diese Dauer.',
-	'wg.issue.rest_short': '{day}: Nur {time} Std. Ruhezeit seit dem Vortag, vorgesehen sind 11 Stunden.',
+	'wg.issue.rest_short': '{day}: Nur {time} Std. Ruhezeit seit dem Vortag, unter der Grenze des Rechtsprofils.',
 	'wg.issue.non_working': '{day}: Kein Arbeitstag nach deinem Arbeitsmodell.',
 
 	'wg.help_title': 'Bedienung des Rasters',

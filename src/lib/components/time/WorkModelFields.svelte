@@ -3,6 +3,8 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
+	import { Select } from '#lib/components/ui/select/index.js';
+	import type { LegalProfile } from '#lib/api/types.js';
 	import { t } from '#lib/i18n/index.js';
 	import { formatDuration, parseDuration } from '#lib/time/format.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
@@ -13,8 +15,10 @@
 		form = $bindable(),
 		errors,
 		pending,
-		mode
-	}: { form: WorkModelFormValues; errors: WorkModelFormErrors; pending: boolean; mode: 'new' | 'correct' } = $props();
+		mode,
+		profiles
+	}: { form: WorkModelFormValues; errors: WorkModelFormErrors; pending: boolean; mode: 'new' | 'correct'; profiles: LegalProfile[] } = $props();
+	const selectedProfile = $derived(profiles.find((profile) => profile.id === form.legalProfileId));
 
 	const dailyPreview = $derived.by(() => {
 		const weekly = parseDuration(form.weeklyTarget);
@@ -27,6 +31,17 @@
 </script>
 
 <div class="flex flex-col gap-5">
+	<div class="flex flex-col gap-1.5">
+		<Label for="wm-legal-profile">{t('work_model.legal_profile')}</Label>
+		<Select id="wm-legal-profile" bind:value={form.legalProfileId} disabled={pending || profiles.length === 0}>
+			{#each profiles as profile (profile.id)}<option value={profile.id}>{profile.name}</option>{/each}
+		</Select>
+		<p class="text-xs text-muted-foreground">{t('work_model.legal_profile_hint')}</p>
+		{#if selectedProfile}
+			<p class="text-xs text-muted-foreground">{t('work_model.legal_disclaimer')}</p>
+			<p class="text-xs text-muted-foreground">{t('work_model.legal_sources')}: {#each selectedProfile.sources as source (source)}<a href={source} target="_blank" rel="noopener noreferrer" class="mr-2 underline">{source}</a>{/each}</p>
+		{/if}
+	</div>
 		<div class="grid gap-3 sm:grid-cols-2">
 			<Field id="wm-from" type="date" label={t('work_model.valid_from')} hint={mode === 'correct' ? t('work_model.valid_from_correct_hint') : t('work_model.valid_from_hint')} bind:value={form.validFrom} error={errors.validFrom} disabled={pending} />
 			{#if mode === 'correct'}

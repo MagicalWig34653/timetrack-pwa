@@ -1,9 +1,10 @@
-import type { FixedBreak, WorkModel, WorkModelInput } from '#lib/api/types.js';
+import type { FixedBreak, LegalProfileId, WorkModel, WorkModelInput } from '#lib/api/types.js';
 import { t } from '#lib/i18n/index.js';
 import { isValidDate } from './dates.js';
 import { formatDuration, parseDuration } from './format.js';
 
 export interface WorkModelFormValues {
+	legalProfileId: LegalProfileId;
 	validFrom: string;
 	/** '' = open-ended; only sent when correcting a version */
 	validTo: string;
@@ -25,6 +26,7 @@ export type WorkModelFormErrors = Partial<Record<'validFrom' | 'validTo' | 'time
 
 export function defaultWorkModelForm(today: string, timezone: string): WorkModelFormValues {
 	return {
+		legalProfileId: 'arbzg-adult-de',
 		validFrom: today,
 		validTo: '',
 		timezone,
@@ -43,6 +45,7 @@ export function defaultWorkModelForm(today: string, timezone: string): WorkModel
 /** Prefills a new version from an existing one (validFrom stays editable and defaults to `validFrom`). */
 export function formFromModel(model: WorkModel, validFrom: string, validTo: string = ''): WorkModelFormValues {
 	return {
+		legalProfileId: model.legalProfileId ?? 'arbzg-adult-de',
 		validFrom,
 		validTo,
 		...(model.dailyTargetSeconds && Object.keys(model.dailyTargetSeconds).length > 0 ? { dailyTargetSeconds: { ...model.dailyTargetSeconds } } : {}),
@@ -110,6 +113,7 @@ export function buildWorkModelInput(
 	if (Object.keys(errors).length > 0) return { errors };
 	return {
 		input: {
+			legalProfileId: values.legalProfileId,
 			validFrom: values.validFrom,
 			...(options.withValidTo ? { validTo: values.validTo || null } : {}),
 			...(values.dailyTargetSeconds ? { dailyTargetSeconds: { ...values.dailyTargetSeconds } } : {}),
@@ -146,7 +150,8 @@ const FIELD_LABELS: Record<string, string> = {
 	schoolFullDayThresholdSeconds: 'Schulschwelle',
 	schoolCreditSeconds: 'Schulgutschrift',
 	dayBoundaryMinutes: 'Tagesgrenze',
-	fixedBreaks: 'Feste Pausen'
+	fixedBreaks: 'Feste Pausen',
+	legalProfileId: t('work_model.legal_profile')
 };
 export function changedFieldLabels(fields: string[]): string[] {
 	return fields.map((f) => FIELD_LABELS[f]).filter((x): x is string => Boolean(x));

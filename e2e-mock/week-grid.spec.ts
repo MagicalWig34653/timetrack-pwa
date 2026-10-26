@@ -265,7 +265,7 @@ test('hints for working-time limits and the list view stays reachable', async ({
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
 	await openGrid(page, '2033-W35');
 	await paintBlock(page, addDays(MONDAY, 105), 6 * 60, 19 * 60);
-	await expect(page.getByTestId('plan-issues')).toContainText('mehr als 10 Stunden');
+	await expect(page.getByTestId('plan-issues')).toContainText('über der Tagesgrenze');
 	await page.getByTestId('view-list').click();
 	await expect(page.getByTestId('plan-rows')).toBeVisible();
 	await expect(page.getByTestId(`plan-row-${addDays(MONDAY, 105)}`)).toBeVisible();

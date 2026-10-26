@@ -132,7 +132,24 @@ export type SegmentSource = 'timer' | 'manual' | 'automation' | 'suggestion' | '
 export type DayMarkKind = 'none' | 'holiday' | 'vacation' | 'sick' | 'excused' | 'school_credit';
 export type PlaceKind = 'office' | 'home' | 'customer' | 'school' | 'other';
 export type AutomationMode = 'direct' | 'suggest' | 'off';
-export type BreakHintCode = 'break_missing_30' | 'break_missing_45' | 'break_part_too_short' | 'work_over_6h_without_break';
+export type BreakHintCode = 'break_missing_30' | 'break_missing_45' | 'break_missing_60' | 'break_part_too_short' | 'work_over_6h_without_break' | 'work_over_4h30_without_break';
+export type LegalProfileId = 'arbzg-adult-de' | 'jarbschg-minor-de';
+export type LegalWarningCode = 'daily_limit' | 'weekly_limit' | 'five_day_week' | 'rest_period' | 'weekend_work' | 'work_after_full_school_day' | 'work_before_school';
+export interface LegalProfile {
+	id: LegalProfileId;
+	name: string;
+	maxDailySeconds: number | null;
+	maxWeeklySeconds: number | null;
+	maxWorkdaysPerWeek: number | null;
+	breakRules: { afterSeconds: number; requiredSeconds: number }[];
+	minimumBreakPartSeconds: number;
+	maximumContinuousSeconds: number;
+	minimumRestSeconds: number | null;
+	restrictedWeekdays: number[];
+	school?: { noWorkBeforeMinutes: number; fullDayLessons?: number; fullDayCreditSeconds?: number; fullDaysPerWeek?: number; blockWeekLessons?: number; blockWeekDays?: number; blockWeekCreditSeconds?: number } | null;
+	sources: string[];
+	informationalOnly: true;
+}
 
 export interface FixedBreak {
 	start: string;
@@ -140,6 +157,7 @@ export interface FixedBreak {
 }
 
 export interface WorkModelInput {
+	legalProfileId?: LegalProfileId;
 	validFrom: string;
 	validTo?: string | null;
 	timezone?: string;
@@ -202,6 +220,7 @@ export interface SegmentInput {
 }
 
 export interface SegmentCorrection {
+	needsReview?: false;
 	startedAt?: string;
 	endedAt?: string | null;
 	kind?: SegmentKind;
@@ -346,9 +365,13 @@ export interface DayEvaluation {
 	targetOverrideSeconds?: number | null;
 	note?: string | null;
 	breakHints: { code: BreakHintCode }[];
+	legalProfileId?: LegalProfileId;
+	legalWarnings?: { code: LegalWarningCode }[];
+	schoolLessonCount?: number | null;
 }
 
 export interface DayPreferences {
+	schoolLessonCount?: number | null;
 	mark?: DayMarkKind;
 	creditSeconds?: number | null;
 	skipFixedBreaks?: boolean;
@@ -371,6 +394,18 @@ export interface AccountAdjustmentInput {
 	date: string;
 	seconds: number;
 	reason: string;
+}
+
+export interface AccountAdjustment extends AccountAdjustmentInput {
+	id: string;
+	createdAt: string;
+}
+
+export interface AccountAdjustmentPage {
+	items: AccountAdjustment[];
+	total: number;
+	limit: number;
+	offset: number;
 }
 
 export interface Suggestion {
@@ -614,6 +649,10 @@ export type WeekMark = 'work' | 'school' | 'vacation' | 'sick' | 'holiday' | 'ex
 
 export interface TimeWeekDay {
 	date: string;
+	legalProfileId?: LegalProfileId;
+	legalWarnings?: { code: LegalWarningCode }[];
+	breakHints?: { code: BreakHintCode }[];
+	schoolLessonCount?: number | null;
 	weekday: number;
 	mark: WeekMark;
 	markSource: DayMarkSource;

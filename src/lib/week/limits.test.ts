@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanWeekDay } from '#lib/api/types.js';
-import { requiredBreak, weekIssues } from './limits.js';
+import { ADULT_PROFILE, requiredBreak, weekIssues } from './limits.js';
 import { emptyDraft, type DayDraft } from './plan-draft.js';
 
 const date = (i: number) => `2026-10-${26 + i}`;
@@ -15,6 +15,17 @@ describe('requiredBreak', () => {
 		expect(requiredBreak(6 * 60 + 1)).toBe(30);
 		expect(requiredBreak(9 * 60)).toBe(30);
 		expect(requiredBreak(9 * 60 + 1)).toBe(45);
+	});
+	it('uses the selected minor profile thresholds', () => {
+		const minor = { ...ADULT_PROFILE, id: 'jarbschg-minor-de' as const, maxDailySeconds: 8 * 3600, maxWeeklySeconds: 40 * 3600, maxWorkdaysPerWeek: 5, minimumRestSeconds: 12 * 3600, breakRules: [{ afterSeconds: 6 * 3600, requiredSeconds: 3600 }, { afterSeconds: 4.5 * 3600, requiredSeconds: 1800 }] };
+		expect(requiredBreak(5 * 60, minor)).toBe(30);
+		expect(requiredBreak(7 * 60, { ...minor, breakRules: [...minor.breakRules].reverse() })).toBe(60);
+		const issues = weekIssues(days(), week({ 0: block('08:00', '17:00', 30), 1: block('04:00', '13:00', 30) }), () => minor);
+		expect(issues).toContainEqual({ date: date(0), kind: 'daily_max', severity: 'warn', value: 8.5 * 60 });
+		expect(issues).toContainEqual({ date: date(0), kind: 'break_short', severity: 'warn', value: 30 });
+		expect(issues).toContainEqual({ date: date(1), kind: 'rest_short', severity: 'warn', value: 11 * 60 });
+		const weekend = weekIssues(days(), week({ 5: block('08:00', '12:00', 0) }), () => ({ ...minor, restrictedWeekdays: [6, 7] }));
+		expect(weekend).toContainEqual({ date: date(5), kind: 'weekend_work', severity: 'warn' });
 	});
 });
 
