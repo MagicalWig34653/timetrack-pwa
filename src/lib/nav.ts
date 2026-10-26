@@ -217,3 +217,11 @@ export function searchSettings<T extends { href: string; label: MessageKey }>(li
 		return words.every((word) => haystack.includes(word));
 	});
 }
+
+/**
+ * Pages that share one section shell (the settings nav + content column, see SettingsShell). The app layout keeps such a
+ * shell mounted across navigations between its pages; `/admin/mail` is listed in the settings nav and uses the same shell.
+ */
+export function sectionShell(pathname: string): 'settings' | null {
+	return pathname === '/settings' || pathname.startsWith('/settings/') || pathname === '/admin/mail' ? 'settings' : null;
+}

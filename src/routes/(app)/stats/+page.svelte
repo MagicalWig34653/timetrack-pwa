@@ -164,7 +164,7 @@
 				<KpiCard title={t('stats.kpi.absences')} value={data.absencesAvailable === false ? '–' : String(data.totals.absenceDays).replace('.', ',')} icon={Plane} testid="stats-absences" />
 			</section>
 
-			<div class="grid gap-4 lg:grid-cols-2">
+			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<Panel class="lg:col-span-2">
 					{#if data.balanceAvailable}
 						<Chart title={t('stats.chart.account')} description={t('stats.chart.account_desc')} categories={labels} series={accountSeries} type="line" format={fmtDeltaHours} ticks={hourTicks} axisFormat={(v) => `${Math.round(v)} h`} testid="chart-account" legend={false} />
