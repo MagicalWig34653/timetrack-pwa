@@ -477,6 +477,17 @@ export interface TriggerLinkInput {
 
 // --- Planning and vacation (contracts/openapi.yaml v0.3.1) ---
 
+/** Contract 0.32.0 (N4, ADR-0029): none = work day, half = half target, full = like a public holiday. */
+export type CompanyDayTreatment = 'none' | 'half' | 'full';
+
+export interface CompanyDay {
+	month: number;
+	day: number;
+	treatment: CompanyDayTreatment;
+	/** null/empty: the server uses Heiligabend (24.12.), Silvester (31.12.) or "Betriebsfreier Tag" */
+	name?: string | null;
+}
+
 export interface VacationSettings {
 	/** Read-only: false while nothing is stored; GET then returns the defaults (200). */
 	configured?: boolean;
@@ -488,6 +499,8 @@ export interface VacationSettings {
 	carryOverByYear?: Record<string, number>;
 	/** MM-DD or null */
 	carryOverExpiry?: string | null;
+	/** Contract 0.32.0: GET always lists 24.12. and 31.12.; PUT without the field keeps the stored rules, with it replaces the list (max 12). */
+	companyDays?: CompanyDay[];
 }
 
 export interface VacationBalance {
@@ -607,6 +620,8 @@ export interface CalendarDay {
 	name: string;
 	kind: CalendarDayKind;
 	source: 'builtin' | 'custom';
+	/** Contract 0.32.0: set for company days (kind stays holiday, source builtin); older servers omit it. */
+	companyTreatment?: 'half' | 'full' | null;
 }
 
 export interface CustomDayInput {
@@ -675,6 +690,10 @@ export interface TimeWeekDay {
 	schoolLessonCount?: number | null;
 	weekday: number;
 	mark: WeekMark;
+	/** Contract 0.31.0/0.32.0: name of a public, custom or company holiday on this date (also on free days); null without one. */
+	holidayName?: string | null;
+	/** Contract 0.32.0: half = mark stays work, target halved; full = mark holiday; null otherwise. */
+	companyDayTreatment?: 'half' | 'full' | null;
 	markSource: DayMarkSource;
 	targetSeconds: number;
 	plannedSeconds: number | null;

@@ -208,6 +208,7 @@
 	});
 
 	let holidayNames = $state<Record<string, string>>({});
+	let holidayTreatments = $state<Record<string, 'half' | 'full'>>({});
 	$effect(() => {
 		const years = [...new Set([Number(monday.slice(0, 4)), Number(addDays(monday, 6).slice(0, 4))])];
 		let current = true;
@@ -215,11 +216,16 @@
 			.then((lists) => {
 				if (!current) return;
 				const names: Record<string, string> = {};
+				const treatments: Record<string, 'half' | 'full'> = {};
 				for (const day of lists.flat()) {
 					if (day.kind !== 'holiday') continue;
-					for (let d = day.startDate; d <= day.endDate; d = addDays(d, 1)) names[d] = day.name;
+					for (let d = day.startDate; d <= day.endDate; d = addDays(d, 1)) {
+						names[d] = day.name;
+						if (day.companyTreatment) treatments[d] = day.companyTreatment;
+					}
 				}
 				holidayNames = names;
+				holidayTreatments = treatments;
 			})
 			.catch(() => undefined);
 		return () => (current = false);
@@ -508,6 +514,7 @@
 		{nowMinute}
 		{suggestion}
 		{holidayNames}
+		{holidayTreatments}
 		{vacation}
 		onpaint={paint}
 		onquick={quick}

@@ -1,5 +1,6 @@
 import type { PlanMode, TimeWeekDay, TimeWeekSummary, WeekMark } from '#lib/api/types.js';
 import { t, type MessageKey } from '#lib/i18n/index.js';
+import { holidayHint } from '#lib/planning/company-days.js';
 import { absenceKindLabel } from '#lib/planning/labels.js';
 import { formatDateLong } from '#lib/time/dates.js';
 import { absenceWarning, chipAbsences } from './absences.js';
@@ -45,6 +46,7 @@ export function isEmptyWeek(days: TimeWeekDay[]): boolean {
 export function dayAriaLabel(day: TimeWeekDay, vacation: VacationEntry[] | null = null): string {
 	const parts = [formatDateLong(day.date)];
 	if (day.mark !== 'work') parts.push(weekMarkLabel(day.mark));
+	if (day.holidayName) parts.push(holidayHint(day.holidayName, day.companyDayTreatment));
 	for (const entry of vacation ?? []) parts.push(vacationTooltip(entry));
 	for (const absence of chipAbsences(day, vacation !== null)) {
 		const warning = absenceWarning(absence.status);

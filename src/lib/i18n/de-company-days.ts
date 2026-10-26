@@ -1,0 +1,27 @@
+// German UI texts for company days such as 24.12. and 31.12. (N4, contract 0.32.0, ADR-0029).
+export const deCompanyDays = {
+	'company.title': 'Betriebstage',
+	'company.text': 'Heiligabend und Silvester sind keine gesetzlichen Feiertage, werden aber oft ganz oder halb freigegeben. Lege fest, wie sie gelten. „Halber Tag“ halbiert das Tagessoll, „Ganzer Tag“ wirkt wie ein Feiertag.',
+	'company.treatment.none': 'Keine',
+	'company.treatment.half': 'Halber Tag',
+	'company.treatment.full': 'Ganzer Tag',
+	'company.treatment_label': 'Behandlung von {name}',
+	'company.date': 'Datum',
+	'company.date_hint': 'Tag und Monat, zum Beispiel 12.06.; gilt jedes Jahr.',
+	'company.name': 'Name',
+	'company.name_placeholder': 'Betriebsfreier Tag',
+	'company.own_title': 'Eigene Betriebstage',
+	'company.own_empty': 'Keine eigenen Betriebstage. Einzelne Tage nur eines Jahres trägst du als eigenen Kalendertag ein.',
+	'company.add': 'Betriebstag hinzufügen',
+	'company.remove': 'Betriebstag {name} entfernen',
+	'company.limit': 'Höchstens {max} Regeln insgesamt.',
+	'company.error_date': 'Bitte ein gültiges Datum als Tag.Monat. angeben, zum Beispiel 12.06.',
+	'company.error_leap': 'Der 29.02. ist nicht möglich, weil er nicht jedes Jahr vorkommt.',
+	'company.error_duplicate': 'Für dieses Datum gibt es schon eine Regel.',
+	'company.error_name': 'Der Name darf höchstens {max} Zeichen lang sein.',
+	'company.error_max': 'Es sind höchstens {max} Regeln möglich.',
+	'company.hint_half': '{name} – halber Betriebstag, Soll halbiert',
+	'company.hint_full': '{name} – Betriebstag, wie ein Feiertag',
+	'company.badge_half': '{name} ½',
+	'company.legend_half': 'Halber Betriebstag'
+} as const;

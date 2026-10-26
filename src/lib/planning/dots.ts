@@ -32,7 +32,7 @@ export const DOT_CLASSES: Record<DotColor, string> = {
  */
 export function dotsOf(info: DayInfo, hidden: Set<string> = new Set()): Dot[] {
 	const dots: Dot[] = [];
-	if (!hidden.has('holiday')) for (let i = 0; i < info.holidays.length; i++) dots.push({ kind: 'holiday', color: 'holiday', hollow: false });
+	if (!hidden.has('holiday')) for (let i = 0; i < info.holidays.length; i++) dots.push({ kind: 'holiday', color: 'holiday', hollow: info.holidays[i].companyTreatment === 'half' });
 	if (!hidden.has('school_holiday') && info.schoolHolidays.length > 0) dots.push({ kind: 'school_holiday', color: 'school_holiday', hollow: false });
 	for (const absence of info.absences) {
 		if (hidden.has(absence.kind)) continue;

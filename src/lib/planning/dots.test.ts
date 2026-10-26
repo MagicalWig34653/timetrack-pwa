@@ -18,6 +18,11 @@ describe('dotsOf', () => {
 		expect(dots[1].hollow).toBe(true);
 		expect(dots[2].hollow).toBe(false);
 	});
+	it('draws a half company day as a hollow holiday dot', () => {
+		const half = { startDate: '2026-12-24', endDate: '2026-12-24', name: 'Heiligabend', kind: 'holiday', source: 'builtin', companyTreatment: 'half' } as const;
+		expect(dotsOf(info({ holidays: [half] }))[0]).toMatchObject({ kind: 'holiday', hollow: true });
+		expect(dotsOf(info({ holidays: [{ ...half, companyTreatment: 'full' }] }))[0].hollow).toBe(false);
+	});
 	it('respects legend filters', () => {
 		const dots = dotsOf(info({ holidays: [{ startDate: '', endDate: '', name: 'X', kind: 'holiday', source: 'builtin' }] }), new Set(['holiday']));
 		expect(dots).toEqual([]);

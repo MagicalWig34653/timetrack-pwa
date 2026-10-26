@@ -170,6 +170,26 @@
 	$effect(() => {
 		void fetchWeek(isoWeek);
 	});
+	// holiday names and company-day treatment of the shown week (contract 0.32.0); optional, the plan works without them
+	let holidays = $state<Record<string, { name: string; treatment: 'half' | 'full' | null }>>({});
+	$effect(() => {
+		const days = week?.days;
+		if (!days || days.length === 0) return;
+		const years = [...new Set([days[0].date.slice(0, 4), days[days.length - 1].date.slice(0, 4)].map(Number))];
+		let current = true;
+		void Promise.all(years.map((y) => api.listHolidays(y).catch(() => [])))
+			.then((lists) => {
+				if (!current) return;
+				const next: Record<string, { name: string; treatment: 'half' | 'full' | null }> = {};
+				for (const entry of lists.flat()) {
+					if (entry.kind !== 'holiday') continue;
+					for (const day of days) if (day.date >= entry.startDate && day.date <= entry.endDate) next[day.date] = { name: entry.name, treatment: entry.companyTreatment ?? null };
+				}
+				holidays = next;
+			})
+			.catch(() => undefined);
+		return () => (current = false);
+	});
 	$effect(() => {
 		void api.listPlaces().then(
 			(list) => (places = list),
@@ -390,7 +410,7 @@
 		{:else}
 			<ul class="flex flex-col gap-2.5" data-testid="plan-rows">
 				{#each days as day, index (day.date)}
-					<PlanRow {day} draft={drafts[index]} {showProblems} onmode={(mode) => setMode(index, mode)} onchange={(next) => setDraft(index, next)} />
+					<PlanRow {day} holiday={holidays[day.date] ?? null} draft={drafts[index]} {showProblems} onmode={(mode) => setMode(index, mode)} onchange={(next) => setDraft(index, next)} />
 				{/each}
 			</ul>
 		{/if}
