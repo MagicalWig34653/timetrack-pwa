@@ -127,13 +127,21 @@ test('shared: incoming share shows only the granted scopes, read-only', async ({
 	await context.close();
 });
 
-test('phone: the calendar shows a week list and the day panel works', async ({ browser }) => {
+test('phone: the calendar shows a month grid with dots, a week list and the day panel works', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 390, height: 844 } });
 	await page.goto(`/calendar?date=${monday}`);
 	await expect(page.getByTestId('month-grid')).toBeHidden();
 	await expect(page.getByTestId('week-days').getByRole('button')).toHaveCount(7);
-	await page.locator(`[data-date="${monday}"]:visible`).click();
+	await expect(page.getByTestId('phone-month').locator('[data-phone-cell]').first()).toBeVisible();
+	await page.getByTestId('phone-month').locator(`[data-date="${monday}"]`).click();
 	await expect(page.getByTestId('day-panel')).toContainText('Urlaub');
+	await expect(page.getByTestId('phone-month').locator(`[data-date="${monday}"] [data-dot="vacation"]`)).toHaveCount(1);
+	// range by two taps in range mode
+	await page.getByTestId('range-mode').click();
+	const cells = page.getByTestId('phone-month').locator('[data-phone-cell]');
+	// the Monday is already selected: the next tap extends it to a range
+	await cells.nth(12).click();
+	await expect(page.getByTestId('selection-count')).not.toContainText('1 Tage');
 	const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
 	expect(overflow).toBe(false);
 	await context.close();

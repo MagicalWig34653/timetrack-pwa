@@ -55,11 +55,11 @@
 	const weeks = $derived(view === 'week' ? [weekOf(anchor)] : monthGrid(anchor));
 	const gridFrom = $derived(weeks[0][0]);
 	const gridTo = $derived(weeks[weeks.length - 1][6]);
-	const phoneWeek = $derived(weekOf(anchor));
 
 	const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 	const monthTitle = $derived(`${MONTHS[Number(anchor.slice(5, 7)) - 1]} ${anchor.slice(0, 4)}`);
-	const weekTitle = $derived(t('cal.week_title', { n: isoWeekNumber(phoneWeek[0]), from: formatDateNumeric(phoneWeek[0]), to: formatDateNumeric(phoneWeek[6]) }));
+	const anchorWeek = $derived(weekOf(anchor));
+	const weekTitle = $derived(t('cal.week_title', { n: isoWeekNumber(anchorWeek[0]), from: formatDateNumeric(anchorWeek[0]), to: formatDateNumeric(anchorWeek[6]) }));
 
 	let load = $state<LoadState>({ status: 'loading' });
 	let holidays = $state<CalendarDay[]>([]);
@@ -75,6 +75,8 @@
 	let cursor = $state('');
 	let op = $state<DragOp | null>(null);
 	let rangeMode = $state(false);
+	// Legend and filters: open on tablets and desktops, collapsed on phones where the month grid needs the space.
+	let legendOpen = $state(typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(min-width: 640px)').matches : true);
 	let dialog = $state<{ seed: DialogSeed; anchor: DOMRect | null; opener: HTMLElement | null } | null>(null);
 	let dialogError = $state('');
 	let helpOpen = $state<HTMLElement | null | false>(false);
@@ -153,6 +155,8 @@
 	const infoOf = (date: string): DayInfo => dayInfo(date, data);
 	const stateOf = (info: DayInfo) => dayWorkState(info, models);
 	const selectedSet = $derived(new Set(selection.dates));
+	// Phone: the week list below the month grid follows the selected day (when it lies in the shown grid).
+	const phoneWeek = $derived(weekOf(view === 'month' && selection.anchor && selection.anchor >= gridFrom && selection.anchor <= gridTo ? selection.anchor : anchor));
 	const focusDate = $derived(selection.anchor);
 	const absenceById = (id: string) => absences.find((a) => a.id === id);
 	const balanceOf = (week: string[]) => weekBalance(week, days, today);
@@ -545,15 +549,24 @@
 						<Button variant="outline" size="sm" href={href(today)}>{t('datenav.today')}</Button>
 					</nav>
 				{/if}
-				<nav class="flex items-center gap-2 sm:hidden" aria-label={t('calendar.nav_week')}>
-					<Button variant="outline" size="icon" href={href(addDays(anchor, -7))} aria-label={t('calendar.previous_week')}><ChevronLeft /></Button>
-					<p class="flex-1 text-center text-sm font-medium" data-testid="calendar-week">{formatDateNumeric(phoneWeek[0])}–{formatDateNumeric(phoneWeek[6])}</p>
-					<Button variant="outline" size="icon" href={href(addDays(anchor, 7))} aria-label={t('calendar.next_week')}><ChevronRight /></Button>
-					<Button variant="outline" size="sm" href={href(today)}>{t('datenav.today')}</Button>
-				</nav>
+				{#if view === 'month'}
+					<nav class="flex items-center gap-2 sm:hidden" aria-label={t('calendar.nav_month')}>
+						<Button variant="outline" size="icon" href={href(addMonths(anchor, -1))} aria-label={t('calendar.previous_month')}><ChevronLeft /></Button>
+						<p class="flex-1 text-center text-sm font-medium" data-testid="calendar-month-phone">{monthTitle}</p>
+						<Button variant="outline" size="icon" href={href(addMonths(anchor, 1))} aria-label={t('calendar.next_month')}><ChevronRight /></Button>
+						<Button variant="outline" size="sm" href={href(today)}>{t('datenav.today')}</Button>
+					</nav>
+				{:else}
+					<nav class="flex items-center gap-2 sm:hidden" aria-label={t('calendar.nav_week')}>
+						<Button variant="outline" size="icon" href={href(addDays(anchor, -7))} aria-label={t('calendar.previous_week')}><ChevronLeft /></Button>
+						<p class="flex-1 text-center text-sm font-medium" data-testid="calendar-week">{formatDateNumeric(phoneWeek[0])}–{formatDateNumeric(phoneWeek[6])}</p>
+						<Button variant="outline" size="icon" href={href(addDays(anchor, 7))} aria-label={t('calendar.next_week')}><ChevronRight /></Button>
+						<Button variant="outline" size="sm" href={href(today)}>{t('datenav.today')}</Button>
+					</nav>
+				{/if}
 
 				<div class="ml-auto flex flex-wrap items-center gap-2">
-					<div class="hidden sm:inline-flex" role="group" aria-label={t('cal.view')}>
+					<div class="inline-flex" role="group" aria-label={t('cal.view')}>
 						<Button variant={view === 'month' ? 'default' : 'outline'} size="sm" class="rounded-r-none" aria-pressed={view === 'month'} onclick={() => setView('month')} data-testid="view-month">{t('cal.view_month')}</Button>
 						<Button variant={view === 'week' ? 'default' : 'outline'} size="sm" class="-ml-px rounded-l-none" aria-pressed={view === 'week'} onclick={() => setView('week')} data-testid="view-week">{t('cal.view_week')}</Button>
 					</div>
@@ -564,22 +577,28 @@
 				</div>
 			</div>
 
-			<ul class="flex flex-wrap gap-2 text-xs" aria-label={t('calendar.legend')} data-testid="calendar-legend">
-				{#each legend as item (item.key)}
-					<li>
-						<button type="button" class="rounded px-1.5 py-0.5 {item.cls} {hidden.has(item.key) ? 'line-through opacity-40' : ''} focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none" aria-pressed={!hidden.has(item.key)} title={t('cal.legend_toggle')} onclick={() => toggleHidden(item.key)}>{item.label()}</button>
-					</li>
-				{/each}
-			</ul>
+			<details bind:open={legendOpen} class="rounded-lg border px-3 py-2 text-sm" data-testid="calendar-legends">
+				<summary class="cursor-pointer font-medium select-none">{t('n2.legend_title')}</summary>
+				<div class="mt-2 flex flex-col gap-3">
+					<ul class="flex flex-wrap gap-2 text-xs" aria-label={t('calendar.legend')} data-testid="calendar-legend">
+						{#each legend as item (item.key)}
+							<li>
+								<button type="button" class="rounded px-1.5 py-0.5 {item.cls} {hidden.has(item.key) ? 'line-through opacity-40' : ''} focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none" aria-pressed={!hidden.has(item.key)} title={t('cal.legend_toggle')} onclick={() => toggleHidden(item.key)}>{item.label()}</button>
+							</li>
+						{/each}
+					</ul>
 
-			<ul class="flex flex-wrap gap-x-3 gap-y-1.5 text-xs" aria-label={t('calendar.tile_legend')} data-testid="tile-legend">
-				{#each WORK_STATE_ORDER as state (state)}
-					<li class="flex items-center gap-1.5" data-state={state}>
-						<span class="inline-block size-4 rounded-sm border border-border {WORK_STATE_CLASSES[state]}" aria-hidden="true"></span>
-						{workStateLabel(state)}
-					</li>
-				{/each}
-			</ul>
+					<ul class="flex flex-wrap gap-x-3 gap-y-1.5 text-xs" aria-label={t('calendar.tile_legend')} data-testid="tile-legend">
+						{#each WORK_STATE_ORDER as state (state)}
+							<li class="flex items-center gap-1.5" data-state={state}>
+								<span class="inline-block size-4 rounded-sm border border-border {WORK_STATE_CLASSES[state]}" aria-hidden="true"></span>
+								{workStateLabel(state)}
+							</li>
+						{/each}
+					</ul>
+
+				</div>
+			</details>
 
 			<!-- live status: drag preview, selection actions, results -->
 			<div class="flex min-h-9 flex-wrap items-center gap-2" aria-live="polite" data-testid="calendar-status">

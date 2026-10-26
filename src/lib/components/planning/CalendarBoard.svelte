@@ -8,6 +8,7 @@
 	import { WORK_STATE_CLASSES } from '#lib/planning/labels.js';
 	import { moveCursor, type CursorMove, type DateRange } from '#lib/planning/range-select.js';
 	import { formatDateShort, isoWeekNumber } from '#lib/time/dates.js';
+	import { dotsOf, DOT_CLASSES } from '#lib/planning/dots.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { tick } from 'svelte';
 	import type { WeekBalance } from '#lib/planning/week-balance.js';
@@ -243,6 +244,46 @@
 	</tbody>
 </table>
 
+<!-- compact month grid (phone): iOS-like cells with coloured dots; the week list below shows the details of one week -->
+{#if variant === 'month'}
+	<div class="sm:hidden" data-testid="phone-month" role="grid" aria-label={label} style={rangeMode ? 'touch-action: none' : ''}>
+		<div class="grid grid-cols-7 text-center text-[11px] font-medium text-muted-foreground" role="row">
+			{#each [1, 2, 3, 4, 5, 6, 7] as weekday (weekday)}<span role="columnheader" class="py-1">{weekdayLabel(weekday)}</span>{/each}
+		</div>
+		{#each weeks as week (week[0])}
+			<div class="grid grid-cols-7" role="row">
+				{#each week as date (date)}
+					{@const info = infoOf(date)}
+					{@const state = stateOf(info)}
+					{@const dots = dotsOf(info, hidden)}
+					<div role="gridcell" class="p-px">
+						<button
+							type="button"
+							class="relative flex h-14 w-full flex-col items-center gap-1 rounded-lg px-0.5 pt-1.5 select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {state === 'free' ? 'bg-muted/70' : ''} {state === 'sick' ? 'bg-rose-500/10' : ''} {state === 'vacation_booked' ? 'bg-sky-500/15' : ''} {isOtherMonth(date) ? 'opacity-45' : ''} {selected.has(date) ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''} {ghostClass(date)}"
+							aria-label={describe(info)}
+							aria-pressed={selected.has(date)}
+							data-date={date}
+							data-phone-cell
+							data-today={date === today ? 'true' : undefined}
+							onpointerdown={(e) => down(e, date)}
+							onclick={(e) => click(e, date)}
+							ondblclick={(e) => onquick(date, e.currentTarget)}
+							use:contextmenu={(target) => menuFor(date, target)}
+						>
+							<span class="text-sm tabular-nums {date === today ? 'inline-flex size-6 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground' : 'font-medium'}">{Number(date.slice(8))}</span>
+							<span class="flex min-h-2 flex-wrap items-center justify-center gap-0.5" aria-hidden="true">
+								{#each dots.slice(0, 4) as dot, index (index)}
+									<span class="size-1.5 rounded-full {DOT_CLASSES[dot.color]} {dot.hollow ? 'bg-transparent! ring-1 ring-current' : ''}" data-dot={dot.kind}></span>
+								{/each}
+							</span>
+						</button>
+					</div>
+				{/each}
+			</div>
+		{/each}
+	</div>
+{/if}
+
 <!-- week list (phone) -->
 {#if phoneBalance}
 	<p class="mb-2 flex items-baseline gap-2 text-xs text-muted-foreground sm:hidden" data-testid="phone-week-balance">
@@ -250,7 +291,7 @@
 		<WeekBalanceLabel balance={phoneBalance} week={isoWeekNumber(phoneWeek[0])} class="text-xs" />
 	</p>
 {/if}
-<ul class="flex flex-col gap-2 sm:hidden" data-testid="week-days" style={rangeMode ? 'touch-action: none' : ''}>
+<ul class="flex flex-col gap-2 sm:hidden {variant === 'month' ? 'mt-4' : ''}" data-testid="week-days" style={rangeMode ? 'touch-action: none' : ''}>
 	{#each phoneWeek as date (date)}
 		{@const info = infoOf(date)}
 		<li>

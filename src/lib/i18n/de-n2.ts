@@ -11,5 +11,6 @@ export const deN2 = {
 	'vacation.tile_requested': 'Beantragt',
 	'vacation.tile_requested_text': 'Eingereicht, noch nicht entschieden; schon vom Rest abgezogen.',
 	'vacation.tile_planned_unsubmitted': 'Geplant (nicht eingereicht)',
-	'vacation.tile_planned_unsubmitted_text': 'Nur geplant, noch kein Antrag; in der Vorschau abgezogen.'
+	'vacation.tile_planned_unsubmitted_text': 'Nur geplant, noch kein Antrag; in der Vorschau abgezogen.',
+	'n2.legend_title': 'Legende und Filter'
 } as const;
