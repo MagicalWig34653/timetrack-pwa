@@ -24,4 +24,4 @@ Nicht ursächlich (geprüft): Breite/x von `main`, Seitenleiste und Titel-y übe
 - Scrollposition springt bei neuer Unterseite auf 0 (gewollt).
 
 ## Verifikation
-`npm run check` 0 Fehler, `npm test` 1122 grün, `npm run test:e2e:mock`: 178 grün, 80 übersprungen (Screenshot-Fälle), danach Spec-Korrektur und Neulauf der Layout-Specs (11 grün). Ohne die Layout-Änderung schlägt der Persistenz-Test fehl (Gegenprobe).
+`npm run check` 0 Fehler, `npm test` 1122 grün, `npm run test:e2e:mock`: 178 grün, 80 übersprungen (Screenshot-Fälle), danach Spec-Korrektur und Neulauf der Layout-Specs (11 grün). Vor der Änderung zeigte die Sondenmessung `lost`/Scroll 0 für die Navigation (der Persistenz-Test prüft genau das); die Geometrie-Tests waren schon vor J2 grün, weil die Sprünge dort nicht auftraten, sie sichern gegen Rückfälle.

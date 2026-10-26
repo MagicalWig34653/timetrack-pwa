@@ -90,8 +90,10 @@ test('settings nav stays mounted: its scroll position and DOM node survive a pag
 	await expect(page.getByTestId('settings-tabs')).toBeVisible();
 	await page.evaluate(() => {
 		(document.querySelector('[data-testid="settings-tabs"]') as HTMLElement).dataset.mark = 'kept';
-		document.querySelector('[data-testid="settings-nav-sticky"]')!.scrollTop = 200;
+		document.querySelector('[data-testid="settings-nav-sticky"]')!.scrollTop = 200; // clamped to the scrollable range
 	});
+	const start = await page.evaluate(() => document.querySelector('[data-testid="settings-nav-sticky"]')!.scrollTop);
+	expect(start).toBeGreaterThan(50);
 	// /admin/mail has its own layout component (separate route tree), so only hops between settings pages keep the node
 	for (const route of ['/settings/privacy', '/settings/places', '/settings/sessions']) {
 		await page.locator(`#settings-nav-list a[href="${route}"]`).click();
@@ -100,7 +102,8 @@ test('settings nav stays mounted: its scroll position and DOM node survive a pag
 			mark: (document.querySelector('[data-testid="settings-tabs"]') as HTMLElement | null)?.dataset.mark ?? 'lost',
 			scroll: document.querySelector('[data-testid="settings-nav-sticky"]')!.scrollTop
 		}));
-		expect(state, route).toEqual({ mark: 'kept', scroll: 200 });
+		expect(state.mark, route).toBe('kept');
+		expect(state.scroll, route).toBeGreaterThan(50); // not reset to 0 by a rebuilt nav
 	}
 	await context.close();
 });
