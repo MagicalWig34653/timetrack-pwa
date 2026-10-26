@@ -92,16 +92,15 @@ test('settings nav stays mounted: its scroll position and DOM node survive a pag
 		(document.querySelector('[data-testid="settings-tabs"]') as HTMLElement).dataset.mark = 'kept';
 		document.querySelector('[data-testid="settings-nav-sticky"]')!.scrollTop = 200;
 	});
-	for (const route of ['/settings/privacy', '/admin/mail', '/settings/places']) {
+	// /admin/mail has its own layout component (separate route tree), so only hops between settings pages keep the node
+	for (const route of ['/settings/privacy', '/settings/places', '/settings/sessions']) {
 		await page.locator(`#settings-nav-list a[href="${route}"]`).click();
 		await page.waitForURL(`**${route}`);
 		const state = await page.evaluate(() => ({
 			mark: (document.querySelector('[data-testid="settings-tabs"]') as HTMLElement | null)?.dataset.mark ?? 'lost',
 			scroll: document.querySelector('[data-testid="settings-nav-sticky"]')!.scrollTop
 		}));
-		// /admin/mail has its own layout component (separate route tree), so only the settings pages must keep the node
-		if (route.startsWith('/settings/')) expect(state, route).toEqual({ mark: 'kept', scroll: 200 });
-		else await page.evaluate(() => { (document.querySelector('[data-testid="settings-tabs"]') as HTMLElement).dataset.mark = 'kept'; document.querySelector('[data-testid="settings-nav-sticky"]')!.scrollTop = 200; });
+		expect(state, route).toEqual({ mark: 'kept', scroll: 200 });
 	}
 	await context.close();
 });
