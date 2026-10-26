@@ -138,7 +138,7 @@ describe('layouts hide switched-off modules', () => {
 		const labels = navLabels();
 		expect(labels).not.toContain('Berichtsheft');
 		expect(labels).not.toContain('Urlaub');
-		expect(labels).toContain('Zeit');
+		expect(labels).toContain('Woche');
 		expect(labels).toContain('Module (Server)'); // admin
 		expect(screen.getByTestId('module-disabled')).toHaveTextContent('Dieses Modul ist deaktiviert');
 		expect(screen.queryByTestId('child')).toBeNull();

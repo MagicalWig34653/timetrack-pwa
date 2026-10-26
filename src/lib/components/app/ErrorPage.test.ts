@@ -9,7 +9,7 @@ describe('ErrorPage', () => {
 		const heading = screen.getByRole('heading', { level: 1, name: 'Seite nicht gefunden' });
 		expect(heading).toHaveFocus();
 		expect(screen.getByTestId('error-path')).toHaveTextContent('/gibt/es/nicht');
-		for (const name of ['Heute', 'Kalender', 'Zeit']) expect(screen.getAllByRole('link', { name }).length).toBeGreaterThan(0);
+		for (const name of ['Heute', 'Kalender', 'Woche']) expect(screen.getAllByRole('link', { name }).length).toBeGreaterThan(0);
 		expect(screen.queryByTestId('error-retry')).toBeNull();
 	});
 

@@ -12,7 +12,7 @@ test('unknown address, signed out: designed 404 with links, focus on the heading
 	await expect(heading).toBeFocused();
 	await expect(page.getByRole('alert')).toBeVisible();
 	await expect(page.getByTestId('error-path')).toHaveText('/gibt-es-nicht');
-	for (const name of ['Heute', 'Kalender', 'Zeit']) await expect(page.getByRole('link', { name }).first()).toBeVisible();
+	for (const name of ['Heute', 'Kalender', 'Woche']) await expect(page.getByRole('link', { name }).first()).toBeVisible();
 	await expect(page.locator('body')).not.toContainText('Not Found');
 });
 

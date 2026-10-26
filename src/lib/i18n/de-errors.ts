@@ -21,7 +21,6 @@ export const deErrors = {
 	'errorpage.links': 'Zurück zu',
 	'errorpage.link_today': 'Heute',
 	'errorpage.link_calendar': 'Kalender',
-	'errorpage.link_time': 'Zeit',
 	'errorpage.link_week': 'Woche',
 	'errorpage.report_hint': 'Gib die Fehler-ID an, wenn du den Fehler meldest.',
 	'errorpage.boundary_title': 'Dieser Bereich konnte nicht angezeigt werden'

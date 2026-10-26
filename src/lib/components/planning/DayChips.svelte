@@ -40,6 +40,6 @@
 		</span>
 	{/if}
 	{#if worked > 0 && !hidden.has('worked')}
-		<span class="px-1.5 tabular-nums text-muted-foreground" data-chip="worked">{t('calendar.worked', { time: timeDisplay.duration(worked) })}</span>
+		<span class="px-1.5 tabular-nums text-foreground/80" data-chip="worked">{t('calendar.worked', { time: timeDisplay.duration(worked) })}</span>
 	{/if}
 </span>

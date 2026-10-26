@@ -11,7 +11,7 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
 vi.mock('$app/state', () => ({ page: pageState }));
 
 import Dashboard from './(app)/+page.svelte';
-import WeekPage from './(app)/time/+page.svelte';
+import { load as timeLoad } from './(app)/time/+page.js';
 import DayPage from './(app)/time/[date]/+page.svelte';
 import SuggestionsPage from './(app)/suggestions/+page.svelte';
 import DevicesPage from './(app)/settings/devices/+page.svelte';
@@ -86,22 +86,23 @@ describe('dashboard "Heute"', () => {
 	});
 });
 
-describe('week list', () => {
-	it('lists seven days with target, delta and totals only for elapsed days', async () => {
-		pageState.url = new URL('http://localhost/time');
-		render(WeekPage);
-		const list = await screen.findByTestId('week-list');
-		expect(within(list).getAllByRole('link')).toHaveLength(7);
-		expect(screen.getByText('Woche vom 12.10.2026 bis 18.10.2026')).toBeInTheDocument();
-		const totals = screen.getByTestId('week-totals');
-		expect(totals).toHaveTextContent('Soll bisher'); // 3 elapsed workdays = 23:06
-		expect(totals).toHaveTextContent('23:06');
+describe('/time redirect (merged into the week page)', () => {
+	const redirectOf = (search: string) => {
+		try {
+			timeLoad({ url: new URL(`http://localhost/time${search}`) } as never);
+		} catch (error) {
+			const redirect = error as { status: number; location: string };
+			return `${redirect.status} ${redirect.location}`;
+		}
+		return 'no redirect';
+	};
+	it('sends /time to the current week', () => {
+		expect(redirectOf('')).toBe('307 /week');
 	});
-
-	it('navigates to another week via the query parameter', async () => {
-		pageState.url = new URL('http://localhost/time?week=2026-10-05');
-		render(WeekPage);
-		expect(await screen.findByText('Woche vom 05.10.2026 bis 11.10.2026')).toBeInTheDocument();
+	it('turns a day of the wanted week into an ISO week and keeps the review filter', () => {
+		expect(redirectOf('?week=2026-10-07')).toBe('307 /week?week=2026-W41');
+		expect(redirectOf('?week=2026-10-07&review=1')).toBe('307 /week?week=2026-W41&review=1');
+		expect(redirectOf('?week=kaputt')).toBe('307 /week');
 	});
 });
 

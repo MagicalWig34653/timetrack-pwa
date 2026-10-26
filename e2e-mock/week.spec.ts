@@ -43,9 +43,12 @@ test('overview: numbers, marks and aria labels of a past week', async ({ browser
 	expect(marks).toEqual(['work', 'work', 'vacation', 'sick', 'work', 'off', 'off']);
 	await expect(page.getByTestId(`week-day-${d(0)}`)).toHaveAttribute('aria-label', /8:00 Stunden, Saldo plus 0:18/);
 	await expect(page.getByTestId(`week-day-${d(4)}`)).toHaveAttribute('aria-label', /Saldo minus 7:42/);
-	// a day card opens the day
+	// a day card opens the day panel in place (no navigation away); the day page stays available as a link
 	await page.getByTestId(`week-day-${d(0)}`).click();
-	await expect(page).toHaveURL(new RegExp(`/time/${d(0)}$`));
+	await expect(page).toHaveURL(new RegExp(`/week\\?week=.*&day=${d(0)}`));
+	await expect(page.getByTestId('week-day-panel')).toHaveAttribute('data-date', d(0));
+	await expect(page.getByTestId('week-day-panel').getByTestId('segment-row')).toHaveCount(1);
+	await expect(page.getByTestId('week-day-open')).toHaveAttribute('href', `/time/${d(0)}`);
 	await context.close();
 });
 

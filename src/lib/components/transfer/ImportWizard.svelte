@@ -807,9 +807,9 @@
 				</CardContent>
 			</Card>
 			{#if isWorktime && nextStepDate}
-				<WorktimeNextStep firstDate={nextStepDate} initialModels={models ?? []} sheetBalanceSeconds={sheetBalance} continueHref={firstDate ? `/time/${firstDate}` : '/time'} />
+				<WorktimeNextStep firstDate={nextStepDate} initialModels={models ?? []} sheetBalanceSeconds={sheetBalance} continueHref={firstDate ? `/time/${firstDate}` : '/week'} />
 			{:else if isWorktime}
-				<a class={buttonVariants()} href="/time">{t('worktime.next_continue')}</a>
+				<a class={buttonVariants()} href="/week">{t('worktime.next_continue')}</a>
 			{/if}
 			{#if (result.warnings ?? []).length > 0}<ImportWarnings warnings={result.warnings ?? []} testid="result-warnings" />{/if}
 			{#if !isWorktime}
@@ -818,7 +818,7 @@
 						<a class="text-sm underline underline-offset-4" href="/time/{firstDate}">{t('import.open_day')}</a>
 						{#if moduleStore.enabled('planning')}<a class="text-sm underline underline-offset-4" href="/calendar?date={firstDate}">{t('import.open_calendar')}</a>{/if}
 					{:else}
-						<a class="text-sm underline underline-offset-4" href="/time">{t('import.open_time')}</a>
+						<a class="text-sm underline underline-offset-4" href="/week">{t('import.open_time')}</a>
 					{/if}
 				</div>
 			{/if}

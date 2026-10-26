@@ -2,7 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.js';
-	import type { TimeWeek } from '#lib/api/types.js';
+	import type { DayEvaluation, TimeWeek } from '#lib/api/types.js';
+	import DayDetail from '#lib/components/day/DayDetail.svelte';
 	import EmptyState from '#lib/components/app/EmptyState.svelte';
 	import KpiCard from '#lib/components/app/KpiCard.svelte';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
@@ -17,7 +18,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
-	import { formatDateNumeric, isoWeekLabel, isoWeekNumber, mondayOfIsoWeek, startOfWeek, todayLocal } from '#lib/time/dates.js';
+	import { addDays, formatDateLong, formatDateNumeric, isoWeekLabel, isoWeekNumber, mondayOfIsoWeek, startOfWeek, todayLocal } from '#lib/time/dates.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
@@ -61,14 +62,18 @@
 
 	let load = $state<LoadState>({ status: 'loading' });
 	let week = $state<TimeWeek | null>(null);
+	/** day evaluations of the week, only used to find entries that need a check (the review filter of the former time list) */
+	let reviewDates = $state<string[]>([]);
+	const reviewOnly = $derived(page.url.searchParams.get('review') === '1');
 
 	async function fetchWeek(target: string, silent: boolean) {
 		if (!silent) load = { status: 'loading' };
 		try {
 			await zoneStore.ensure();
-			const result = await api.getTimeWeek(target);
+			const [result, evaluations] = await Promise.all([api.getTimeWeek(target), api.listDays(monday, addDays(monday, 6)).catch((): DayEvaluation[] => [])]);
 			if (target !== isoWeek) return;
 			week = result;
+			reviewDates = evaluations.filter((day) => day.segments?.some((segment) => segment.needsReview)).map((day) => day.date);
 			load = { status: 'ready' };
 		} catch (error) {
 			if (target === isoWeek && !(silent && load.status === 'ready')) load = toLoadState(error);
@@ -88,15 +93,31 @@
 	});
 
 	const summary = $derived(week?.summary ?? null);
-	const days = $derived(week?.days ?? []);
+	const allDays = $derived(week?.days ?? []);
+	const days = $derived(reviewOnly ? allDays.filter((day) => reviewDates.includes(day.date)) : allDays);
+	// The day panel: ?day=YYYY-MM-DD inside this week, else today in the current week.
+	const dayParam = $derived(page.url.searchParams.get('day') ?? '');
+	const selectedDate = $derived(allDays.some((day) => day.date === dayParam) ? dayParam : isCurrent && allDays.some((day) => day.date === today) ? today : null);
+	function hrefFor(date: string | null): string {
+		const params = new URLSearchParams({ week: isoWeek });
+		if (date) params.set('day', date);
+		if (reviewOnly) params.set('review', '1');
+		return `/week?${params}`;
+	}
+	const selectDay = (date: string) => void goto(hrefFor(date), { replace: true, reset: false });
+	function toggleReview() {
+		const params = new URLSearchParams({ week: isoWeek });
+		if (!reviewOnly) params.set('review', '1');
+		void goto(`/week?${params}`, { replace: true, reset: false });
+	}
 	const planned = $derived(summary?.plannedSeconds ?? null);
-	const plannedToDate = $derived(days.filter((d) => !d.isFuture).reduce((sum, d) => sum + (d.plannedSeconds ?? 0), 0));
+	const plannedToDate = $derived(allDays.filter((d) => !d.isFuture).reduce((sum, d) => sum + (d.plannedSeconds ?? 0), 0));
 	const workedHours = $derived(summary ? summary.workSeconds + summary.creditSeconds : 0);
 	const sentence = $derived(summary ? summarySentence(summary, isCurrent, isoWeekNumber(monday)) : '');
-	const longestWeekday = $derived(summary?.longestDay ? weekdayLabel(days.find((d) => d.date === summary.longestDay!.date)?.weekday ?? 1) : '');
+	const longestWeekday = $derived(summary?.longestDay ? weekdayLabel(allDays.find((d) => d.date === summary.longestDay!.date)?.weekday ?? 1) : '');
 	const planDiff = $derived(workedHours - plannedToDate);
-	const runs = $derived(absenceRuns(days));
-	const openAbsence = $derived(hasOpenAbsence(days));
+	const runs = $derived(absenceRuns(allDays));
+	const openAbsence = $derived(hasOpenAbsence(allDays));
 </script>
 
 <PageHeader title={t('weekview.title')} description={t('weekview.description')} />
@@ -136,7 +157,14 @@
 			/>
 		</section>
 
-		{#if isEmptyWeek(days) && planned === null}
+		{#if reviewDates.length > 0}
+			<Alert variant="warning" data-testid="review-banner">
+				{t('segments.review_overview', { count: reviewDates.length })}
+				<button type="button" class="underline" onclick={toggleReview} data-testid="review-toggle">{reviewOnly ? t('segments.show_all') : t('segments.show_review_only')}</button>
+			</Alert>
+		{/if}
+
+		{#if isEmptyWeek(allDays) && planned === null}
 			<EmptyState title={t('weekview.empty_title')} description={t('weekview.empty_text')} icon={CalendarRange} testid="week-empty">
 				{#snippet action()}
 					{#if moduleStore.enabled('planning')}<Button variant="outline" size="sm" href="/plan?week={isoWeek}">{t('weekview.empty_plan')}</Button>{/if}
@@ -145,9 +173,23 @@
 		{:else}
 			<ol class="grid gap-3 lg:grid-cols-7 lg:items-stretch" aria-label={t('weekview.days_label')} data-testid="week-days">
 				{#each days as day (day.date)}
-					<li class="min-w-0 *:h-full"><DayCard {day} {timeZone} /></li>
+					<li class="min-w-0 *:h-full"><DayCard {day} {timeZone} href={hrefFor(day.date)} selected={day.date === selectedDate} review={reviewDates.includes(day.date)} onselect={() => selectDay(day.date)} /></li>
 				{/each}
 			</ol>
+		{/if}
+
+		{#if selectedDate}
+			<section class="flex flex-col gap-3" aria-label={t('n2.day_panel_label', { date: formatDateLong(selectedDate) })} data-testid="week-day-panel" data-date={selectedDate}>
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					<h2 class="text-lg font-semibold">{formatDateLong(selectedDate)}</h2>
+					<Button variant="outline" size="sm" href="/time/{selectedDate}" data-testid="week-day-open">{t('n2.day_open_page')}</Button>
+				</div>
+				{#key selectedDate}
+					<DayDetail date={selectedDate} heading={false} onchanged={() => void fetchWeek(isoWeek, true)} />
+				{/key}
+			</section>
+		{:else if allDays.length > 0}
+			<p class="text-sm text-muted-foreground" data-testid="week-day-hint">{t('n2.day_pick_hint')}</p>
 		{/if}
 
 		{#if runs.length > 0}
@@ -172,6 +214,8 @@
 				{/if}
 			</Panel>
 		{/if}
+
+		<p class="text-xs"><a class="underline underline-offset-4" href="/time/cancelled" data-testid="cancelled-link">{t('trash.link')}</a></p>
 
 		<p class="text-[15px] text-foreground" data-testid="week-sentence">{sentence}</p>
 

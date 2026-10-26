@@ -197,7 +197,7 @@ export const deTransfer = {
 	'import.result_none_created': 'Es wurden keine neuen Einträge angelegt. Wahrscheinlich war die Datei schon importiert.',
 	'import.open_calendar': 'Zum Kalender',
 	'import.open_day': 'Zum ersten importierten Tag',
-	'import.open_time': 'Zur Zeitübersicht',
+	'import.open_time': 'Zur Wochenübersicht',
 	'import.rollback': 'Import zurücknehmen',
 	'import.rollback_confirm_text': 'Alle durch diesen Import angelegten Einträge werden storniert. Einträge, die du seitdem geändert hast, verhindern das Zurücknehmen.',
 	'import.rollback_confirm': 'Jetzt zurücknehmen',

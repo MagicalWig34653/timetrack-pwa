@@ -40,10 +40,11 @@ test('review banner filters days and a segment can be marked reviewed', async ({
 	await page.evaluate(async (id) => {
 		await fetch('/api/v1/mock/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ segmentId: id }) });
 	}, segmentId);
-	await page.goto(`/time?week=${day}`);
+	await page.goto(`/time?week=${day}`); // redirects to the week page
+	await expect(page).toHaveURL(/\/week\?week=\d{4}-W\d{2}/);
 	await expect(page.getByTestId('review-banner')).toBeVisible();
-	await page.getByText('Nur zu prüfende Tage zeigen').click();
-	await expect(page.getByTestId('week-list').getByRole('listitem')).toHaveCount(1);
+	await page.getByTestId('review-toggle').click();
+	await expect(page.getByTestId('week-days').getByRole('listitem')).toHaveCount(1);
 	await page.goto(`/time/${day}`);
 	await page.getByTestId('segment-row').filter({ hasText: 'Zu prüfen' }).getByRole('button', { name: 'Als geprüft markieren' }).click();
 	await expect(page.getByText('Eintrag als geprüft markiert.')).toBeVisible();

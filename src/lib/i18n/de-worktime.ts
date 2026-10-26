@@ -222,7 +222,7 @@ export const deWorktime = {
 	'worktime.next_settings': 'Arbeitsmodell in den Einstellungen öffnen',
 	'worktime.next_ok': 'Dein Arbeitsmodell gilt schon ab {modelFrom} und passt zu deiner Tabelle. Du musst nichts weiter einrichten.',
 	'worktime.next_late': 'Dein erstes Arbeitsmodell beginnt erst am {modelFrom}, nach dem ersten Tag deiner Tabelle ({date}). Für die Tage davor gibt es kein Soll. Passe es in den Einstellungen an.',
-	'worktime.next_continue': 'Zur Zeitübersicht',
+	'worktime.next_continue': 'Zur Wochenübersicht',
 	'worktime.next_open_day': 'Zum ersten importierten Tag',
 	'worktime.result_compare_title': 'Zeitkonto: Tabelle gegen App',
 	'worktime.result_compare_text': 'Die Tabelle rechnet bis heute {sheet}, die App kommt auf {app}.',

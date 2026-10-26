@@ -12,6 +12,7 @@ for (const [name, viewport] of [['phone', { width: 390, height: 844 }], ['deskto
 			const { page, context } = await loginAsAdmin(browser, { viewport, colorScheme: scheme });
 			for (const route of routes) {
 				await page.goto(route);
+				if (route === '/week') await page.getByTestId('week-days').getByRole('link').nth(1).click();
 				await page.waitForLoadState('networkidle');
 				await expect(page.locator('main')).toBeVisible();
 				await page.screenshot({ path: `${dir}/${route.replace(/[^a-z0-9]+/gi, '_')}-${name}-${scheme}.png`, fullPage: true });

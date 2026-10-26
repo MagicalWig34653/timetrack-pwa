@@ -23,8 +23,10 @@ test('dashboard: start and stop the timer, one running segment, timeline appears
 
 test('week list and day detail: correction with reason, void, day preferences', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser);
-	await page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Zeit' }).click();
-	await expect(page.getByTestId('week-list')).toBeVisible();
+	await page.getByRole('navigation', { name: 'Hauptnavigation' }).getByRole('link', { name: 'Woche' }).click();
+	await expect(page.getByTestId('week-days')).toBeVisible();
+	await page.goto('/time');
+	await expect(page).toHaveURL(/\/week$/);
 	await page.goto(`/time/${dayA}`);
 	await expect(page.getByRole('heading', { name: new RegExp(german(dayA).replace(/\./g, '\\.')) })).toBeVisible();
 	const rows = page.getByTestId('segment-row');

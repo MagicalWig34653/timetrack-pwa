@@ -102,7 +102,7 @@ test('cancelled entries: filter, restore, delete one, bulk, delete all with type
 		ids.push(segment.id);
 		await call(page, 'DELETE', `/time/segments/${segment.id}?reason=test`);
 	}
-	await page.goto('/time');
+	await page.goto('/week');
 	await page.getByTestId('cancelled-link').click();
 	await expect(page).toHaveURL(/\/time\/cancelled$/);
 	await expect(page.getByTestId('trash-row')).toHaveCount(5);

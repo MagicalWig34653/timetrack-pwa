@@ -220,7 +220,7 @@
 					<td class="{variant === 'week' ? 'h-60' : 'h-28'} border p-0 align-top">
 						<button
 							type="button"
-							class="{base} {WORK_STATE_CLASSES[stateOf(info)]} {isOtherMonth(date) ? 'opacity-60' : ''} {selected.has(date) ? 'ring-2 ring-primary ring-inset' : ''} {ghostClass(date)}"
+							class="{base} {WORK_STATE_CLASSES[stateOf(info)]} {isOtherMonth(date) ? 'bg-muted/30' : ''} {selected.has(date) ? 'ring-2 ring-primary ring-inset' : ''} {ghostClass(date)}"
 							aria-label={describe(info)}
 							data-work-state={stateOf(info)}
 							aria-pressed={selected.has(date)}

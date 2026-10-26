@@ -3,7 +3,6 @@ import type { MessageKey } from '#lib/i18n/index.js';
 /** Top navigation entries; entries of a switched-off module are filtered out by the layout (see modules/map.ts). */
 export const MAIN_LINKS: { href: string; label: MessageKey; prefix: boolean; section?: string }[] = [
 	{ href: '/', label: 'nav.home', prefix: false },
-	{ href: '/time', label: 'nav.time', prefix: true },
 	{ href: '/week', label: 'nav.week', prefix: true },
 	{ href: '/suggestions', label: 'nav.suggestions', prefix: true },
 	{ href: '/reports', label: 'nav.reports', prefix: true },
@@ -98,8 +97,7 @@ export const NAV_GROUPS: NavGroup[] = [
 		label: 'nav.group.daily',
 		items: [
 			{ href: '/', label: 'nav.home', prefix: false, icon: 'house' },
-			{ href: '/time', label: 'nav.time', prefix: true, icon: 'clock' },
-			{ href: '/week', label: 'nav.week', prefix: true, icon: 'week', alsoActive: ['/plan'] },
+			{ href: '/week', label: 'nav.week', prefix: true, icon: 'week', alsoActive: ['/plan', '/time'] },
 			{ href: '/calendar', label: 'nav.calendar', prefix: true, icon: 'calendar' },
 			{ href: '/stats', label: 'nav.stats', prefix: true, icon: 'chart' },
 			{ href: '/reports', label: 'nav.reports', prefix: true, icon: 'book' }
@@ -173,6 +171,8 @@ for (const group of NAV_GROUPS) for (const item of group.items) ALL_LABELS.set(i
 for (const link of [...SETTINGS_LINKS, ...SETTINGS_ADMIN_LINKS]) ALL_LABELS.set(link.href, link.label);
 ALL_LABELS.set('/notifications', 'nav.notifications');
 ALL_LABELS.set('/plan', 'nav.week');
+// /time was merged into the week page (N2): its sub pages (day detail, cancelled entries) belong to "Woche".
+ALL_LABELS.set('/time', 'nav.week');
 
 /** Breadcrumb trail for a pathname: section, then page; unknown tails are shown as text. */
 export function breadcrumbs(pathname: string): Crumb[] {
@@ -192,7 +192,7 @@ export function breadcrumbs(pathname: string): Crumb[] {
 	}
 	const label = ALL_LABELS.get(`/${parts[0]}`);
 	if (label && pathname === '/time/cancelled') {
-		trail.push({ label, href: '/time' }, { label: 'trash.title' });
+		trail.push({ label, href: '/week' }, { label: 'trash.title' });
 		return trail;
 	}
 	if (label && pathname === '/vacation/planner') {
@@ -200,7 +200,7 @@ export function breadcrumbs(pathname: string): Crumb[] {
 		return trail;
 	}
 	if (label) {
-		trail.push(parts.length > 1 ? { label, href: `/${parts[0]}` } : { label });
+		trail.push(parts.length > 1 ? { label, href: parts[0] === 'time' ? '/week' : `/${parts[0]}` } : { label });
 		if (parts.length > 1) trail.push({ label: null, text: parts.slice(1).join(' / ') });
 	}
 	return trail;

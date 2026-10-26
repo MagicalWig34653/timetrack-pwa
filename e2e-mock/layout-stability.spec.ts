@@ -121,7 +121,7 @@ test('scrolled settings page: nav stays sticky under the top bar, new sub page s
 
 for (const [label, routes] of [
 	['admin', ['/admin/invitations', '/admin/accounts', '/admin/modules', '/admin/mail']],
-	['main', ['/', '/time', '/week', '/reports', '/calendar', '/vacation', '/absences', '/shared']]
+	['main', ['/', '/week', '/reports', '/calendar', '/vacation', '/absences', '/shared']]
 ] as const) {
 	test(`${label} pages keep the viewport width (no scrollbar toggling)`, async ({ browser }) => {
 		const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 800 } });

@@ -51,7 +51,7 @@ test('sidebar groups navigation, hides module entries and filters settings by se
 	await expect(nav.getByRole('link', { name: 'Urlaub', exact: true })).toHaveCount(0);
 	await expect(nav.getByRole('link', { name: 'Export', exact: true })).toHaveCount(0);
 	await expect(page.getByTestId('nav-group-data')).toHaveCount(0);
-	await expect(nav.getByRole('link', { name: 'Zeit', exact: true })).toBeVisible();
+	await expect(nav.getByRole('link', { name: 'Woche', exact: true })).toBeVisible();
 	await setModules(page, allOn);
 	await page.goto('/');
 	await expect(nav.getByRole('link', { name: 'Urlaub', exact: true })).toBeVisible();
@@ -75,8 +75,8 @@ test('mobile menu is an off-canvas dialog with focus trap, Escape and close on n
 	await expect(button).toBeFocused();
 
 	await button.click();
-	await dialog.getByRole('link', { name: 'Zeit', exact: true }).click();
-	await expect(page).toHaveURL(/\/time$/);
+	await dialog.getByRole('link', { name: 'Woche', exact: true }).click();
+	await expect(page).toHaveURL(/\/week$/);
 	await expect(dialog).toHaveCount(0);
 	await context.close();
 });
@@ -184,7 +184,7 @@ test('reduced transparency and reduced motion fall back to opaque surfaces witho
 });
 
 const MAIN_PAGES = [
-	'/', '/time', '/calendar', '/reports', '/vacation', '/absences', '/shared', '/suggestions', '/export', '/import', '/notifications',
+	'/', '/week', '/calendar', '/reports', '/vacation', '/absences', '/shared', '/suggestions', '/export', '/import', '/notifications',
 	'/settings/profile', '/onboarding', '/settings/work-model', '/settings/appearance', '/settings/places', '/settings/account-time', '/settings/learning-fields', '/settings/notifications',
 	'/settings/modules', '/settings/devices', '/settings/sharing', '/settings/passkeys', '/settings/identities', '/settings/connections',
 	'/settings/api-tokens', '/settings/mcp-help', '/settings/recovery', '/settings/sessions', '/settings/storage', '/admin/invitations', '/admin/modules'

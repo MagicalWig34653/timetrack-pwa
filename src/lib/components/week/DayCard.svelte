@@ -11,7 +11,14 @@
 	import MarkIcon from './MarkIcon.svelte';
 
 	/** One day of the week overview: weekday and date, mark, hours, worked/planned/target bar, balance, first start to last end. */
-	let { day, timeZone }: { day: TimeWeekDay; timeZone: string } = $props();
+	let { day, timeZone, href = `/time/${day.date}`, selected = false, review = false, onselect }: { day: TimeWeekDay; timeZone: string; href?: string; selected?: boolean; /** has entries that need a check */ review?: boolean; onselect?: () => void } = $props();
+
+	function click(event: MouseEvent) {
+		// plain clicks open the day panel in place; modified clicks keep the link behaviour (new tab, download ...)
+		if (!onselect || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+		event.preventDefault();
+		onselect();
+	}
 
 	const hours = $derived(dayHours(day));
 	const bars = $derived(barShares(day));
@@ -22,10 +29,13 @@
 </script>
 
 <a
-	href="/time/{day.date}"
-	class="day ui-card rounded-[10px] border bg-card p-3 shadow-[var(--shadow-card)] transition-colors outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring {day.isToday ? 'ring-2 ring-ui-accent/60' : ''} {dim ? 'opacity-75' : ''}"
+	{href}
+	onclick={click}
+	class="day ui-card rounded-[10px] border bg-card p-3 shadow-[var(--shadow-card)] transition-colors outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring {day.isToday ? 'ring-2 ring-ui-accent/60' : ''} {selected ? 'bg-ui-accent-soft ring-2 ring-ui-accent' : ''} {dim ? 'bg-muted/40' : ''}"
 	aria-label={dayAriaLabel(day)}
 	aria-current={day.isToday ? 'date' : undefined}
+	aria-expanded={onselect ? selected : undefined}
+	data-selected={selected ? 'true' : undefined}
 	data-testid="week-day-{day.date}"
 	data-mark={day.mark}
 >
@@ -80,6 +90,7 @@
 		{#if day.balanceSeconds !== null && (day.targetSeconds > 0 || hours > 0)}
 			<StatusChip tone={balanceTone(day.balanceSeconds)} dot={false}>{timeDisplay.delta(day.balanceSeconds)}</StatusChip>
 		{/if}
+		{#if review}<StatusChip tone="warning" dot={false}>{t('segments.needs_review')}</StatusChip>{/if}
 		{#if showMode && day.planMode}<span class="text-muted-foreground">{planModeLabel(day.planMode)}</span>{/if}
 	</span>
 
