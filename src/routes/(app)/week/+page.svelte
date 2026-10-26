@@ -18,7 +18,7 @@
 	import { t } from '#lib/i18n/index.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { formatDateNumeric, isoWeekLabel, isoWeekNumber, mondayOfIsoWeek, startOfWeek, todayLocal } from '#lib/time/dates.js';
-	import { formatDelta, formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
@@ -117,19 +117,19 @@
 {:else if summary}
 	<div class="flex flex-col gap-4" data-testid="week-overview" data-week={isoWeek}>
 		<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('weekview.summary_label')} data-testid="week-kpis">
-			<KpiCard title={t('weekview.actual')} value={formatDuration(workedHours)} hint={t('weekview.actual_hint')} icon={Gauge} testid="week-actual" />
+			<KpiCard title={t('weekview.actual')} seconds={workedHours} hint={t('weekview.actual_hint')} icon={Gauge} testid="week-actual" />
 			<KpiCard
 				title={t('weekview.target')}
-				value={formatDuration(summary.targetSeconds)}
-				hint={isCurrent && summary.targetToDateSeconds < summary.targetSeconds ? t('weekview.target_hint_to_date', { time: formatDuration(summary.targetToDateSeconds) }) : t('weekview.target_hint_full')}
+				seconds={summary.targetSeconds}
+				hint={isCurrent && summary.targetToDateSeconds < summary.targetSeconds ? t('weekview.target_hint_to_date', { time: timeDisplay.duration(summary.targetToDateSeconds) }) : t('weekview.target_hint_full')}
 				icon={Target}
 				testid="week-target"
 			/>
-			<KpiCard title={t('weekview.balance')} value={formatDelta(summary.balanceSeconds)} hint={isCurrent ? t('weekview.balance_hint') : t('weekview.balance_hint_past')} icon={Scale} tone={summary.balanceSeconds < 0 ? 'negative' : 'default'} testid="week-balance" />
+			<KpiCard title={t('weekview.balance')} seconds={summary.balanceSeconds} delta hint={isCurrent ? t('weekview.balance_hint') : t('weekview.balance_hint_past')} icon={Scale} tone={summary.balanceSeconds < 0 ? 'negative' : 'default'} testid="week-balance" />
 			<KpiCard
 				title={t('weekview.account')}
-				value={formatDelta(summary.accountBalanceAfterSeconds)}
-				hint={t('weekview.account_hint_before', { time: formatDelta(summary.accountBalanceBeforeSeconds) })}
+				seconds={summary.accountBalanceAfterSeconds} delta
+				hint={t('weekview.account_hint_before', { time: timeDisplay.delta(summary.accountBalanceBeforeSeconds) })}
 				icon={Wallet}
 				tone={summary.accountBalanceAfterSeconds < 0 ? 'negative' : 'default'}
 				testid="week-account"
@@ -181,19 +181,19 @@
 			{#if summary.sickDays > 0}<StatChip icon={Stethoscope} value={String(summary.sickDays)} caption={t(summary.sickDays === 1 ? 'weekview.chip.sick_one' : 'weekview.chip.sick_other')} testid="chip-sick" />{/if}
 			{#if summary.schoolDays > 0}<StatChip icon={GraduationCap} value={String(summary.schoolDays)} caption={t(summary.schoolDays === 1 ? 'weekview.chip.school_one' : 'weekview.chip.school_other')} testid="chip-school" />{/if}
 			{#if summary.holidayDays > 0}<StatChip icon={Flag} value={String(summary.holidayDays)} caption={t(summary.holidayDays === 1 ? 'weekview.chip.holiday_one' : 'weekview.chip.holiday_other')} testid="chip-holiday" />{/if}
-			{#if summary.travelSeconds > 0}<StatChip icon={Car} value={formatDuration(summary.travelSeconds)} caption={t('weekview.chip.travel')} testid="chip-travel" />{/if}
-			{#if summary.breakSeconds > 0}<StatChip icon={Coffee} value={formatDuration(summary.breakSeconds)} caption={t('weekview.chip.breaks')} testid="chip-breaks" />{/if}
+			{#if summary.travelSeconds > 0}<StatChip icon={Car} seconds={summary.travelSeconds} caption={t('weekview.chip.travel')} testid="chip-travel" />{/if}
+			{#if summary.breakSeconds > 0}<StatChip icon={Coffee} seconds={summary.breakSeconds} caption={t('weekview.chip.breaks')} testid="chip-breaks" />{/if}
 			{#if summary.averageStart && summary.averageEnd}<StatChip icon={Clock} value="{summary.averageStart}–{summary.averageEnd}" caption={t('weekview.chip.average')} testid="chip-average" />{/if}
-			{#if summary.longestDay}<StatChip icon={isCurrent ? Flame : Trophy} value={formatDuration(summary.longestDay.seconds)} caption={t('weekview.chip.longest', { weekday: longestWeekday })} testid="chip-longest" />{/if}
+			{#if summary.longestDay}<StatChip icon={isCurrent ? Flame : Trophy} seconds={summary.longestDay.seconds} caption={t('weekview.chip.longest', { weekday: longestWeekday })} testid="chip-longest" />{/if}
 		</ul>
 
 		{#if planned !== null}
 			<Panel title={t('weekview.plan_card_title')} data-testid="week-plan-card">
 				<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-					<p class="text-[15px]">{t('weekview.plan_card_line', { planned: formatDuration(planned), actual: formatDuration(workedHours) })}</p>
+					<p class="text-[15px]">{t('weekview.plan_card_line', { planned: timeDisplay.duration(planned), actual: timeDisplay.duration(workedHours) })}</p>
 					{#if isCurrent || plannedToDate > 0}
 						<StatusChip tone={planDiff === 0 ? 'neutral' : planDiff < 0 ? 'warning' : 'success'} dot={false}>
-							{planDiff === 0 ? t('weekview.plan_card_diff_equal') : t(planDiff < 0 ? 'weekview.plan_card_diff_under' : 'weekview.plan_card_diff_over', { time: formatDuration(Math.abs(planDiff)) })}
+							{planDiff === 0 ? t('weekview.plan_card_diff_equal') : t(planDiff < 0 ? 'weekview.plan_card_diff_under' : 'weekview.plan_card_diff_over', { time: timeDisplay.duration(Math.abs(planDiff)) })}
 						</StatusChip>
 					{/if}
 				</div>

@@ -4,7 +4,8 @@
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { t } from '#lib/i18n/index.js';
-	import { formatDelta, formatDuration } from '#lib/time/format.js';
+	import Dur from '#lib/components/app/Dur.svelte';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { hintLabel, markLabel } from '#lib/time/labels.js';
 	import { onMount } from 'svelte';
 
@@ -33,25 +34,25 @@
 	{#if targetNote}<p class="text-sm text-muted-foreground" data-testid="day-target-note">{targetNote}</p>{/if}
 	{#if sourceNote}<p class="text-xs text-muted-foreground" data-testid="day-mark-source" data-source={evaluation.markSource}>{sourceNote}</p>{/if}
 	<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
-		{#if kpis}<div><dt class="text-muted-foreground">{t('day.target')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-target">{formatDuration(evaluation.targetSeconds)}</dd></div>{/if}
-		<div><dt class="text-muted-foreground">{t('day.raw')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-raw">{formatDuration(evaluation.rawWorkSeconds)}</dd></div>
-		{#if kpis}<div><dt class="text-muted-foreground">{t('day.evaluated')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-evaluated">{formatDuration(evaluation.evaluatedWorkSeconds)}</dd></div>{/if}
+		{#if kpis}<div><dt class="text-muted-foreground">{t('day.target')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-target"><Dur seconds={evaluation.targetSeconds} /></dd></div>{/if}
+		<div><dt class="text-muted-foreground">{t('day.raw')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-raw"><Dur seconds={evaluation.rawWorkSeconds} /></dd></div>
+		{#if kpis}<div><dt class="text-muted-foreground">{t('day.evaluated')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-evaluated"><Dur seconds={evaluation.evaluatedWorkSeconds} /></dd></div>{/if}
 		{#if rounding !== 0}
 			<div>
 				<dt class="text-muted-foreground">{t('day.rounding')}</dt>
-				<dd class="tabular-nums" data-testid="day-rounding">{formatDelta(rounding)} <span class="text-xs text-muted-foreground">({formatDuration(evaluation.startAdjustSeconds)} + {formatDuration(evaluation.endAdjustSeconds)})</span></dd>
+				<dd class="tabular-nums" data-testid="day-rounding">{timeDisplay.delta(rounding)} <span class="text-xs text-muted-foreground">({timeDisplay.duration(evaluation.startAdjustSeconds)} + {timeDisplay.duration(evaluation.endAdjustSeconds)})</span></dd>
 			</div>
 		{/if}
 		{#if evaluation.breakDeductionSeconds > 0}
-			<div><dt class="text-muted-foreground">{t('day.break_deduction')}</dt><dd class="tabular-nums" data-testid="day-break-deduction">-{formatDuration(evaluation.breakDeductionSeconds)}</dd></div>
+			<div><dt class="text-muted-foreground">{t('day.break_deduction')}</dt><dd class="tabular-nums" data-testid="day-break-deduction">-<Dur seconds={evaluation.breakDeductionSeconds} /></dd></div>
 		{/if}
 		{#if evaluation.creditSeconds > 0}
-			<div><dt class="text-muted-foreground">{t('day.credit')}</dt><dd class="tabular-nums" data-testid="day-credit">+{formatDuration(evaluation.creditSeconds)}</dd></div>
+			<div><dt class="text-muted-foreground">{t('day.credit')}</dt><dd class="tabular-nums" data-testid="day-credit">+<Dur seconds={evaluation.creditSeconds} /></dd></div>
 		{/if}
 		{#if kpis}
 			<div>
 				<dt class="text-muted-foreground">{t('day.delta')}</dt>
-				<dd class="text-lg font-semibold tabular-nums {evaluation.deltaSeconds < 0 ? 'text-destructive' : ''}" data-testid="day-delta">{formatDelta(evaluation.deltaSeconds)}</dd>
+				<dd class="text-lg font-semibold tabular-nums {evaluation.deltaSeconds < 0 ? 'text-destructive' : ''}" data-testid="day-delta"><Dur seconds={evaluation.deltaSeconds} delta /></dd>
 			</div>
 		{/if}
 	</dl>

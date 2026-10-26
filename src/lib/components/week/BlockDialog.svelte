@@ -10,7 +10,7 @@
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { type DayDraft, draftProblem, plannedSecondsOf } from '#lib/week/plan-draft.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { untrack } from 'svelte';
 
 	/**
@@ -102,7 +102,7 @@
 					{#each places.filter((p) => !p.archived) as place (place.id)}<option value={place.id}>{place.name}</option>{/each}
 				</Select>
 			</div>
-			<p class="text-sm text-muted-foreground tabular-nums" data-testid="bd-planned">{planned !== null ? t('wg.dialog_planned', { time: formatDuration(planned) }) : ''}</p>
+			<p class="text-sm text-muted-foreground tabular-nums" data-testid="bd-planned">{planned !== null ? t('wg.dialog_planned', { time: timeDisplay.duration(planned) }) : ''}</p>
 		{/if}
 		<Field id="bd-note" label={t('weekplan.note')} bind:value={form.note} maxlength={200} />
 		{#if showErrors && problem}<p class="text-sm text-destructive" role="alert" data-testid="bd-problem">{t(`weekplan.problem.${problem}`)}</p>{/if}

@@ -2,7 +2,7 @@
 	import { t } from '#lib/i18n/index.js';
 	import type { DayInfo } from '#lib/planning/calendar.js';
 	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS } from '#lib/planning/labels.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 
 	let { info, compact = false, hidden = new Set<string>(), draggable = false }: { info: DayInfo; compact?: boolean; hidden?: Set<string>; draggable?: boolean } = $props();
 
@@ -40,6 +40,6 @@
 		</span>
 	{/if}
 	{#if worked > 0 && !hidden.has('worked')}
-		<span class="px-1.5 tabular-nums text-muted-foreground" data-chip="worked">{t('calendar.worked', { time: formatDuration(worked) })}</span>
+		<span class="px-1.5 tabular-nums text-muted-foreground" data-chip="worked">{t('calendar.worked', { time: timeDisplay.duration(worked) })}</span>
 	{/if}
 </span>

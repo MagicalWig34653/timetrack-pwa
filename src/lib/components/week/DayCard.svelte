@@ -5,7 +5,7 @@
 	import { ABSENCE_CLASSES, absenceKindLabel, planModeLabel } from '#lib/planning/labels.js';
 	import { absenceWarning, chipAbsences } from '#lib/week/absences.js';
 	import { formatDateNumeric, localTimeOf } from '#lib/time/dates.js';
-	import { formatDelta, formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { balanceTone, barShares, dayAriaLabel, dayHours, MARK_CLASSES, weekMarkLabel } from '#lib/week/overview.js';
 	import MarkIcon from './MarkIcon.svelte';
@@ -54,9 +54,9 @@
 
 	<span class="hours tabular-nums" data-testid="day-hours">
 		{#if showHours}
-			<span class="text-[26px] leading-none font-semibold tracking-[-0.5px] lg:text-[28px]">{formatDuration(hours)}</span>
+			<span class="text-[26px] leading-none font-semibold tracking-[-0.5px] lg:text-[28px]">{timeDisplay.duration(hours)}</span>
 		{:else if day.isFuture && day.plannedSeconds}
-			<span class="text-[20px] leading-none font-medium text-muted-foreground">{formatDuration(day.plannedSeconds)}</span>
+			<span class="text-[20px] leading-none font-medium text-muted-foreground">{timeDisplay.duration(day.plannedSeconds)}</span>
 			<span class="sr-only">{t('weekview.bar_planned')}</span>
 		{:else}
 			<span class="text-[20px] leading-none text-muted-foreground" aria-hidden="true">–</span>
@@ -69,16 +69,16 @@
 			{#if bars.actual > 0}<span class="absolute inset-y-0 left-0 rounded-full bg-ui-accent" style="width: {bars.actual}%" data-testid="bar-actual"></span>{/if}
 		</span>
 		{#if day.targetSeconds > 0}
-			<span class="mt-1 block text-[11px] text-muted-foreground tabular-nums">{t('weekview.target_of', { time: formatDuration(day.targetSeconds) })}</span>
-			{#if day.plannedSeconds}<span class="block text-[11px] text-muted-foreground tabular-nums">{t('weekview.planned', { time: formatDuration(day.plannedSeconds) })}</span>{/if}
+			<span class="mt-1 block text-[11px] text-muted-foreground tabular-nums">{t('weekview.target_of', { time: timeDisplay.duration(day.targetSeconds) })}</span>
+			{#if day.plannedSeconds}<span class="block text-[11px] text-muted-foreground tabular-nums">{t('weekview.planned', { time: timeDisplay.duration(day.plannedSeconds) })}</span>{/if}
 		{:else if day.plannedSeconds}
-			<span class="mt-1 block text-[11px] text-muted-foreground tabular-nums">{t('weekview.planned', { time: formatDuration(day.plannedSeconds) })}</span>
+			<span class="mt-1 block text-[11px] text-muted-foreground tabular-nums">{t('weekview.planned', { time: timeDisplay.duration(day.plannedSeconds) })}</span>
 		{/if}
 	</span>
 
 	<span class="balance flex flex-wrap items-center gap-1.5 text-xs">
 		{#if day.balanceSeconds !== null && (day.targetSeconds > 0 || hours > 0)}
-			<StatusChip tone={balanceTone(day.balanceSeconds)} dot={false}>{formatDelta(day.balanceSeconds)}</StatusChip>
+			<StatusChip tone={balanceTone(day.balanceSeconds)} dot={false}>{timeDisplay.delta(day.balanceSeconds)}</StatusChip>
 		{/if}
 		{#if showMode && day.planMode}<span class="text-muted-foreground">{planModeLabel(day.planMode)}</span>{/if}
 	</span>

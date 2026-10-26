@@ -6,7 +6,7 @@
 	import { exceedsThreshold } from '#lib/planning/drag.js';
 	import { planModeLabel } from '#lib/planning/labels.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
-	import { formatDelta, formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import {
 		blockRect,
@@ -568,7 +568,7 @@
 			planModeLabel(draft.mode as PlanMode),
 			`${weekdayLabel(days[i].weekday)} ${formatDateNumeric(days[i].date)}`,
 			t('wg.block_time', { start: clock(range.start), end: clock(range.end) }),
-			t('wg.block_net', { time: formatDuration(netSeconds(draft)) })
+			t('wg.block_net', { time: timeDisplay.duration(netSeconds(draft)) })
 		];
 		if (draft.breakMinutes > 0) parts.push(t('wg.block_break', { minutes: draft.breakMinutes }));
 		if (place) parts.push(place);
@@ -606,11 +606,11 @@
 						<span class="wg-dn" aria-label={formatDateNumeric(day.date)}>{Number(day.date.slice(8))}</span>
 						<button type="button" class="wg-add" data-nodrag onclick={() => onadd(day.date)} aria-label={t('wg.add_day', { day: weekdayLabel(day.weekday) })} data-testid="add-{day.date}" disabled={day.blockedBy !== null}><Plus class="size-3.5" /></button>
 					</div>
-					<div class="wg-sum" aria-label={t('wg.day_sum', { plan: formatDuration(planned), target: formatDuration(day.targetSeconds) })}>
-						<span class="wg-plan" data-testid="day-plan-{day.date}">{planned > 0 ? formatDuration(planned) : '–'}</span>
-						<span class="wg-target" data-testid="day-target-{day.date}">{t('wg.of_target', { time: formatDuration(day.targetSeconds) })}</span>
+					<div class="wg-sum" aria-label={t('wg.day_sum', { plan: timeDisplay.duration(planned), target: timeDisplay.duration(day.targetSeconds) })}>
+						<span class="wg-plan" data-testid="day-plan-{day.date}">{planned > 0 ? timeDisplay.duration(planned) : '–'}</span>
+						<span class="wg-target" data-testid="day-target-{day.date}">{t('wg.of_target', { time: timeDisplay.duration(day.targetSeconds) })}</span>
 						{#if planned > 0 || (day.targetSeconds > 0 && day.blockedBy === null)}
-							<span class="wg-diff" data-sign={diff === 0 ? 'zero' : diff < 0 ? 'under' : 'over'} data-testid="day-diff-{day.date}">{diff === 0 ? '±0' : formatDelta(diff)}</span>
+							<span class="wg-diff" data-sign={diff === 0 ? 'zero' : diff < 0 ? 'under' : 'over'} data-testid="day-diff-{day.date}">{diff === 0 ? '±0' : timeDisplay.delta(diff)}</span>
 						{/if}
 					</div>
 				</div>
@@ -697,7 +697,7 @@
 							>
 								<span class="wg-handle wg-handle-start" data-handle="start" data-testid="handle-start-{day.date}" aria-hidden="true"><i></i></span>
 								<div class="wg-body-text">
-									<p class="wg-title"><span class="wg-mode">{planModeLabel(draft.mode as PlanMode)}</span><span class="wg-net">{formatDuration(netSeconds(draft))}</span></p>
+									<p class="wg-title"><span class="wg-mode">{planModeLabel(draft.mode as PlanMode)}</span><span class="wg-net">{timeDisplay.duration(netSeconds(draft))}</span></p>
 									<p class="wg-time" data-testid="block-time-{day.date}">{clock(range.start)}–{clock(range.end)}</p>
 									{#if placeName(draft.placeId)}<p class="wg-meta">{placeName(draft.placeId)}</p>{/if}
 									{#if draft.breakMinutes > 0}<p class="wg-meta wg-break">{t('wg.break_chip', { minutes: draft.breakMinutes })}</p>{/if}

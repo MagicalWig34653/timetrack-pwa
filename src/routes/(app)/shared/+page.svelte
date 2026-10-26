@@ -12,7 +12,7 @@
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import { PLAN_CLASSES, planModeLabel, SHARE_SCOPE_KEYS, scopeLabel } from '#lib/planning/labels.js';
 	import { addDays, formatDateNumeric, formatDateShort, isValidDate, localTimeOf, startOfWeek, todayLocal } from '#lib/time/dates.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { onMount } from 'svelte';
@@ -165,7 +165,7 @@
 													<td class="py-1 tabular-nums">
 														{#if day.evaluatedStart && day.evaluatedEnd}{localTimeOf(day.evaluatedStart, timeZone)}–{localTimeOf(day.evaluatedEnd, timeZone)}{:else}–{/if}
 													</td>
-													<td class="py-1 text-right tabular-nums">{formatDuration(day.evaluatedWorkSeconds)}</td>
+													<td class="py-1 text-right tabular-nums">{timeDisplay.duration(day.evaluatedWorkSeconds)}</td>
 												</tr>
 											{/each}
 										</tbody>

@@ -24,7 +24,7 @@
 	import { weekBalance } from '#lib/planning/week-balance.js';
 	import WeekBalanceLabel from '#lib/components/planning/WeekBalanceLabel.svelte';
 	import { addDays, formatDateLong, formatDateNumeric, isoWeekNumber, isValidDate, todayLocal } from '#lib/time/dates.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import CalendarPlus from '@lucide/svelte/icons/calendar-plus';
@@ -163,7 +163,7 @@
 		for (const h of info.schoolHolidays) parts.push(h.name);
 		for (const a of info.absences) parts.push(absenceKindLabel(a.kind));
 		if (info.plan) parts.push(`${t('calendar.plan')} ${planModeLabel(info.plan.mode)}`);
-		if (info.evaluation && info.evaluation.evaluatedWorkSeconds > 0) parts.push(t('calendar.worked', { time: formatDuration(info.evaluation.evaluatedWorkSeconds) }));
+		if (info.evaluation && info.evaluation.evaluatedWorkSeconds > 0) parts.push(t('calendar.worked', { time: timeDisplay.duration(info.evaluation.evaluatedWorkSeconds) }));
 		return parts.join(', ');
 	}
 

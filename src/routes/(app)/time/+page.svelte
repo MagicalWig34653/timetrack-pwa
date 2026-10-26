@@ -12,7 +12,8 @@
 	import { Card, CardContent } from '#lib/components/ui/card/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { addDays, formatDateNumeric, formatDateShort, isoWeekday, isValidDate, localTimeOf, startOfWeek, todayLocal } from '#lib/time/dates.js';
-	import { formatDelta, formatDuration } from '#lib/time/format.js';
+	import Dur from '#lib/components/app/Dur.svelte';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { markLabel } from '#lib/time/labels.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
@@ -101,7 +102,7 @@
 								{#if isoWeekday(day.date) > 5}<span class="sr-only"> {t('week.weekend')}</span>{/if}
 							</span>
 							<span class="text-right font-medium tabular-nums sm:order-5 {day.date <= today && day.deltaSeconds < 0 ? 'text-destructive' : ''}" title={t('day.delta')}>
-								{day.date <= today ? formatDelta(day.deltaSeconds) : '–'}
+								{day.date <= today ? timeDisplay.delta(day.deltaSeconds) : '–'}
 							</span>
 							<span class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground sm:order-2">
 								{#if day.evaluatedStart && day.evaluatedEnd}
@@ -115,10 +116,10 @@
 								{#if day.segments?.some((segment) => segment.needsReview)}<Badge variant="outline">{t('segments.needs_review')}</Badge>{/if}
 							</span>
 							<span class="text-right text-sm tabular-nums sm:order-3" title={t('day.target')}>
-								<span class="text-muted-foreground">{t('week.target_short')}</span> {formatDuration(day.targetSeconds)}
+								<span class="text-muted-foreground">{t('week.target_short')}</span> {timeDisplay.duration(day.targetSeconds)}
 							</span>
 							<span class="hidden text-right text-sm tabular-nums sm:order-4 sm:inline" title={t('day.evaluated')}>
-								<span class="text-muted-foreground">{t('week.evaluated_short')}</span> {formatDuration(day.evaluatedWorkSeconds + day.creditSeconds)}
+								<span class="text-muted-foreground">{t('week.evaluated_short')}</span> {timeDisplay.duration(day.evaluatedWorkSeconds + day.creditSeconds)}
 							</span>
 						</a>
 					</li>
@@ -127,9 +128,9 @@
 		</CardContent>
 	</Card>
 	<dl class="mt-4 grid grid-cols-3 gap-4 text-sm" data-testid="week-totals">
-		<div><dt class="text-muted-foreground">{t('week.total_target')}</dt><dd class="text-lg font-medium tabular-nums">{formatDuration(totals.target)}</dd></div>
-		<div><dt class="text-muted-foreground">{t('week.total_evaluated')}</dt><dd class="text-lg font-medium tabular-nums">{formatDuration(totals.evaluated)}</dd></div>
-		<div><dt class="text-muted-foreground">{t('week.total_delta')}</dt><dd class="text-lg font-semibold tabular-nums {totals.delta < 0 ? 'text-destructive' : ''}">{formatDelta(totals.delta)}</dd></div>
+		<div><dt class="text-muted-foreground">{t('week.total_target')}</dt><dd class="text-lg font-medium tabular-nums"><Dur seconds={totals.target} /></dd></div>
+		<div><dt class="text-muted-foreground">{t('week.total_evaluated')}</dt><dd class="text-lg font-medium tabular-nums"><Dur seconds={totals.evaluated} /></dd></div>
+		<div><dt class="text-muted-foreground">{t('week.total_delta')}</dt><dd class="text-lg font-semibold tabular-nums {totals.delta < 0 ? 'text-destructive' : ''}"><Dur seconds={totals.delta} delta /></dd></div>
 	</dl>
 	<p class="mt-3 text-xs text-muted-foreground">{t('week.note')}</p>
 	<p class="mt-2 text-xs"><a class="underline underline-offset-4" href="/time/cancelled" data-testid="cancelled-link">{t('trash.link')}</a></p>

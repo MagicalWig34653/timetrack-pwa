@@ -4,6 +4,7 @@ import { deDesign } from './de-design';
 import { deErrors } from './de-errors';
 import { deMail } from './de-mail';
 import { deMcp } from './de-mcp';
+import { deN2 } from './de-n2';
 import { deModules } from './de-modules';
 import { deOidc } from './de-oidc';
 import { dePlanning } from './de-planning';
@@ -28,6 +29,7 @@ export const de = {
 	...deErrors,
 	...deMail,
 	...deMcp,
+	...deN2,
 	...deModules,
 	...deOidc,
 	...dePlanning,

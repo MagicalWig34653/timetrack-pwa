@@ -5,7 +5,7 @@
 	import { t } from '#lib/i18n/index.js';
 	import { PLAN_MODES, planModeLabel } from '#lib/planning/labels.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { type DayDraft, type DraftMode, draftProblem, plannedSecondsOf, STEP_MINUTES } from '#lib/week/plan-draft.js';
 	import { MARK_CLASSES } from '#lib/week/overview.js';
@@ -46,7 +46,7 @@
 	<div class="grid gap-x-3 gap-y-2.5 grid-cols-2 lg:grid-cols-[6.5rem_10rem_8rem_8rem_5rem_4rem_minmax(0,1fr)] lg:items-center">
 		<div class="col-span-2 flex items-baseline gap-2 lg:col-span-1 lg:block">
 			<p class="text-sm font-semibold">{weekdayLabel(day.weekday)} <span class="font-normal text-muted-foreground tabular-nums">{formatDateNumeric(day.date).slice(0, 6)}</span></p>
-			<p class="text-xs text-muted-foreground tabular-nums">{t('weekplan.day_target', { time: formatDuration(day.targetSeconds) })}</p>
+			<p class="text-xs text-muted-foreground tabular-nums">{t('weekplan.day_target', { time: timeDisplay.duration(day.targetSeconds) })}</p>
 		</div>
 
 		<div class="col-span-2 flex flex-col gap-1 lg:col-span-1">
@@ -98,8 +98,8 @@
 
 		<div class="{hideOnPhone} flex flex-col gap-1">
 			<span class={label}>{t('weekplan.planned_hours')}</span>
-			<p class="flex h-10 items-center text-[17px] font-semibold tabular-nums {planned ? '' : 'text-muted-foreground'}" data-testid="plan-hours-{day.date}" aria-label="{t('weekplan.planned_hours')} {planned ? formatDuration(planned) : '0:00'}">
-				{planned ? formatDuration(planned) : '–'}
+			<p class="flex h-10 items-center text-[17px] font-semibold tabular-nums {planned ? '' : 'text-muted-foreground'}" data-testid="plan-hours-{day.date}" aria-label="{t('weekplan.planned_hours')} {planned ? timeDisplay.duration(planned) : '0:00'}">
+				{planned ? timeDisplay.duration(planned) : '–'}
 			</p>
 		</div>
 

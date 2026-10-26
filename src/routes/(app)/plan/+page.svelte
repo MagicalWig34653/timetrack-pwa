@@ -17,7 +17,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import { addDays, isoWeekLabel, mondayOfIsoWeek, startOfWeek, todayLocal } from '#lib/time/dates.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { followEntries } from '#lib/week/follow.js';
@@ -292,7 +292,7 @@
 	const viewButton =
 		'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 	const differenceText = $derived(
-		totals.differenceSeconds === 0 ? t('weekplan.diff_equal') : t(totals.differenceSeconds < 0 ? 'weekplan.diff_under' : 'weekplan.diff_over', { time: formatDuration(Math.abs(totals.differenceSeconds)) })
+		totals.differenceSeconds === 0 ? t('weekplan.diff_equal') : t(totals.differenceSeconds < 0 ? 'weekplan.diff_under' : 'weekplan.diff_over', { time: timeDisplay.duration(Math.abs(totals.differenceSeconds)) })
 	);
 </script>
 
@@ -327,7 +327,7 @@
 			<!-- Compact week sum above the grid: the grid itself needs the height. -->
 			<div class="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="plan-total">
 				<p class="text-[15px] font-semibold tabular-nums" data-testid="plan-total-text">
-					{t('weekplan.total_text', { planned: formatDuration(totals.plannedSeconds), target: formatDuration(totals.targetSeconds) })}
+					{t('weekplan.total_text', { planned: timeDisplay.duration(totals.plannedSeconds), target: timeDisplay.duration(totals.targetSeconds) })}
 				</p>
 				<StatusChip tone={totals.differenceSeconds === 0 ? 'success' : totals.differenceSeconds < 0 ? 'warning' : 'accent'} dot={false}>
 					<span data-testid="plan-diff">{differenceText}</span>
@@ -345,7 +345,7 @@
 				<div class="min-w-0">
 					<p class="text-[13px] font-medium text-muted-foreground">{t('weekplan.total_label')}</p>
 					<p class="text-[22px] sm:text-[22px] sm:text-[28px] leading-tight font-semibold tracking-[-0.6px] tabular-nums" data-testid="plan-total-text">
-						{t('weekplan.total_text', { planned: formatDuration(totals.plannedSeconds), target: formatDuration(totals.targetSeconds) })}
+						{t('weekplan.total_text', { planned: timeDisplay.duration(totals.plannedSeconds), target: timeDisplay.duration(totals.targetSeconds) })}
 					</p>
 				</div>
 				<StatusChip tone={totals.differenceSeconds === 0 ? 'success' : totals.differenceSeconds < 0 ? 'warning' : 'accent'} dot={false}>

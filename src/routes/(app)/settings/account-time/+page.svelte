@@ -9,7 +9,9 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import { formatDateNumeric, isValidDate, todayLocal } from '#lib/time/dates.js';
-	import { formatDelta, parseDuration } from '#lib/time/format.js';
+	import Dur from '#lib/components/app/Dur.svelte';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
+	import { parseDuration } from '#lib/time/format.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { onMount } from 'svelte';
@@ -138,9 +140,9 @@
 			</CardHeader>
 			<CardContent>
 				<dl class="grid grid-cols-3 gap-4 text-sm">
-					<div><dt class="text-muted-foreground">{t('account_time.balance')}</dt><dd class="text-2xl font-semibold tabular-nums {account.balanceSeconds < 0 ? 'text-destructive' : ''}" data-testid="account-balance">{formatDelta(account.balanceSeconds)}</dd></div>
-					<div><dt class="text-muted-foreground">{t('account_time.opening')}</dt><dd class="text-lg tabular-nums" data-testid="account-opening">{formatDelta(account.openingSeconds)}</dd></div>
-					<div><dt class="text-muted-foreground">{t('account_time.corrections')}</dt><dd class="text-lg tabular-nums" data-testid="account-corrections">{formatDelta(account.adjustmentSeconds)}</dd></div>
+					<div><dt class="text-muted-foreground">{t('account_time.balance')}</dt><dd class="text-2xl font-semibold tabular-nums {account.balanceSeconds < 0 ? 'text-destructive' : ''}" data-testid="account-balance"><Dur seconds={account.balanceSeconds} delta /></dd></div>
+					<div><dt class="text-muted-foreground">{t('account_time.opening')}</dt><dd class="text-lg tabular-nums" data-testid="account-opening"><Dur seconds={account.openingSeconds} delta /></dd></div>
+					<div><dt class="text-muted-foreground">{t('account_time.corrections')}</dt><dd class="text-lg tabular-nums" data-testid="account-corrections"><Dur seconds={account.adjustmentSeconds} delta /></dd></div>
 				</dl>
 			</CardContent>
 		</Card>
@@ -191,7 +193,7 @@
 				{#each adjustments?.items ?? [] as item (item.id)}
 					<div class="flex flex-wrap items-center gap-3 border-b pb-3 text-sm" data-testid="adjustment-row">
 						<div class="min-w-0 flex-1"><strong>{t(`account_time.kind.${item.kind}`)}</strong> · {formatDateNumeric(item.date)}<p class="text-muted-foreground">{item.reason}</p></div>
-						<span class="tabular-nums">{formatDelta(item.seconds)}</span>
+						<span class="tabular-nums">{timeDisplay.delta(item.seconds)}</span>
 						<Button variant="outline" size="sm" onclick={() => deleteAdjustment(item.id)} disabled={pending}>{t('account_time.delete')}</Button>
 					</div>
 				{/each}

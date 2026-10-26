@@ -12,7 +12,8 @@
 	import { hourTicks } from '#lib/stats/scale.js';
 	import { statsSource } from '#lib/stats/source.js';
 	import { addDays, isValidDate, todayLocal } from '#lib/time/dates.js';
-	import { formatDelta, formatDuration } from '#lib/time/format.js';
+	import Dur from '#lib/components/app/Dur.svelte';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import BarChart3 from '@lucide/svelte/icons/chart-column';
@@ -77,8 +78,8 @@
 	});
 
 	const hours = (seconds: number) => Math.round((seconds / 3600) * 100) / 100;
-	const fmtHours = (h: number) => formatDuration(h * 3600);
-	const fmtDeltaHours = (h: number) => formatDelta(Math.round(h * 3600));
+	const fmtHours = (h: number) => timeDisplay.duration(h * 3600);
+	const fmtDeltaHours = (h: number) => timeDisplay.delta(Math.round(h * 3600));
 	const labels = $derived(data?.points.map((p) => p.label) ?? []);
 
 	const accountSeries = $derived<ChartSeries[]>([{ key: 'balance', label: t('stats.series.balance'), values: data?.points.map((p) => hours(p.balanceSeconds)) ?? [], cls: 'text-ui-accent' }]);
@@ -153,13 +154,13 @@
 			<EmptyState title={t('stats.empty_title')} description={t('stats.empty_text')} icon={BarChart3} testid="stats-empty" />
 		{:else}
 			<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('stats.title')} data-testid="stats-kpis">
-				<KpiCard title={t('stats.kpi.actual')} value={formatDuration(data.totals.actualSeconds)} icon={Gauge} testid="stats-actual" />
-				<KpiCard title={t('stats.kpi.target')} value={formatDuration(data.totals.targetSeconds)} icon={Target} testid="stats-target" />
-				<KpiCard title={t('stats.kpi.balance')} value={formatDelta(data.totals.deltaSeconds)} icon={Scale} tone={data.totals.deltaSeconds < 0 ? 'negative' : 'default'} testid="stats-delta" />
-				<KpiCard title={t('stats.kpi.account')} value={endBalance === null ? '–' : formatDelta(endBalance)} icon={Wallet} tone={(endBalance ?? 0) < 0 ? 'negative' : 'default'} testid="stats-account" />
+				<KpiCard title={t('stats.kpi.actual')} seconds={data.totals.actualSeconds} icon={Gauge} testid="stats-actual" />
+				<KpiCard title={t('stats.kpi.target')} seconds={data.totals.targetSeconds} icon={Target} testid="stats-target" />
+				<KpiCard title={t('stats.kpi.balance')} seconds={data.totals.deltaSeconds} delta icon={Scale} tone={data.totals.deltaSeconds < 0 ? 'negative' : 'default'} testid="stats-delta" />
+				<KpiCard title={t('stats.kpi.account')} value={endBalance === null ? '–' : timeDisplay.delta(endBalance)} icon={Wallet} tone={(endBalance ?? 0) < 0 ? 'negative' : 'default'} testid="stats-account" />
 				<KpiCard title={t('stats.kpi.avg_start')} value={data.totals.avgStartMinutes === null ? '–' : clockText(data.totals.avgStartMinutes)} icon={Clock} testid="stats-avg-start" />
 				<KpiCard title={t('stats.kpi.avg_end')} value={data.totals.avgEndMinutes === null ? '–' : clockText(data.totals.avgEndMinutes)} icon={Clock} testid="stats-avg-end" />
-				<KpiCard title={t('stats.kpi.breaks')} value={formatDuration(data.totals.breakSeconds)} icon={Coffee} testid="stats-breaks" />
+				<KpiCard title={t('stats.kpi.breaks')} seconds={data.totals.breakSeconds} icon={Coffee} testid="stats-breaks" />
 				<KpiCard title={t('stats.kpi.absences')} value={data.absencesAvailable === false ? '–' : String(data.totals.absenceDays).replace('.', ',')} icon={Plane} testid="stats-absences" />
 			</section>
 
@@ -189,7 +190,7 @@
 								<li class="flex items-center gap-2" data-testid="kind-{k.key}">
 									<span class="inline-block size-2.5 rounded-sm {k.cls}"></span>
 									<span class="flex-1">{k.label}</span>
-									<span class="tabular-nums">{formatDuration(k.seconds)}</span>
+									<Dur seconds={k.seconds} class="tabular-nums" />
 									<span class="w-12 text-right text-muted-foreground tabular-nums">{Math.round(k.share * 100)} %</span>
 								</li>
 							{/each}
