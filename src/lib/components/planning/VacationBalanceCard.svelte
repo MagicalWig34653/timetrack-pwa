@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { VacationBalance, VacationSettings } from '#lib/api/types.js';
+	import type { Absence, VacationBalance, VacationSettings } from '#lib/api/types.js';
+	import { splitPlanned } from '#lib/vacation/breakdown.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
 	import { t } from '#lib/i18n/index.js';
@@ -8,7 +9,8 @@
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { formatHalfDays, formatHalfDaysSigned } from '#lib/vacation/halfdays.js';
 
-	let { balance, settings = null }: { balance: VacationBalance; settings?: VacationSettings | null } = $props();
+	let { balance, settings = null, absences = null }: { balance: VacationBalance; settings?: VacationSettings | null; /** Vacation absences of the year; splits "planned" into requested and not-yet-submitted. */ absences?: Absence[] | null } = $props();
+	const split = $derived(absences ? splitPlanned(balance, absences) : null);
 
 	const snapshot = $derived(balance.snapshotDate ?? null);
 	const snapshotRemaining = $derived(balance.snapshotRemainingHalfDays ?? 0);
@@ -25,7 +27,12 @@
 			? [{ key: 'snapshot', label: t('vacation.tile_snapshot'), value: formatHalfDays(snapshotRemaining), text: t('vacation.tile_snapshot_text', { date: formatDateNumeric(snapshot) }) }]
 			: []),
 		{ key: 'booked', label: t('vacation.tile_booked'), value: formatHalfDays(balance.bookedHalfDays), text: t('vacation.tile_booked_text') },
-		{ key: 'planned', label: t('vacation.tile_planned'), value: formatHalfDays(balance.plannedHalfDays), text: t('vacation.tile_planned_text') }
+		...(split
+			? [
+					{ key: 'requested', label: t('vacation.tile_requested'), value: formatHalfDays(split.requestedHalfDays), text: t('vacation.tile_requested_text') },
+					{ key: 'planned', label: t('vacation.tile_planned_unsubmitted'), value: formatHalfDays(split.unsubmittedHalfDays), text: t('vacation.tile_planned_unsubmitted_text') }
+				]
+			: [{ key: 'planned', label: t('vacation.tile_planned'), value: formatHalfDays(balance.plannedHalfDays), text: t('vacation.tile_planned_text') }])
 	]);
 	const expiryNote = $derived(
 		settings?.carryOverExpiry && balance.carryOverHalfDays > 0

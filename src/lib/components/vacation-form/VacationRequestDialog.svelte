@@ -2,6 +2,7 @@
 	import type { AbsenceStatus } from '#lib/api/types.js';
 
 	export interface RequestTarget {
+		id?: string;
 		startDate: string;
 		endDate: string;
 		halfDayStart?: boolean;
@@ -99,7 +100,8 @@
 					halfDayEnd: current.halfDayEnd,
 					today: todayLocal(zone),
 					...sources,
-					inBalance: current.status !== 'cancelled' && current.status !== 'rejected'
+					inBalance: current.status !== 'cancelled' && current.status !== 'rejected',
+					targetId: current.id
 				});
 				phase = 'form';
 				closeButton?.focus();
@@ -196,6 +198,20 @@
 						<dd class="text-xl font-semibold tabular-nums" data-testid="request-rest">{formatDaysDe(data.restBeforeHalfDays / 2)} / {formatDaysDe(data.restAfterHalfDays / 2)}</dd>
 					</div>
 				</dl>
+				{#if data.breakdown}
+					{@const b = data.breakdown}
+					<dl class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 rounded-lg border bg-muted/30 p-3 text-sm tabular-nums" data-testid="request-breakdown">
+						<dt>{t('vform.bd.entitlement')}</dt><dd class="text-right">{formatDaysDe(b.entitlementTotalHalfDays / 2)}</dd>
+						<dt>{t('vform.bd.booked')}</dt><dd class="text-right">{formatDaysDe(b.bookedHalfDays / 2)}</dd>
+						<dt>{t('vform.bd.requested')}</dt><dd class="text-right">{formatDaysDe(b.requestedOthersHalfDays / 2)}</dd>
+						<dt>{t('vform.bd.planned')}</dt><dd class="text-right" data-testid="request-planned-others">{formatDaysDe(b.plannedOthersHalfDays / 2)}</dd>
+						<dt class="font-medium">{t('vform.bd.this_request')}</dt><dd class="text-right font-medium">{formatDaysDe(b.requestHalfDays / 2)}</dd>
+						{#if b.plannedOthersHalfDays > 0}
+							<dt class="text-muted-foreground">{t('vform.bd.rest_incl_planned')}</dt><dd class="text-right text-muted-foreground" data-testid="request-rest-incl">{formatDaysDe(b.restBeforeInclPlannedHalfDays / 2)} / {formatDaysDe(b.restAfterInclPlannedHalfDays / 2)}</dd>
+						{/if}
+					</dl>
+					<p class="text-xs text-muted-foreground">{t('vform.bd.note')}</p>
+				{/if}
 				<p class="text-xs text-muted-foreground">{t('vform.dialog_stale_balance', { year: data.from.slice(0, 4) })}</p>
 
 				<div class="flex flex-col gap-1.5">

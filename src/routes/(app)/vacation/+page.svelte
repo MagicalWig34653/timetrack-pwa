@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '#lib/api/client.js';
-	import type { VacationBalance, VacationEntries, VacationSettings } from '#lib/api/types.js';
+	import type { Absence, VacationBalance, VacationEntries, VacationSettings } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import Unavailable from '#lib/components/planning/Unavailable.svelte';
 	import VacationBalanceCard from '#lib/components/planning/VacationBalanceCard.svelte';
@@ -24,6 +24,8 @@
 	let settings = $state<VacationSettings | null>(null);
 	let entries = $state<VacationEntries>({ snapshots: [], adjustments: [] });
 	let today = $state(todayLocal(zoneStore.value));
+	/** null when the absences cannot be read (planning module off): the balance card then shows the combined figure. */
+	let absences = $state<Absence[] | null>(null);
 
 	async function refresh() {
 		try {
@@ -32,6 +34,7 @@
 			balance = await api.getVacationBalance(year);
 			settings = await api.getVacationSettings();
 			entries = await api.listVacationEntries(year);
+			absences = await api.listAbsences(`${year}-01-01`, `${year}-12-31`).catch(() => null);
 			load = { status: 'ready' };
 		} catch (error) {
 			load = toLoadState(error);
@@ -75,7 +78,7 @@
 				<a class="underline underline-offset-4" href="/settings/vacation-form" data-testid="vacation-form-link">{t('vform.settings_link')}</a>
 			</span>
 		</nav>
-		<VacationBalanceCard {balance} {settings} />
+		<VacationBalanceCard {balance} {settings} {absences} />
 		<VacationEntryForms {today} onsaved={saved} />
 		<VacationEntryList {year} {entries} ondeleted={refresh} />
 		{#if settings}

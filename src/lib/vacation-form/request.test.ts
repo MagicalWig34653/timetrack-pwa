@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CalendarDay, VacationBalance, WorkModel } from '../api/types';
+import type { Absence, CalendarDay, VacationBalance, WorkModel } from '../api/types';
 import { buildRequestData } from './request';
 
 const balance = (extra: Partial<VacationBalance> = {}): VacationBalance => ({
@@ -50,5 +50,31 @@ describe('buildRequestData', () => {
 	it('passes the substitute and today through', () => {
 		const data = buildRequestData({ ...base, balance: balance(), inBalance: false, substitute: 'A. B.' });
 		expect(data).toMatchObject({ substitute: 'A. B.', today: '2026-06-01', from: '2026-07-06', to: '2026-07-17' });
+	});
+});
+
+describe('buildRequestData with planned (not submitted) vacation', () => {
+	const abs = (id: string, status: Absence['status'], countedHalfDays: number): Absence => ({
+		id, version: 1, kind: 'vacation', status, countedHalfDays, startDate: '2026-09-01', endDate: '2026-09-04'
+	});
+	// plannedHalfDays 20 = this request (18, planned) + another unsubmitted plan (2)
+	const bal = balance({ plannedHalfDays: 20, availableAfterPlannedHalfDays: 40 });
+	it('does not deduct other unsubmitted plans from the rest shown on the form', () => {
+		const data = buildRequestData({ ...base, balance: bal, inBalance: true, targetId: 'self', absences: [abs('self', 'planned', 18), abs('other', 'planned', 2)] });
+		expect(data.breakdown).toMatchObject({ plannedOthersHalfDays: 2, requestedOthersHalfDays: 0, requestHalfDays: 18 });
+		expect(data.restBeforeHalfDays).toBe(60); // 40 + own 18 + other plan 2
+		expect(data.restAfterHalfDays).toBe(42);
+		expect(data.breakdown?.restBeforeInclPlannedHalfDays).toBe(58);
+		expect(data.breakdown?.restAfterInclPlannedHalfDays).toBe(40);
+	});
+	it('still deducts requested vacation of other absences', () => {
+		const data = buildRequestData({ ...base, balance: bal, inBalance: true, targetId: 'self', absences: [abs('self', 'planned', 18), abs('req', 'requested', 2)] });
+		expect(data.breakdown).toMatchObject({ plannedOthersHalfDays: 0, requestedOthersHalfDays: 2 });
+		expect(data.restBeforeHalfDays).toBe(58);
+	});
+	it('is unchanged without absences (older callers)', () => {
+		const data = buildRequestData({ ...base, balance: bal, inBalance: false });
+		expect(data.restBeforeHalfDays).toBe(40);
+		expect(data.breakdown?.plannedOthersHalfDays).toBe(0);
 	});
 });

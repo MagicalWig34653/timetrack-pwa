@@ -75,6 +75,24 @@ export interface FormMapping {
 	overlays: OverlayItem[];
 }
 
+/** Vacation account figures around one request, in half days. "Planned" means not submitted yet. */
+export interface RequestBreakdown {
+	entitlementTotalHalfDays: number;
+	/** approved or taken */
+	bookedHalfDays: number;
+	/** requested (submitted, undecided) vacation of other absences */
+	requestedOthersHalfDays: number;
+	/** planned but not submitted vacation of other absences */
+	plannedOthersHalfDays: number;
+	requestHalfDays: number;
+	/** without the other unsubmitted plans: what the form shows */
+	restBeforeHalfDays: number;
+	restAfterHalfDays: number;
+	/** with every other plan deducted as well */
+	restBeforeInclPlannedHalfDays: number;
+	restAfterInclPlannedHalfDays: number;
+}
+
 /** Everything a request provides at generation time. */
 export interface RequestData {
 	from: string;
@@ -89,6 +107,7 @@ export interface RequestData {
 	restAfterHalfDays: number;
 	workingDays: number;
 	freeRanges: DateRange[];
+	breakdown?: RequestBreakdown;
 }
 
 export type ResolvedValue = string | boolean | null;
