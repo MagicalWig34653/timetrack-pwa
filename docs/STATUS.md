@@ -1,5 +1,8 @@
 # Stand der PWA – 26.10.2026 (Paket P15 im Worktree, uncommittet)
 
+## Paket N3-pwa (26.10.2026, Branch n3-week-vacation, nicht gemergt)
+Urlaub (geplant/beantragt/genehmigt, auch Halbtage) erscheint in der Wochenübersicht als Icon-Chip (schraffiert bis genehmigt) mit Tooltip/aria-Text, im Tagesdetail mit Link zur Urlaubsübersicht; falscher Warn-Chip an freien Tagen entfernt. Details: `docs/handoffs/N3-pwa.md`.
+
 ## Paket N2-pwa (26.10.2026, Branch p15-profile-adjustments, nicht gemergt)
 Globale Zeitanzeige (h:mm/Dezimal, klickbar), Urlaubsantrag-Rest ohne nicht eingereichte Planung, Kalender-Monatsraster mit Punkten (Phone), Woche mit Tagespanel statt Tagesseite (`/time` leitet auf `/week` um), Planer mit fester Speichern-Leiste und Urlaub im Raster, Kalender-Abos `/settings/calendar-feeds` (Vertrag 0.31.0). Details und offene Punkte: `docs/handoffs/N2-pwa.md`.
 

@@ -3,6 +3,7 @@ import { t, type MessageKey } from '#lib/i18n/index.js';
 import { absenceKindLabel } from '#lib/planning/labels.js';
 import { formatDateLong } from '#lib/time/dates.js';
 import { absenceWarning, chipAbsences } from './absences.js';
+import { vacationTooltip, type VacationEntry } from './vacation.js';
 import { formatDelta, formatDuration } from '#lib/time/format.js';
 
 /** Presentation rules of the week overview (K1, ADR-0021); pure so they can be unit tested. */
@@ -41,10 +42,11 @@ export function isEmptyWeek(days: TimeWeekDay[]): boolean {
 }
 
 /** Screen reader label of a day card, e.g. "Dienstag, 20.10.2026: 7:42 Stunden, Saldo plus 0:12, Büro". */
-export function dayAriaLabel(day: TimeWeekDay): string {
+export function dayAriaLabel(day: TimeWeekDay, vacation: VacationEntry[] | null = null): string {
 	const parts = [formatDateLong(day.date)];
 	if (day.mark !== 'work') parts.push(weekMarkLabel(day.mark));
-	for (const absence of chipAbsences(day)) {
+	for (const entry of vacation ?? []) parts.push(vacationTooltip(entry));
+	for (const absence of chipAbsences(day, vacation !== null)) {
 		const warning = absenceWarning(absence.status);
 		parts.push(warning ? `${absenceKindLabel(absence.kind)}, ${warning}` : absenceKindLabel(absence.kind));
 	}

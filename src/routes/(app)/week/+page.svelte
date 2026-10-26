@@ -23,6 +23,7 @@
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
+	import { entriesForDay, vacationByDay } from '#lib/week/vacation.js';
 	import { absenceRuns, absenceWarning, hasOpenAbsence } from '#lib/week/absences.js';
 	import { recalledWeek, rememberWeek } from '#lib/week/last-week.js';
 	import { ABSENCE_CLASSES, absenceKindLabel } from '#lib/planning/labels.js';
@@ -90,6 +91,20 @@
 			if (isCurrent && document.visibilityState === 'visible') void fetchWeek(isoWeek, true);
 		}, 60_000);
 		return () => clearInterval(poll);
+	});
+
+	/** vacation of the visible week from the absence list (N3); null while unknown or when planning is off */
+	let vacationDays = $state<ReturnType<typeof vacationByDay> | null>(null);
+	$effect(() => {
+		const from = monday;
+		let current = true;
+		vacationDays = null;
+		if (!moduleStore.enabled('planning')) return;
+		void api
+			.listAbsences(from, addDays(from, 6))
+			.then((list) => current && (vacationDays = vacationByDay(list, from, addDays(from, 6))))
+			.catch(() => current && (vacationDays = null));
+		return () => (current = false);
 	});
 
 	const summary = $derived(week?.summary ?? null);
@@ -173,7 +188,7 @@
 		{:else}
 			<ol class="grid gap-3 lg:grid-cols-7 lg:items-stretch" aria-label={t('weekview.days_label')} data-testid="week-days">
 				{#each days as day (day.date)}
-					<li class="min-w-0 *:h-full"><DayCard {day} {timeZone} href={hrefFor(day.date)} selected={day.date === selectedDate} review={reviewDates.includes(day.date)} onselect={() => selectDay(day.date)} /></li>
+					<li class="min-w-0 *:h-full"><DayCard {day} {timeZone} href={hrefFor(day.date)} selected={day.date === selectedDate} review={reviewDates.includes(day.date)} vacation={entriesForDay(vacationDays, day.date, day.mark)} onselect={() => selectDay(day.date)} /></li>
 				{/each}
 			</ol>
 		{/if}

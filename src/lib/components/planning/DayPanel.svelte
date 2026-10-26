@@ -89,6 +89,7 @@
 						{formatDateNumeric(absence.startDate)}–{formatDateNumeric(absence.endDate)} · {absenceStatusLabel(absence.status)}
 						{#if absence.kind === 'vacation'} · {t('absence.counted', { days: formatHalfDays(absence.countedHalfDays) })}{/if}
 					</span>
+					{#if absence.kind === 'vacation'}<Button variant="link" size="sm" href="/absences?year={absence.startDate.slice(0, 4)}" data-testid="panel-absence-link">{t('weekview.vacation.open_page')}</Button>{/if}
 					<Button variant="outline" size="sm" onclick={() => (mode = { type: 'absence', absence })}>{t('absence.edit')}</Button>
 					<Button variant="outline" size="sm" onclick={() => removeAbsence(absence)}>{t('absence.delete')}</Button>
 				</dd>

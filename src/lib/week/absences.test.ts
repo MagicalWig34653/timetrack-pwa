@@ -45,3 +45,13 @@ describe('absenceRuns', () => {
 		expect(hasOpenAbsence([{ absences: [abs('vacation', 'approved')] }])).toBe(false);
 	});
 });
+
+describe('chipAbsences on free days and with a vacation list', () => {
+	it('shows nothing on free days', () => {
+		expect(chipAbsences({ mark: 'off', absences: [abs('vacation', 'planned')] })).toHaveLength(0);
+		expect(chipAbsences({ mark: 'holiday', absences: [abs('other', 'planned')] })).toHaveLength(0);
+	});
+	it('leaves vacation to the vacation chips when the list is loaded', () => {
+		expect(chipAbsences({ mark: 'work', absences: [abs('vacation', 'planned'), abs('other', 'approved')] }, true)).toHaveLength(1);
+	});
+});

@@ -3,15 +3,17 @@
 	import StatusChip from '#lib/components/app/StatusChip.svelte';
 	import { t } from '#lib/i18n/index.js';
 	import { ABSENCE_CLASSES, absenceKindLabel, planModeLabel } from '#lib/planning/labels.js';
+	import { vacationTooltip, type VacationEntry } from '#lib/week/vacation.js';
 	import { absenceWarning, chipAbsences } from '#lib/week/absences.js';
 	import { formatDateNumeric, localTimeOf } from '#lib/time/dates.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { balanceTone, barShares, dayAriaLabel, dayHours, MARK_CLASSES, weekMarkLabel } from '#lib/week/overview.js';
+	import TreePalm from '@lucide/svelte/icons/tree-palm';
 	import MarkIcon from './MarkIcon.svelte';
 
 	/** One day of the week overview: weekday and date, mark, hours, worked/planned/target bar, balance, first start to last end. */
-	let { day, timeZone, href = `/time/${day.date}`, selected = false, review = false, onselect }: { day: TimeWeekDay; timeZone: string; href?: string; selected?: boolean; /** has entries that need a check */ review?: boolean; onselect?: () => void } = $props();
+	let { day, timeZone, href = `/time/${day.date}`, selected = false, review = false, vacation = null, onselect }: { day: TimeWeekDay; timeZone: string; /** vacation entries of this day from the absence list; null = not loaded (fall back to the week's own absences) */ vacation?: VacationEntry[] | null; href?: string; selected?: boolean; /** has entries that need a check */ review?: boolean; onselect?: () => void } = $props();
 
 	function click(event: MouseEvent) {
 		// plain clicks open the day panel in place; modified clicks keep the link behaviour (new tab, download ...)
@@ -22,6 +24,8 @@
 
 	const hours = $derived(dayHours(day));
 	const bars = $derived(barShares(day));
+	const listed = $derived(vacation !== null);
+	const hideMark = $derived(day.mark === 'vacation' && (vacation?.length ?? 0) > 0);
 	const halfDay = $derived(day.mark === 'vacation' && day.absences.some((a) => a.kind === 'vacation' && a.halfDay));
 	const showHours = $derived(hours > 0 || day.isToday || (!day.isFuture && day.mark === 'work' && day.targetSeconds > 0));
 	const showMode = $derived(!!day.planMode && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark));
@@ -31,8 +35,8 @@
 <a
 	{href}
 	onclick={click}
-	class="day ui-card rounded-[10px] border bg-card p-3 shadow-[var(--shadow-card)] transition-colors outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring {day.isToday ? 'ring-2 ring-ui-accent/60' : ''} {selected ? 'bg-ui-accent-soft ring-2 ring-ui-accent' : ''} {dim ? 'bg-muted/40' : ''}"
-	aria-label={dayAriaLabel(day)}
+	class="day group/card ui-card rounded-[10px] border bg-card p-3 shadow-[var(--shadow-card)] transition-colors outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring {day.isToday ? 'ring-2 ring-ui-accent/60' : ''} {selected ? 'bg-ui-accent-soft ring-2 ring-ui-accent' : ''} {dim ? 'bg-muted/40' : ''} {(vacation?.length ?? 0) > 0 ? 'vacation-day' : ''}"
+	aria-label={dayAriaLabel(day, vacation)}
 	aria-current={day.isToday ? 'date' : undefined}
 	aria-expanded={onselect ? selected : undefined}
 	data-selected={selected ? 'true' : undefined}
@@ -45,17 +49,27 @@
 	</span>
 
 	<span class="chip flex flex-wrap items-center gap-1.5">
-		<span class="inline-flex h-5 items-center gap-1 rounded-full px-2 text-xs font-medium whitespace-nowrap {MARK_CLASSES[day.mark]}" data-testid="day-mark">
-			<MarkIcon mark={day.mark} class="size-3" />{weekMarkLabel(day.mark)}{#if halfDay}<span class="font-normal"> ½</span>{/if}
-		</span>
-		{#each chipAbsences(day) as absence, i (i)}
+		{#if !hideMark}
+			<span class="inline-flex h-5 items-center gap-1 rounded-full px-2 text-xs font-medium whitespace-nowrap {MARK_CLASSES[day.mark]}" data-testid="day-mark">
+				<MarkIcon mark={day.mark} class="size-3" />{weekMarkLabel(day.mark)}{#if halfDay && !listed}<span class="font-normal"> ½</span>{/if}
+			</span>
+		{/if}
+		{#each vacation ?? [] as entry (entry.id)}
+			<!-- icon only; the full text is a tooltip on hover and on keyboard focus of the card, and part of the card's aria-label -->
+			<span class="vac group/vac relative inline-flex h-5 items-center gap-0.5 rounded-full px-1.5 text-xs font-medium {entry.status === 'approved' ? MARK_CLASSES.vacation : 'vac-open ' + MARK_CLASSES.vacation}" data-testid="day-vacation" data-status={entry.status} data-half={entry.halfDay ? 'true' : undefined}>
+				<TreePalm class="size-3.5" aria-hidden="true" />{#if entry.halfDay}<span aria-hidden="true">½</span>{/if}
+				<span role="tooltip" class="vac-tip pointer-events-none absolute top-full left-0 z-20 mt-1 hidden w-max max-w-[14rem] rounded-md border bg-popover px-2 py-1 text-xs font-normal text-popover-foreground shadow-md group-hover/vac:block group-focus-visible/card:block" data-testid="day-vacation-tip">{vacationTooltip(entry)}</span>
+			</span>
+		{/each}
+		{#each chipAbsences(day, listed) as absence, i (i)}
 			{@const warning = absenceWarning(absence.status)}
 			<span
-				class="inline-flex min-h-5 items-center gap-1 rounded-full px-2 text-xs font-medium {warning ? 'bg-amber-500/15 text-amber-900 dark:text-amber-200' : ABSENCE_CLASSES[absence.kind]}"
+				title={warning ? `${absenceKindLabel(absence.kind)}: ${warning}` : undefined}
+				class="inline-flex h-5 max-w-full items-center gap-1 rounded-full px-2 text-xs font-medium {warning ? 'bg-amber-500/15 text-amber-900 dark:text-amber-200' : ABSENCE_CLASSES[absence.kind]}"
 				data-testid="day-absence"
 				data-status={absence.status}
 			>
-				{absenceKindLabel(absence.kind)}{#if absence.halfDay}<span class="font-normal">&nbsp;½</span>{/if}{#if warning}<span class="font-normal">:&nbsp;{warning}</span>{/if}
+				<span class="truncate">{absenceKindLabel(absence.kind)}{#if absence.halfDay}&nbsp;½{/if}</span>
 			</span>
 		{/each}
 		{#if day.isToday}<StatusChip tone="accent" dot={false}>{t('weekview.today')}</StatusChip>{/if}
@@ -114,6 +128,13 @@
 		align-items: center;
 		gap: 0.375rem 0.75rem;
 		min-width: 0;
+	}
+	.vac-open {
+		border: 1px dashed currentColor;
+		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, currentColor 22%, transparent) 0 3px, transparent 3px 6px);
+	}
+	.vacation-day {
+		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, #0ea5e9 12%, transparent) 0 6px, transparent 6px 14px);
 	}
 	.head { grid-area: head; align-self: start; flex-direction: column; }
 	.chip { grid-area: chip; }

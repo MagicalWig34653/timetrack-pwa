@@ -169,7 +169,7 @@ test('/week remembers the last viewed week and shows open absences with warnings
 	await expect(page.getByTestId('week-absence-run')).toHaveCount(3);
 	await expect(page.getByTestId('week-absences')).toContainText('noch nicht beantragt');
 	await expect(page.getByTestId('week-absences')).toContainText('beantragt, noch nicht genehmigt');
-	await expect(page.getByTestId(`week-day-${monday}`).getByTestId('day-absence')).toContainText('noch nicht beantragt');
+	await expect(page.getByTestId(`week-day-${monday}`).getByTestId('day-vacation-tip')).toHaveText('Urlaub – geplant, noch nicht beantragt');
 	await expect(page.getByTestId('week-absence-planner')).toHaveAttribute('href', '/vacation/planner');
 	// leave and come back without ?week: the remembered week is restored
 	await page.goto('/calendar');

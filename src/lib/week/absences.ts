@@ -23,10 +23,13 @@ const MARK_OF_KIND: Partial<Record<AbsenceKind, WeekMark>> = { vacation: 'vacati
 
 /**
  * Absences of a day that need their own chip on the day card: every open one (planned/requested) and decided ones
- * the day mark does not already express (e.g. "Sonstiges").
+ * the day mark does not already express (e.g. "Sonstiges"). With `vacationListed` vacation is left out.
  */
-export function chipAbsences(day: Pick<TimeWeekDay, 'mark' | 'absences'>): DayAbsence[] {
-	return day.absences.filter((a) => isOpenStatus(a.status) || MARK_OF_KIND[a.kind] !== day.mark);
+export function chipAbsences(day: Pick<TimeWeekDay, 'mark' | 'absences'>, vacationListed = false): DayAbsence[] {
+	// when the vacation entries come from the absence list (N3), they get their own chips and are not repeated here
+	// open absences on free days (weekend, holiday) are not shown: nothing is taken there
+	if (day.mark === 'off' || day.mark === 'holiday') return [];
+	return day.absences.filter((a) => !(vacationListed && a.kind === 'vacation') && (isOpenStatus(a.status) || MARK_OF_KIND[a.kind] !== day.mark));
 }
 
 export interface AbsenceRun {
