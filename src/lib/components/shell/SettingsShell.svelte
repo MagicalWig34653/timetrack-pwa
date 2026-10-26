@@ -2,6 +2,8 @@
 	// Section shell of the settings pages (nav + content column). Used by the settings layout and by /admin/mail,
 	// which is listed in the settings nav; without the shell the nav would vanish and the content would jump (J1).
 	import { page } from '$app/state';
+	import ErrorPage from '#lib/components/app/ErrorPage.svelte';
+	import { newErrorId } from '#lib/errors/describe.js';
 	import { t } from '#lib/i18n/index.js';
 	import { moduleOfPath } from '#lib/modules/map.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
@@ -68,6 +70,14 @@
 		</nav>
 	</div>
 	<div class="max-w-[820px] min-w-0" data-testid="settings-content">
-		{@render children()}
+		<!-- the page body is re-created per route (and an error stays confined to it); the nav above stays mounted (J2) -->
+		{#key page.url.pathname}
+			<svelte:boundary onerror={(error) => console.error(error)}>
+				{@render children()}
+				{#snippet failed(_error, reset)}
+					<ErrorPage status={500} errorId={newErrorId()} onretry={reset} />
+				{/snippet}
+			</svelte:boundary>
+		{/key}
 	</div>
 </div>
