@@ -1,5 +1,6 @@
 import { deAccounts } from './de-accounts';
 import { deCalendar } from './de-calendar';
+import { deCalendarFeeds } from './de-calendar-feeds';
 import { deDesign } from './de-design';
 import { deErrors } from './de-errors';
 import { deMail } from './de-mail';
@@ -25,6 +26,7 @@ import { deWorktime } from './de-worktime';
 export const de = {
 	...deAccounts,
 	...deCalendar,
+	...deCalendarFeeds,
 	...deDesign,
 	...deErrors,
 	...deMail,

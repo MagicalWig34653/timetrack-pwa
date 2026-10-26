@@ -199,6 +199,24 @@ describe('mock time API', () => {
 		expect((await post('departure', crypto.randomUUID())).status).toBe(401);
 	});
 
+	it('calendar feeds: token and path only in the POST response, defaults, validation, limit, idempotent revoke', async () => {
+		const created = await api.createCalendarFeed({ label: 'Apple Kalender' });
+		expect(created.include).toEqual(['absences', 'holidays']);
+		expect(created.path).toMatch(/^\/ics\/[A-Za-z0-9]+\.ics$/);
+		const listed = await api.listCalendarFeeds();
+		expect(listed).toHaveLength(1);
+		expect(listed[0]).not.toHaveProperty('token');
+		expect(listed[0]).not.toHaveProperty('path');
+		expect(await code(api.createCalendarFeed({ label: ' ' }))).toBe('400:bad_request');
+		expect(await code(api.createCalendarFeed({ label: 'x', include: [] }))).toBe('400:bad_request');
+		expect(await code(api.createCalendarFeed({ label: 'x', include: ['plan', 'plan'] }))).toBe('400:bad_request');
+		expect(await code(api.createCalendarFeed({ label: 'x', expiresInDays: 0 }))).toBe('400:bad_request');
+		for (let i = 1; i < 10; i++) await api.createCalendarFeed({ label: `f${i}`, include: ['tracked'] });
+		expect(await code(api.createCalendarFeed({ label: 'x' }))).toBe('409:too_many_calendar_feeds');
+		await api.revokeCalendarFeed(created.id);
+		await api.revokeCalendarFeed(created.id);
+		expect(await api.listCalendarFeeds()).toHaveLength(9);
+	});
 	it('trigger links: token and path only in the POST response, validation, limit, revoke', async () => {
 		const created = await api.createTriggerLink({ label: 'Tag', actions: ['start', 'toggle'], expiresInDays: 10 });
 		expect(created.path).toBe(`/t/${created.token}`);

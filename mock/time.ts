@@ -10,6 +10,7 @@ import type {
 	LegalProfile,
 	DeviceToken,
 	TriggerLink,
+	CalendarFeed,
 	Place,
 	PlaceInput,
 	Segment,
@@ -43,6 +44,10 @@ interface StoredToken extends DeviceToken {
 	secret: string;
 }
 
+interface StoredCalendarFeed extends CalendarFeed {
+	secret: string;
+}
+
 interface StoredTriggerLink extends TriggerLink {
 	secret: string;
 }
@@ -57,6 +62,7 @@ interface TimeState {
 	suggestions: Suggestion[];
 	tokens: StoredToken[];
 	triggerLinks: StoredTriggerLink[];
+	calendarFeeds: StoredCalendarFeed[];
 	timerEvents: Map<string, string>;
 	automationEvents: Map<string, { result: string; segmentId: string | null; suggestionId: string | null }>;
 }
@@ -100,6 +106,7 @@ export function createTimeMock(clock: () => number) {
 				suggestions: [],
 				tokens: [],
 				triggerLinks: [],
+				calendarFeeds: [],
 				timerEvents: new Map(),
 				automationEvents: new Map()
 			};
@@ -807,6 +814,37 @@ export function createTimeMock(clock: () => number) {
 				const { secret: _s, ...publicLink } = link;
 				return ok({ ...publicLink, token: secret, path: `/t/${secret}` }, 201);
 			}
+		}
+		// --- ICS subscriptions (contract 0.31.0): token and path exist only in the POST response ---
+		if (route === 'me/calendar-feeds') {
+			if (method === 'GET') return ok(state.calendarFeeds.map(({ secret: _secret, ...rest }) => rest));
+			if (method === 'POST') {
+				const parts = ['absences', 'holidays', 'plan', 'tracked'];
+				const include = body.include ?? ['absences', 'holidays'];
+				if (typeof body.label !== 'string' || !body.label.trim() || body.label.length > 80) return fail(400, 'bad_request');
+				if (!Array.isArray(include) || include.length === 0 || new Set(include).size !== include.length || include.some((p) => !parts.includes(p))) return fail(400, 'bad_request');
+				const days = body.expiresInDays;
+				if (days !== undefined && !(Number.isInteger(days) && days >= 1 && days <= 730)) return fail(400, 'bad_request');
+				if (state.calendarFeeds.length >= 10) return fail(409, 'too_many_calendar_feeds');
+				const secret = (uuid() + uuid()).replace(/-/g, '').slice(0, 43);
+				const feed: StoredCalendarFeed = {
+					id: uuid(),
+					label: body.label.trim(),
+					include: [...include] as CalendarFeed['include'],
+					createdAt: new Date(clock()).toISOString(),
+					expiresAt: days ? new Date(clock() + days * 86400_000).toISOString() : null,
+					lastUsedAt: null,
+					secret
+				};
+				state.calendarFeeds.push(feed);
+				const { secret: _s, ...publicFeed } = feed;
+				return ok({ ...publicFeed, token: secret, path: `/ics/${secret}.ics` }, 201);
+			}
+		}
+		if ((m = route.match(/^me\/calendar-feeds\/([^/]+)$/)) && method === 'DELETE') {
+			const index = state.calendarFeeds.findIndex((f) => f.id === m![1]);
+			if (index >= 0) state.calendarFeeds.splice(index, 1);
+			return { status: 204 };
 		}
 		if ((m = route.match(/^me\/trigger-links\/([^/]+)$/)) && method === 'DELETE') {
 			const index = state.triggerLinks.findIndex((l) => l.id === m![1]);

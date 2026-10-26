@@ -23,6 +23,7 @@ export const CORE_ROUTES = [
 	'/settings/work-model',
 	'/settings/appearance',
 	'/settings/places',
+	'/settings/calendar-feeds',
 	'/settings/account-time',
 	'/settings/notifications',
 	'/settings/passkeys',

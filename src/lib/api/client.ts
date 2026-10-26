@@ -67,6 +67,8 @@ import type {
 	DeviceToken,
 	DeviceTokenCreated,
 	TriggerLink,
+	CalendarFeed,
+	CalendarFeedInput,
 	TriggerLinkInput,
 	Place,
 	PlaceInput,
@@ -537,6 +539,10 @@ export const api = {
 	revokeDeviceToken: (id: string) => request<void>('DELETE', `/me/device-tokens/${id}`),
 	listTriggerLinks: () => request<TriggerLink[]>('GET', '/me/trigger-links'),
 	createTriggerLink: (input: TriggerLinkInput) => request<TriggerLink>('POST', '/me/trigger-links', input),
+	// ICS subscriptions (contract 0.31.0)
+	listCalendarFeeds: () => request<CalendarFeed[]>('GET', '/me/calendar-feeds'),
+	createCalendarFeed: (input: CalendarFeedInput) => request<CalendarFeed>('POST', '/me/calendar-feeds', input),
+	revokeCalendarFeed: (id: string) => request<void>('DELETE', `/me/calendar-feeds/${id}`),
 	revokeTriggerLink: (id: string) => request<void>('DELETE', `/me/trigger-links/${id}`),
 
 	// vacation (contract v0.3.1); amounts are half days; GET settings answers 200 with `configured: false` until saved

@@ -447,6 +447,26 @@ export interface TriggerLink {
 	path?: string;
 }
 
+export type CalendarFeedPart = 'absences' | 'holidays' | 'plan' | 'tracked';
+
+/** ICS subscription (contract 0.31.0). `token` and `path` (`/ics/<token>.ics`) only exist in the POST response. */
+export interface CalendarFeed {
+	id: string;
+	label: string;
+	include: CalendarFeedPart[];
+	createdAt: string;
+	expiresAt?: string | null;
+	lastUsedAt?: string | null;
+	token?: string;
+	path?: string;
+}
+
+export interface CalendarFeedInput {
+	label: string;
+	include?: CalendarFeedPart[];
+	expiresInDays?: number;
+}
+
 export interface TriggerLinkInput {
 	label: string;
 	actions: TriggerAction[];
