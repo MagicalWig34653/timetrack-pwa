@@ -87,7 +87,7 @@ describe('parsePushPayload', () => {
 describe('request interception rules', () => {
 	const origin = 'https://app.example';
 	it('never touches API, OAuth, MCP, discovery and probes', () => {
-		for (const p of ['/api/v1/time/segments', '/api', '/oauth/consent', '/oauth/authorize', '/mcp', '/.well-known/oauth-authorization-server', '/health', '/ready', '/t', '/t/abc/start', '/t/abc/toggle?at=2026-10-22T08:00:00Z']) {
+		for (const p of ['/api/v1/time/segments', '/api', '/oauth/consent', '/oauth/authorize', '/mcp', '/.well-known/oauth-authorization-server', '/health', '/ready', '/t', '/ics/abc.ics', '/t/abc/start', '/t/abc/toggle?at=2026-10-22T08:00:00Z']) {
 			expect(isBypassPath(p), p).toBe(true);
 			expect(isInterceptable(new URL(p, origin), 'GET', origin), p).toBe(false);
 		}
@@ -103,6 +103,8 @@ describe('request interception rules', () => {
 		expect(isBypassPath('/time')).toBe(false);
 		expect(isBypassPath('/time/2026-10-15')).toBe(false);
 		expect(isBypassPath('/tx')).toBe(false);
+		// '/ics' is the calendar subscription prefix, but not a path that merely starts with ics
+		expect(isBypassPath('/icsx')).toBe(false);
 	});
 });
 
