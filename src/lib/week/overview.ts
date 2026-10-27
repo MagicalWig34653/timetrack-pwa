@@ -4,6 +4,7 @@ import { holidayHint } from '#lib/planning/company-days.js';
 import { absenceKindLabel } from '#lib/planning/labels.js';
 import { formatDateLong } from '#lib/time/dates.js';
 import { absenceWarning, chipAbsences } from './absences.js';
+import { blocksText, listsBlocks } from './plan-blocks.js';
 import { vacationTooltip, type VacationEntry } from './vacation.js';
 import { formatDelta, formatDuration } from '#lib/time/format.js';
 
@@ -62,6 +63,11 @@ export function dayAriaLabel(day: TimeWeekDay, vacation: VacationEntry[] | null 
 		}
 	}
 	if (day.planMode && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark)) parts.push(planModeShort(day.planMode));
+	if (listsBlocks(day.planBlocks) && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark)) parts.push(blocksText(day.planBlocks ?? []));
+	if (day.planActualDifferenceSeconds !== null && day.planActualDifferenceSeconds !== undefined) {
+		const sign = day.planActualDifferenceSeconds > 0 ? 'plus ' : day.planActualDifferenceSeconds < 0 ? 'minus ' : '';
+		parts.push(t('weekview.aria_plan_diff', { delta: day.planActualDifferenceSeconds === 0 ? 'genau im Plan' : sign + formatDuration(Math.abs(day.planActualDifferenceSeconds)) }));
+	}
 	if (day.provisional && !day.isFuture) parts.push(t('weekview.provisional'));
 	return parts.join(', ');
 }

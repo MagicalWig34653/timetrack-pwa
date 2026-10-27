@@ -131,6 +131,10 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 				targetSeconds: ev.targetSeconds,
 				plannedSeconds: blocked ? (plan ? 0 : null) : (plan?.plannedSeconds ?? null),
 				planMode: plan?.mode ?? null,
+				planBlocks: plan ? (plan.blocks ?? []) : null,
+				planHints: plan?.planHints ?? [],
+				// evaluated work + credit - effective planned seconds; null on future or blocked days and without a planned duration
+				planActualDifferenceSeconds: future || blocked || plan?.plannedSeconds == null ? null : ev.evaluatedWorkSeconds + ev.creditSeconds - plan.plannedSeconds,
 				workSeconds: ev.evaluatedWorkSeconds,
 				creditSeconds: ev.creditSeconds,
 				rawWorkSeconds: ev.rawWorkSeconds,

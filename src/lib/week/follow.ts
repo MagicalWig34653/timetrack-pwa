@@ -8,7 +8,7 @@ export const MAX_FOLLOW_WEEKS = 12;
  * plan stay untouched in the target, blocked target days (holiday, vacation, ...) are skipped, and days that already
  * hold a plan are only replaced when `overwrite` is set. The result is sent with `replace: false` (upsert by date).
  */
-export function followEntries(source: DayDraft[], target: PlanWeek, overwrite: boolean): { entries: PlanWeekEntry[]; skippedBlocked: number; skippedExisting: number } {
+export function followEntries(source: DayDraft[], target: PlanWeek, overwrite: boolean, multi = true): { entries: PlanWeekEntry[]; skippedBlocked: number; skippedExisting: number } {
 	const entries: PlanWeekEntry[] = [];
 	let skippedBlocked = 0;
 	let skippedExisting = 0;
@@ -23,7 +23,7 @@ export function followEntries(source: DayDraft[], target: PlanWeek, overwrite: b
 			skippedExisting++;
 			return;
 		}
-		const entry = entryFromDraft({ ...draft, date: day.date });
+		const entry = entryFromDraft({ ...draft, date: day.date }, multi);
 		if (entry) entries.push(entry);
 	});
 	return { entries, skippedBlocked, skippedExisting };

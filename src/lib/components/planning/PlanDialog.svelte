@@ -12,6 +12,7 @@
 	import { buildResult, formFromSeed, previewOf, type DialogForm, type DialogKind, type DialogResult, type DialogSeed } from '#lib/planning/dialog.js';
 	import { ABSENCE_KINDS, ABSENCE_STATUSES, absenceKindLabel, absenceStatusLabel, PLAN_MODES, planModeLabel } from '#lib/planning/labels.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
+	import { blocksText } from '#lib/week/plan-blocks.js';
 	import { untrack } from 'svelte';
 	import ConflictList from './ConflictList.svelte';
 
@@ -121,6 +122,9 @@
 					<Field id="pd-to" type="time" label={t('pd.time_end')} bind:value={form.plannedEnd} disabled={busy} />
 					<Field id="pd-break" inputmode="numeric" autocomplete="off" label={t('pd.break')} bind:value={form.breakMinutes} error={errors.break} disabled={busy} />
 				</div>
+			{/if}
+			{#if form.blocks && form.blocks.length > 1}
+				<p class="text-xs text-muted-foreground" data-testid="pd-blocks-hint">{t('pd.blocks_hint', { count: form.blocks.length, blocks: blocksText(form.blocks) })}</p>
 			{/if}
 			{#if preview.dates.length > 1 || form.start !== form.end || multi}
 				<label class="flex items-center gap-2 text-sm"><Checkbox id="pd-workdays" bind:checked={form.onlyWorkdays} disabled={busy || planOff} />{t('pd.only_workdays')}</label>

@@ -4,33 +4,47 @@
 	import type { AbsenceStatus, LegalProfile, Place, PlanMode, PlanWeek, WorkModel } from '#lib/api/types.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
-	import { planModeLabel, PLAN_MODES } from '#lib/planning/labels.js';
+	import { blockKindLabel, planModeLabel } from '#lib/planning/labels.js';
 	import { addDays, formatDateNumeric, localDateOf, localMinutesOf, zonedTimeToInstant } from '#lib/time/dates.js';
 	import { formatDuration } from '#lib/time/format.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { clock, type MinuteRange, paintRange, snap } from '#lib/week/grid.js';
 	import {
+		type BlockId,
+		blockId,
+		blocksOf,
+		breakBlock,
 		type Brush,
+		type BrushKind,
+		canMergeWithNext,
 		type Clip,
 		copyClip,
 		copyToDates,
+		type EditCtx,
 		type EditResult,
+		eraseBlocks,
 		eraseDays,
+		mergeWithNext,
 		moveBlocks,
 		paintDays,
+		parseBlockId,
 		pasteClip,
 		putDraft,
-		rangeOf,
+		rangeAt,
+		replaceBlock,
 		resizeBlock,
 		setBreakOn,
-		setModeOn
+		setKindOn,
+		setModeOn,
+		splitBlock
 	} from '#lib/week/grid-edit.js';
 	import { ADULT_PROFILE, issuesByDate, weekIssues, type DayIssue } from '#lib/week/limits.js';
-	import { type DayDraft, emptyDraft, formatClock, parseClock, plannedSecondsOf, type WindowSuggestion } from '#lib/week/plan-draft.js';
+	import { type BlockKind, BLOCK_KINDS, type DayDraft, type DraftBlock, emptyDraft, modeForKind, newBlock, parseClock, planHintsOfDay, spanOf, type WindowSuggestion } from '#lib/week/plan-draft.js';
 	import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
 	import Copy from '@lucide/svelte/icons/copy';
 	import CopyPlus from '@lucide/svelte/icons/copy-plus';
 	import Keyboard from '@lucide/svelte/icons/keyboard';
+	import Lightbulb from '@lucide/svelte/icons/lightbulb';
 	import Pencil from '@lucide/svelte/icons/pencil';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Scissors from '@lucide/svelte/icons/scissors';
@@ -39,6 +53,8 @@
 	import WandSparkles from '@lucide/svelte/icons/wand-sparkles';
 	import X from '@lucide/svelte/icons/x';
 	import Coffee from '@lucide/svelte/icons/coffee';
+	import Merge from '@lucide/svelte/icons/merge';
+	import Split from '@lucide/svelte/icons/split';
 	import { onMount } from 'svelte';
 	import BlockDialog from './BlockDialog.svelte';
 	import CopyDaysDialog from './CopyDaysDialog.svelte';
@@ -47,11 +63,13 @@
 
 	/**
 	 * Week planner as a time grid (P11): toolbar with brush, the grid, selection bar, hints. The page owns the drafts and
-	 * the undo history; every edit leaves through `commit`. One block per day (the server stores one plan per day).
+	 * the undo history; every edit leaves through `commit`. A day holds several blocks (contract 0.35.0, `multi`) or
+	 * one block on an older server.
 	 */
 	let {
 		week,
 		drafts,
+		multi,
 		commit,
 		undo,
 		redo,
@@ -69,6 +87,8 @@
 	}: {
 		week: PlanWeek;
 		drafts: DayDraft[];
+		/** block lists per day (contract 0.35.0) instead of one window */
+		multi: boolean;
 		commit: (label: string, next: DayDraft[]) => void;
 		undo: () => void;
 		redo: () => void;
@@ -86,6 +106,7 @@
 	} = $props();
 
 	const days = $derived(week.days);
+	const ctx = $derived<EditCtx>({ days, multi });
 	let legalProfiles = $state<LegalProfile[]>([]);
 	let workModels = $state<WorkModel[]>([]);
 	onMount(() => {
@@ -101,10 +122,10 @@
 
 	// ---- tool and brush --------------------------------------------------------------------------------------
 	let tool = $state<GridTool>('draw');
-	let brushMode = $state<PlanMode>('office');
+	let brushKind = $state<BrushKind>('office');
 	let brushPlace = $state('');
-	const brush = $derived<Brush>({ mode: brushMode, placeId: brushPlace || null, breakMinutes: null });
-	let selected = $state<string[]>([]);
+	const brush = $derived<Brush>({ kind: brushKind, placeId: brushPlace || null, breakMinutes: null });
+	let selected = $state<BlockId[]>([]);
 	let activeDate = $state<string | null>(null);
 	let clip = $state<Clip>([]);
 
@@ -232,7 +253,15 @@
 	});
 
 	// ---- hints -----------------------------------------------------------------------------------------------
-	const issues = $derived(weekIssues(days, drafts, profileForDate));
+	const issues = $derived(weekIssues(days, drafts, profileForDate, multi));
+	/** Non-binding planning hints per day (contract 0.35.0 `planHints`, mirrored live for the draft). */
+	const planHints = $derived(
+		drafts.flatMap((draft, index) => (days[index].blockedBy === null ? planHintsOfDay(draft).map((hint) => ({ date: draft.date, hint })) : []))
+	);
+	function hintText(item: { date: string; hint: string }): string {
+		const day = days.find((d) => d.date === item.date)!;
+		return t(`plan.hint.${item.hint}` as 'plan.hint.planned_break_short', { day: `${weekdayLabel(day.weekday)} ${formatDateNumeric(day.date).slice(0, 6)}` });
+	}
 	const issueMap = $derived(issuesByDate(issues));
 	function issueText(issue: DayIssue): string {
 		const day = days.find((d) => d.date === issue.date)!;
@@ -248,9 +277,9 @@
 		clearTimeout(noticeTimer);
 		noticeTimer = setTimeout(() => (notice = ''), 6000);
 	}
-	const blockDates = $derived(drafts.filter((d, i) => days[i].blockedBy === null && rangeOf(d)).map((d) => d.date));
+	const blockIds = $derived(drafts.flatMap((d, i) => (days[i].blockedBy === null ? blocksOf(d).map((b) => b.id) : [])));
 	$effect(() => {
-		const keep = selected.filter((d) => blockDates.includes(d));
+		const keep = selected.filter((id) => blockIds.includes(id));
 		if (keep.length !== selected.length) selected = keep;
 	});
 	const defaultLength = $derived.by(() => {
@@ -274,109 +303,193 @@
 	}
 
 	// ---- grid callbacks --------------------------------------------------------------------------------------
+	const kindText = (kind: BrushKind) => (kind === 'off' ? planModeLabel('off') : blockKindLabel(kind));
 	function paint(dates: string[], range: MinuteRange) {
-		const result = paintDays(drafts, days, dates, range, brush);
-		if (apply(t('wg.did_paint', { mode: planModeLabel(brush.mode) }), result)) selected = brush.mode === 'off' ? [] : result.touched;
+		const result = paintDays(drafts, ctx, dates, range, brush);
+		if (apply(t('wg.did_paint', { mode: kindText(brush.kind) }), result)) selected = result.selection;
 	}
 	function quick(date: string, minute: number) {
 		const range = paintRange(minute, minute + defaultLength, 15);
 		paint([date], range);
 	}
-	function move(sources: string[], deltaDays: number, deltaMinutes: number, copy: boolean): boolean {
-		const result = moveBlocks(drafts, days, sources, deltaDays, deltaMinutes, copy);
+	function move(sources: BlockId[], deltaDays: number, deltaMinutes: number, copy: boolean): boolean {
+		const result = moveBlocks(drafts, ctx, sources, deltaDays, deltaMinutes, copy);
 		if (!result.ok) {
 			say(t('wg.say_blocked', { count: result.skipped.length || 1 }));
 			return false;
 		}
-		const target = sources.map((s) => days.findIndex((d) => d.date === s) + deltaDays).map((i) => days[i]?.date).filter((d): d is string => !!d);
 		if (!apply(copy ? t('wg.did_copy') : t('wg.did_move'), result)) return false;
-		selected = target;
+		selected = result.selection;
 		return true;
 	}
-	function resize(date: string, range: MinuteRange) {
-		apply(t('wg.did_resize', { start: clock(range.start), end: clock(range.end) }), resizeBlock(drafts, date, range));
+	function resize(id: BlockId, range: MinuteRange) {
+		const result = resizeBlock(drafts, id, range);
+		if (apply(t('wg.did_resize', { start: clock(range.start), end: clock(range.end) }), result)) selected = result.selection;
 	}
-	function erase(dates: string[]) {
-		if (apply(t('wg.did_erase'), eraseDays(drafts, days, dates))) selected = selected.filter((d) => !dates.includes(d));
+	function erase(ids: BlockId[]) {
+		if (apply(t('wg.did_erase'), eraseBlocks(drafts, ctx, ids))) selected = selected.filter((id) => !ids.includes(id));
+	}
+	/** Splits a block at the clicked minute, or in the middle (keyboard). */
+	function split(id: BlockId, minute?: number, gap = 0) {
+		const range = rangeAt(drafts, id);
+		if (!range) return;
+		const at = minute !== undefined ? snap(minute, 5) : snap((range.start + range.end) / 2, 5);
+		const result = gap > 0 ? breakBlock(drafts, ctx, id, gap) : splitBlock(drafts, ctx, id, at);
+		if (apply(gap > 0 ? t('wg.did_break', { minutes: gap }) : t('wg.did_split'), result)) selected = result.selection;
+		else say(t('wg.say_split_short'));
+	}
+	function merge(id: BlockId) {
+		const result = mergeWithNext(drafts, ctx, id);
+		if (apply(t('wg.did_merge'), result)) selected = result.selection;
 	}
 
 	// ---- dialogs ---------------------------------------------------------------------------------------------
-	let dialog = $state<{ seed: DayDraft; isNew: boolean; anchor: DOMRect | null; returnFocus: HTMLElement | null } | null>(null);
+	interface DialogState {
+		/** id of the edited block; null = new block */
+		id: BlockId | null;
+		/** day-level only (mode, note): chip of a rough plan */
+		dayOnly: boolean;
+		seed: { date: string; block: DraftBlock; mode: PlanMode; breakMinutes: number; note: string };
+		anchor: DOMRect | null;
+		returnFocus: HTMLElement | null;
+	}
+	let dialog = $state<DialogState | null>(null);
 	let copyDialog = $state<{ sourceDate: string; anchor: DOMRect | null; returnFocus: HTMLElement | null } | null>(null);
-	const blockElement = (date: string) => document.querySelector<HTMLElement>(`[data-testid="block-${date}"]`);
+	const blockElement = (id: BlockId) => document.querySelector<HTMLElement>(`[data-block][data-id="${id}"]:not([data-ghost])`);
+	const kindForBrush = (): BlockKind => (brushKind === 'off' ? 'office' : brushKind);
 
-	function openEdit(date: string) {
+	function openEdit(id: BlockId) {
+		const { date, index } = parseBlockId(id);
+		const draft = drafts.find((d) => d.date === date);
+		const block = draft?.blocks[index];
+		if (!draft || !block) return;
+		const el = blockElement(id);
+		dialog = {
+			id,
+			dayOnly: false,
+			seed: { date, block: { ...block, note: multi ? block.note : draft.note, placeId: block.placeId ?? draft.placeId }, mode: draft.mode === '' || draft.mode === 'off' ? modeForKind(block.kind) : draft.mode, breakMinutes: draft.breakMinutes, note: draft.note },
+			anchor: el?.getBoundingClientRect() ?? null,
+			returnFocus: el
+		};
+	}
+	function openEditDay(date: string) {
 		const draft = drafts.find((d) => d.date === date);
 		if (!draft || draft.mode === '') return;
-		const el = blockElement(date) ?? document.querySelector<HTMLElement>(`[data-testid="chip-${date}"]`);
-		dialog = { seed: { ...draft }, isNew: false, anchor: el?.getBoundingClientRect() ?? null, returnFocus: el };
+		const el = document.querySelector<HTMLElement>(`[data-testid="chip-${date}"]`);
+		const kind = kindForBrush();
+		dialog = {
+			id: null,
+			dayOnly: true,
+			seed: { date, block: newBlock(480, 720, kind), mode: draft.mode === 'off' ? 'office' : draft.mode, breakMinutes: draft.breakMinutes, note: draft.note },
+			anchor: el?.getBoundingClientRect() ?? null,
+			returnFocus: el
+		};
 	}
 	function openAdd(date?: string, minute?: number) {
 		const index = date ? days.findIndex((d) => d.date === date) : days.findIndex((d, i) => d.blockedBy === null && visible.includes(i));
 		const target = days[index >= 0 ? index : 0];
-		const start = minute !== undefined ? snap(minute, 15) : (parseClock(suggestion.start) ?? 480);
-		const end = Math.min(start + defaultLength, 23 * 60 + 59);
-		const off = brushMode === 'off';
-		const seed: DayDraft = { ...emptyDraft(target.date), mode: brushMode, placeId: brushPlace || null, ...(off ? {} : { start: formatClock(start), end: formatClock(end), breakMinutes: end - start > 360 ? 30 : 0 }) };
+		const draft = drafts.find((d) => d.date === target.date) ?? emptyDraft(target.date);
+		// a new block starts after the last block of the day (or at the suggested start) unless a minute was clicked
+		const last = spanOf(draft);
+		const start = minute !== undefined ? snap(minute, 15) : last && multi ? Math.min(snap(last.end, 15), 22 * 60) : (parseClock(suggestion.start) ?? 480);
+		const end = Math.min(start + (multi && last ? 240 : defaultLength), 23 * 60 + 59);
+		const kind = kindForBrush();
 		const trigger = document.querySelector<HTMLElement>('[data-testid="plan-add-block"]');
-		dialog = { seed, isNew: true, anchor: trigger?.getBoundingClientRect() ?? null, returnFocus: trigger };
+		dialog = {
+			id: null,
+			dayOnly: false,
+			seed: { date: target.date, block: newBlock(start, end, kind, brushPlace || null), mode: draft.mode === '' || draft.mode === 'off' ? modeForKind(kind) : draft.mode, breakMinutes: end - start > 360 ? 30 : 0, note: draft.note },
+			anchor: trigger?.getBoundingClientRect() ?? null,
+			returnFocus: trigger
+		};
 	}
-	function submitDialog(draft: DayDraft, fromDate: string) {
+	function submitDialog(input: { date: string; block: DraftBlock; mode: PlanMode; breakMinutes: number }) {
 		if (!dialog) return;
-		let next = drafts;
-		if (!dialog.isNew && fromDate !== draft.date) next = eraseDays(next, days, [fromDate]).drafts;
-		const result = putDraft(next, days, draft);
+		const { id, dayOnly } = dialog;
+		const label = id || dayOnly ? t('wg.did_edit') : t('wg.did_add');
+		if (dayOnly) {
+			const result = input.mode === 'off' ? setModeOn(drafts, ctx, [input.date], 'off') : setModeOn(drafts, ctx, [input.date], input.mode);
+			const index = drafts.findIndex((d) => d.date === input.date);
+			let next = result.drafts;
+			if (result.touched.length === 0 && drafts[index]?.mode === input.mode) next = drafts;
+			const noted = next.map((d) => (d.date === input.date ? { ...d, note: input.block.note } : d));
+			if (JSON.stringify(noted) !== JSON.stringify(drafts)) {
+				commit(label, noted);
+				say(label);
+			}
+			dialog = null;
+			return;
+		}
+		const result = replaceBlock(drafts, ctx, id, input.date, input.block, { mode: input.mode, breakMinutes: input.breakMinutes, ...(multi ? {} : { dayNote: input.block.note }) });
 		if (result.touched.length === 0) {
 			say(t('wg.say_blocked', { count: 1 }));
 			return;
 		}
-		commit(dialog.isNew ? t('wg.did_add') : t('wg.did_edit'), result.drafts);
-		selected = [draft.date];
-		say(dialog.isNew ? t('wg.did_add') : t('wg.did_edit'));
+		commit(label, result.drafts);
+		selected = result.selection;
+		say(label);
 		dialog = null;
 	}
-	function openCopyTo(date: string) {
-		const el = blockElement(date);
-		copyDialog = { sourceDate: date, anchor: el?.getBoundingClientRect() ?? null, returnFocus: el };
+	function deleteFromDialog() {
+		if (!dialog) return;
+		const { id, dayOnly, seed } = dialog;
+		dialog = null;
+		if (dayOnly || !id) apply(t('wg.did_erase'), eraseDays(drafts, ctx, [seed.date]));
+		else erase([id]);
+	}
+	function openCopyTo(id: BlockId) {
+		const el = blockElement(id);
+		copyDialog = { sourceDate: parseBlockId(id).date, anchor: el?.getBoundingClientRect() ?? null, returnFocus: el };
 	}
 
 	// ---- selection actions -----------------------------------------------------------------------------------
-	const selectedBlocks = $derived(drafts.filter((d) => selected.includes(d.date) && rangeOf(d)));
+	const selectedBlocks = $derived(
+		selected.map((id) => ({ id, ...parseBlockId(id) })).flatMap((ref) => {
+			const block = drafts.find((d) => d.date === ref.date)?.blocks[ref.index];
+			return block ? [{ ...ref, block }] : [];
+		})
+	);
 	function duplicate() {
 		if (!selected.length) return;
-		const ordered = days.map((d) => d.date).filter((d) => selected.includes(d));
-		const free = (shift: number) => moveBlocks(drafts, days, ordered, shift, 0, true).ok;
-		let shift = 1;
-		while (shift < 7 && !free(shift)) shift++;
-		if (shift >= 7) {
-			say(t('wg.say_blocked', { count: 1 }));
-			return;
+		// the next day whose plan is not touched; if every following day has a plan, the first one that takes it
+		let fallback = 0;
+		for (let shift = 1; shift < 7; shift++) {
+			const result = moveBlocks(drafts, ctx, selected, shift, 0, true);
+			if (!result.ok) continue;
+			if (result.replaced.length === 0) return void move(selected, shift, 0, true);
+			fallback ||= shift;
 		}
-		move(ordered, shift, 0, true);
+		if (fallback) return void move(selected, fallback, 0, true);
+		say(t('wg.say_blocked', { count: 1 }));
 	}
 	function copy(cut = false) {
-		const dates = selected.length ? selected : activeDate ? [activeDate] : [];
-		const next = copyClip(drafts, dates);
+		const ids = selected.length ? selected : activeDate ? blocksOf(drafts.find((d) => d.date === activeDate) ?? emptyDraft(activeDate)).map((b) => b.id) : [];
+		const next = copyClip(drafts, ids);
 		if (next.length === 0) return;
 		clip = next;
 		say(cut ? t('wg.did_cut', { count: next.length }) : t('wg.did_clip', { count: next.length }));
-		if (cut) erase(dates);
+		if (cut) erase(ids);
 	}
 	function paste(date?: string) {
 		if (!clip.length) return;
-		const target = date ?? activeDate ?? selected[0] ?? days[visible[0]].date;
-		const result = pasteClip(drafts, days, clip, target);
-		if (apply(t('wg.did_paste'), result)) selected = result.touched;
+		const target = date ?? activeDate ?? (selected[0] ? parseBlockId(selected[0]).date : days[visible[0]].date);
+		const result = pasteClip(drafts, ctx, clip, days.some((d) => d.date === target) ? target : days[visible[0]].date);
+		if (apply(t('wg.did_paste'), result)) selected = result.selection;
 	}
-	function setMode(mode: PlanMode) {
-		apply(t('wg.did_mode', { mode: planModeLabel(mode) }), setModeOn(drafts, days, selected, mode));
+	function setKind(kind: BlockKind) {
+		apply(t('wg.did_mode', { mode: blockKindLabel(kind) }), setKindOn(drafts, ctx, selected, kind));
 	}
 	function setBreak(minutes: number) {
+		if (multi) {
+			const only = selected.length === 1 ? selected[0] : null;
+			if (only) split(only, undefined, minutes);
+			return;
+		}
 		apply(minutes ? t('wg.did_break', { minutes }) : t('wg.did_break_none'), setBreakOn(drafts, selected, minutes));
 	}
 
-	function menu(context: { date: string | null; minute: number; onBlock: boolean }): MenuEntry[] {
-		if (!context.onBlock) {
+	function menu(context: { date: string | null; minute: number; id: BlockId | null }): MenuEntry[] {
+		if (!context.id) {
 			const date = context.date!;
 			return [
 				{ id: 'add', label: t('wg.menu_add_here'), icon: Plus, onselect: () => openAdd(date, context.minute) },
@@ -388,17 +501,24 @@
 		}
 		const only = selectedBlocks.length === 1 ? selectedBlocks[0] : null;
 		const items: MenuEntry[] = [];
-		if (only) items.push({ id: 'edit', label: t('wg.menu_edit'), icon: Pencil, shortcut: 'Enter', onselect: () => openEdit(only.date) }, { separator: true });
-		for (const mode of PLAN_MODES) {
-			items.push({ id: `kind-${mode}`, label: t('wg.menu_kind', { kind: planModeLabel(mode) }), disabled: selectedBlocks.every((b) => b.mode === mode), onselect: () => setMode(mode) });
+		if (only) items.push({ id: 'edit', label: t('wg.menu_edit'), icon: Pencil, shortcut: 'Enter', onselect: () => openEdit(only.id) }, { separator: true });
+		const kinds: BlockKind[] = multi ? BLOCK_KINDS : ['office', 'home', 'customer', 'school'];
+		for (const kind of kinds) {
+			items.push({ id: `kind-${kind}`, label: t('wg.menu_kind', { kind: blockKindLabel(kind) }), disabled: selectedBlocks.every((b) => b.block.kind === kind), onselect: () => setKind(kind) });
 		}
 		items.push({ separator: true });
-		items.push({ id: 'break-30', label: t('wg.menu_break', { minutes: 30 }), icon: Coffee, onselect: () => setBreak(30) });
-		items.push({ id: 'break-45', label: t('wg.menu_break', { minutes: 45 }), icon: Coffee, onselect: () => setBreak(45) });
-		if (selectedBlocks.some((b) => b.breakMinutes > 0)) items.push({ id: 'break-none', label: t('wg.menu_break_none'), onselect: () => setBreak(0) });
+		if (multi && only) {
+			items.push({ id: 'split', label: t('wg.menu_split'), icon: Split, shortcut: 'S', onselect: () => split(only.id, context.minute) });
+			for (const minutes of [15, 30, 45]) items.push({ id: `break-${minutes}`, label: t('wg.menu_break', { minutes }), icon: Coffee, onselect: () => split(only.id, undefined, minutes) });
+			if (canMergeWithNext(drafts, only.id)) items.push({ id: 'merge', label: t('wg.menu_merge'), icon: Merge, onselect: () => merge(only.id) });
+		} else if (!multi) {
+			items.push({ id: 'break-30', label: t('wg.menu_break_legacy', { minutes: 30 }), icon: Coffee, onselect: () => setBreak(30) });
+			items.push({ id: 'break-45', label: t('wg.menu_break_legacy', { minutes: 45 }), icon: Coffee, onselect: () => setBreak(45) });
+			if (selectedBlocks.some((b) => (drafts.find((d) => d.date === b.date)?.breakMinutes ?? 0) > 0)) items.push({ id: 'break-none', label: t('wg.menu_break_none'), onselect: () => setBreak(0) });
+		}
 		items.push({ separator: true });
 		items.push({ id: 'duplicate', label: t('wg.menu_duplicate'), icon: CopyPlus, shortcut: 'Strg+D', onselect: duplicate });
-		if (only) items.push({ id: 'copy-to', label: t('wg.menu_copy_to'), icon: Copy, onselect: () => openCopyTo(only.date) });
+		if (only) items.push({ id: 'copy-to', label: t('wg.menu_copy_to'), icon: Copy, onselect: () => openCopyTo(only.id) });
 		items.push({ id: 'copy', label: t('wg.menu_copy'), icon: Copy, shortcut: 'Strg+C', onselect: () => copy() });
 		items.push({ id: 'cut', label: t('wg.menu_cut'), icon: Scissors, shortcut: 'Strg+X', onselect: () => copy(true) });
 		items.push({ separator: true });
@@ -441,7 +561,7 @@
 			}
 		} else if (mod && key === 'a') {
 			e.preventDefault();
-			selected = blockDates.filter((d) => visible.some((i) => days[i].date === d));
+			selected = blockIds.filter((id) => visible.some((i) => days[i].date === parseBlockId(id).date));
 		} else if (!mod && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace')) {
 			if (selected.length) {
 				e.preventDefault();
@@ -462,7 +582,7 @@
 </script>
 
 <div class="flex flex-col gap-3" data-testid="planner-board">
-	<PlannerToolbar bind:tool bind:mode={brushMode} bind:placeId={brushPlace} bind:showActuals {places} {canUndo} {canRedo} {undoLabel} {redoLabel} onundo={undo} onredo={redo} onadd={() => openAdd()} />
+	<PlannerToolbar bind:tool bind:kind={brushKind} bind:placeId={brushPlace} bind:showActuals {multi} {places} {canUndo} {canRedo} {undoLabel} {redoLabel} onundo={undo} onredo={redo} onadd={() => openAdd()} />
 
 	{#if phone}
 		<div class="flex gap-1 overflow-x-auto" role="tablist" aria-label={t('wg.day_tabs')} data-testid="day-tabs">
@@ -501,6 +621,7 @@
 	<WeekGrid
 		{days}
 		{drafts}
+		{multi}
 		{visible}
 		{tool}
 		{brush}
@@ -522,6 +643,8 @@
 		onresize={resize}
 		onerase={erase}
 		onedit={openEdit}
+		oneditday={openEditDay}
+		onsplit={(id) => split(id)}
 		onadd={(date) => openAdd(date)}
 		{menu}
 		onswipe={swipe}
@@ -541,10 +664,24 @@
 		</section>
 	{/if}
 
+	{#if planHints.length > 0}
+		<section class="rounded-lg border bg-card p-3" aria-label={t('wg.plan_hints')} data-testid="plan-hints">
+			<h3 class="mb-1.5 text-[13px] font-semibold">{t('wg.plan_hints')}</h3>
+			<ul class="flex flex-col gap-1">
+				{#each planHints as item, n (n)}
+					<li class="flex items-start gap-2 text-[13px]" data-hint={item.hint} data-date={item.date}>
+						<Lightbulb class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />{hintText(item)}
+					</li>
+				{/each}
+			</ul>
+			<p class="mt-2 text-xs text-muted-foreground">{t('wg.plan_hints_note')}</p>
+		</section>
+	{/if}
+
 	<details class="rounded-lg border bg-card px-3 py-2 text-[13px]" data-testid="grid-help">
 		<summary class="flex cursor-pointer items-center gap-2 font-medium"><Keyboard class="size-4" />{t('wg.help_title')}</summary>
 		<ul class="mt-2 grid gap-x-6 gap-y-1 text-muted-foreground sm:grid-cols-2">
-			{#each ['paint', 'move', 'resize', 'copy', 'select', 'snap', 'menu', 'keys', 'undo', 'touch'] as key (key)}
+			{#each multi ? ['paint', 'move', 'resize', 'split', 'copy', 'select', 'snap', 'menu', 'keys', 'undo', 'touch'] : ['paint', 'move', 'resize', 'copy', 'select', 'snap_single', 'menu', 'keys', 'undo', 'touch'] as key (key)}
 				<li>{t(`wg.help.${key}` as 'wg.help.paint')}</li>
 			{/each}
 		</ul>
@@ -552,7 +689,7 @@
 </div>
 
 {#if dialog}
-	<BlockDialog {days} seed={dialog.seed} isNew={dialog.isNew} {places} anchor={dialog.anchor} returnFocus={dialog.returnFocus} onsubmit={submitDialog} ondelete={(date) => { erase([date]); dialog = null; }} onclose={() => (dialog = null)} />
+	<BlockDialog {days} {drafts} {multi} seed={dialog.seed} editId={dialog.id} dayOnly={dialog.dayOnly} {places} anchor={dialog.anchor} returnFocus={dialog.returnFocus} onsubmit={submitDialog} ondelete={deleteFromDialog} onclose={() => (dialog = null)} />
 {/if}
 {#if copyDialog}
 	<CopyDaysDialog
@@ -563,7 +700,8 @@
 		onsubmit={(dates) => {
 			const source = copyDialog!.sourceDate;
 			copyDialog = null;
-			if (apply(t('wg.did_copy_days', { count: dates.length }), copyToDates(drafts, days, source, dates))) selected = [source];
+			const result = copyToDates(drafts, ctx, source, dates);
+			if (apply(t('wg.did_copy_days', { count: dates.length }), result)) selected = [];
 		}}
 		onclose={() => (copyDialog = null)}
 	/>

@@ -2,6 +2,7 @@
 	import { goto, beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '#lib/api/client.js';
+	import { capabilities } from '#lib/api/capabilities.svelte.js';
 	import type { Place, PlanWeek, TimeWeekSummary } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import Panel from '#lib/components/app/Panel.svelte';
@@ -56,6 +57,8 @@
 	const monday = $derived(mondayOfIsoWeek(requested) ?? addDays(currentMonday, 7));
 	const isoWeek = $derived(isoWeekLabel(monday));
 
+	// Block lists per day need API 0.35.0; older servers keep the single window with a break (P13, ADR-0031).
+	const multi = $derived(capabilities.planBlocks);
 	let load = $state<LoadState>({ status: 'loading' });
 	let week = $state<PlanWeek | null>(null);
 	let drafts = $state<DayDraft[]>([]);
@@ -150,7 +153,7 @@
 		saveError = '';
 		showProblems = false;
 		try {
-			await zoneStore.ensure();
+			await Promise.all([zoneStore.ensure(), capabilities.ensure()]);
 			const result = await api.getPlanWeek(target);
 			const typical = Math.max(...result.days.map((d) => d.targetSeconds), 0);
 			const suggested = await loadSuggestion(result.from, typical);
@@ -210,13 +213,13 @@
 		historyTick++;
 	}
 	function setMode(index: number, mode: DayDraft['mode']) {
-		drafts[index] = withMode(drafts[index], mode, suggestion, days[index].targetSeconds);
+		drafts[index] = withMode(drafts[index], mode, suggestion, days[index].targetSeconds, multi);
 		history.clear();
 		historyTick++;
 	}
 
 	function applyStandard() {
-		commit(t('weekplan.action_standard'), standardWeek(days, drafts, suggestion));
+		commit(t('weekplan.action_standard'), standardWeek(days, drafts, suggestion, multi));
 	}
 	function applySame() {
 		commit(t('weekplan.action_same'), sameForWorkdays(days, drafts));
@@ -260,7 +263,7 @@
 			for (let n = 1; n <= input.weeks; n++) {
 				const label = isoWeekLabel(addDays(monday, 7 * n));
 				const target = await api.getPlanWeek(label);
-				const plan = followEntries(drafts, target, input.overwrite);
+				const plan = followEntries(drafts, target, input.overwrite, multi);
 				skipped += plan.skippedBlocked + plan.skippedExisting;
 				if (plan.entries.length === 0) continue;
 				await api.putPlanWeek(label, { replace: false, days: plan.entries });
@@ -287,7 +290,7 @@
 		try {
 			const target = isoWeek;
 			const sent = $state.snapshot(drafts) as DayDraft[];
-			const saved = await api.putPlanWeek(target, weekRequest(sent));
+			const saved = await api.putPlanWeek(target, weekRequest(sent, multi));
 			// another week was opened meanwhile: its own load owns the state now
 			if (target !== isoWeek) {
 				showToast(t('weekplan.saved'));
@@ -392,6 +395,7 @@
 			<PlannerBoard
 				{week}
 				{drafts}
+				{multi}
 				{commit}
 				{undo}
 				{redo}
@@ -410,7 +414,7 @@
 		{:else}
 			<ul class="flex flex-col gap-2.5" data-testid="plan-rows">
 				{#each days as day, index (day.date)}
-					<PlanRow {day} holiday={holidays[day.date] ?? null} draft={drafts[index]} {showProblems} onmode={(mode) => setMode(index, mode)} onchange={(next) => setDraft(index, next)} />
+					<PlanRow {day} {multi} {places} holiday={holidays[day.date] ?? null} draft={drafts[index]} {showProblems} onmode={(mode) => setMode(index, mode)} onchange={(next) => setDraft(index, next)} />
 				{/each}
 			</ul>
 		{/if}

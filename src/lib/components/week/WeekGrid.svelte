@@ -5,7 +5,7 @@
 	import { t } from '#lib/i18n/index.js';
 	import { holidayHint } from '#lib/planning/company-days.js';
 	import { exceedsThreshold } from '#lib/planning/drag.js';
-	import { planModeLabel } from '#lib/planning/labels.js';
+	import { blockKindLabel, planModeLabel } from '#lib/planning/labels.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
@@ -15,6 +15,7 @@
 		boxesIntersect,
 		clock,
 		columnAt,
+		clampGroupDelta,
 		type GridMetrics,
 		type MinuteRange,
 		minutesToY,
@@ -27,9 +28,10 @@
 		visibleHours,
 		yToMinutes
 	} from '#lib/week/grid.js';
-	import { type Brush, moveBlocks, rangeOf } from '#lib/week/grid-edit.js';
+	import { type BlockId, blocksOf, type Brush, moveBlocks, neighbourBounds, parseBlockId, rangeAt } from '#lib/week/grid-edit.js';
 	import type { DayIssue } from '#lib/week/limits.js';
-	import { type DayDraft, plannedSecondsOf, type WindowSuggestion } from '#lib/week/plan-draft.js';
+	import { type DayDraft, type DraftBlock, plannedSecondsOf, type WindowSuggestion } from '#lib/week/plan-draft.js';
+	import BlockKindIcon from './BlockKindIcon.svelte';
 	import AlertTriangle from '@lucide/svelte/icons/triangle-alert';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { onMount, tick } from 'svelte';
@@ -45,11 +47,13 @@
 
 	/**
 	 * Time grid of one week (P11). Pure view and pointer layer: every change leaves through a callback and the page
-	 * applies it to the drafts (with undo). One block per day, because the server stores one plan per day.
+	 * applies it to the drafts (with undo). A day holds several blocks (contract 0.35.0, `multi`) or one block on an older
+	 * server; a block is addressed by its id `date#index`.
 	 */
 	let {
 		days,
 		drafts,
+		multi,
 		visible,
 		tool,
 		brush,
@@ -71,17 +75,21 @@
 		onresize,
 		onerase,
 		onedit,
+		oneditday,
+		onsplit,
 		onadd,
 		menu,
 		onswipe
 	}: {
 		days: PlanWeekDay[];
 		drafts: DayDraft[];
+		/** block lists per day (contract 0.35.0); false = one block per day */
+		multi: boolean;
 		/** Week indexes (0 = Monday) of the shown columns; one on phones. */
 		visible: number[];
 		tool: GridTool;
 		brush: Brush;
-		selected?: string[];
+		selected?: BlockId[];
 		activeDate?: string | null;
 		places: Place[];
 		actuals: Record<string, Actual[]>;
@@ -97,12 +105,15 @@
 		vacation?: Record<string, AbsenceStatus>;
 		onpaint: (dates: string[], range: MinuteRange) => void;
 		onquick: (date: string, minute: number) => void;
-		onmove: (sources: string[], deltaDays: number, deltaMinutes: number, copy: boolean) => boolean;
-		onresize: (date: string, range: MinuteRange) => void;
-		onerase: (dates: string[]) => void;
-		onedit: (date: string) => void;
+		onmove: (sources: BlockId[], deltaDays: number, deltaMinutes: number, copy: boolean) => boolean;
+		onresize: (id: BlockId, range: MinuteRange) => void;
+		onerase: (ids: BlockId[]) => void;
+		onedit: (id: BlockId) => void;
+		/** edit the day itself (mode, rough plan without blocks) */
+		oneditday: (date: string) => void;
+		onsplit: (id: BlockId) => void;
 		onadd: (date: string) => void;
-		menu: (context: { date: string | null; minute: number; onBlock: boolean }) => MenuEntry[];
+		menu: (context: { date: string | null; minute: number; id: BlockId | null }) => MenuEntry[];
 		onswipe: (direction: -1 | 1) => void;
 	} = $props();
 
@@ -119,8 +130,7 @@
 	const allRanges = $derived.by(() => {
 		const list: MinuteRange[] = [];
 		drafts.forEach((draft, i) => {
-			const range = days[i]?.blockedBy === null ? rangeOf(draft) : null;
-			if (range) list.push(range);
+			if (days[i]?.blockedBy === null) for (const entry of blocksOf(draft)) list.push(entry.range);
 		});
 		if (showActuals) for (const items of Object.values(actuals)) for (const a of items) list.push({ start: a.start, end: a.end });
 		return list;
@@ -148,15 +158,17 @@
 	const placeName = (id: string | null) => places.find((p) => p.id === id)?.name ?? '';
 	const dateAt = (col: number) => days[visible[Math.min(Math.max(col, 0), visible.length - 1)]].date;
 	const indexOfDate = (date: string) => days.findIndex((d) => d.date === date);
+	const ctx = $derived({ days, multi });
 	const netSeconds = (draft: DayDraft) => plannedSecondsOf(draft) ?? 0;
+	const blockSeconds = (range: MinuteRange) => (range.end - range.start) * 60;
 
 	// ---- interaction state ---------------------------------------------------------------------------------
 	type Drag =
 		| { kind: 'paint'; colA: number; colB: number; minA: number; minB: number }
-		| { kind: 'move'; sources: string[]; grabDate: string; grabCol: number; grabMin: number; col: number; min: number }
-		| { kind: 'resize'; date: string; edge: 'start' | 'end'; origin: MinuteRange; min: number }
-		| { kind: 'marquee'; x0: number; y0: number; x1: number; y1: number; base: string[] }
-		| { kind: 'erase'; dates: string[] };
+		| { kind: 'move'; sources: BlockId[]; grabId: BlockId; grabCol: number; grabMin: number; col: number; min: number }
+		| { kind: 'resize'; id: BlockId; edge: 'start' | 'end'; origin: MinuteRange; bounds: MinuteRange; min: number }
+		| { kind: 'marquee'; x0: number; y0: number; x1: number; y1: number; base: BlockId[] }
+		| { kind: 'erase'; ids: BlockId[] };
 
 	let drag = $state<Drag | null>(null);
 	let mods = $state({ shift: false, free: false, alt: false });
@@ -170,6 +182,8 @@
 		touch: boolean;
 		part: 'empty' | 'block' | 'handle';
 		date: string;
+		/** id of the pressed block, if any */
+		bid: BlockId | null;
 		col: number;
 		minute: number;
 		edge?: 'start' | 'end';
@@ -207,6 +221,7 @@
 		const touch = e.pointerType === 'touch';
 		const part: Press['part'] = handle ? 'handle' : block ? 'block' : 'empty';
 		const date = block?.dataset.date ?? pos.date;
+		const bid = block?.dataset.id ?? null;
 		press = {
 			id: e.pointerId,
 			x: e.clientX,
@@ -214,20 +229,21 @@
 			touch,
 			part,
 			date,
+			bid,
 			col: pos.col,
 			minute: pos.minute,
 			edge: handle ? (handle.dataset.handle as 'start' | 'end') : undefined,
 			additive: e.shiftKey || e.ctrlKey || e.metaKey,
 			armed: !touch,
 			moved: false,
-			wasSelected: selected.includes(date)
+			wasSelected: bid !== null && selected.includes(bid)
 		};
 		activeDate = date;
 		colsEl!.setPointerCapture(e.pointerId);
 		if (tool === 'erase') {
 			// The eraser acts at once and keeps erasing what the pointer passes over.
-			const hit = block ? [date] : [];
-			drag = { kind: 'erase', dates: hit };
+			const hit = bid ? [bid] : [];
+			drag = { kind: 'erase', ids: hit };
 			press.armed = true;
 			press.moved = true;
 			return;
@@ -247,15 +263,14 @@
 
 	function beginDrag(p: Press, at: { x: number; y: number }) {
 		const pos = locate(at.x, at.y);
-		if (p.part === 'handle') {
-			const index = indexOfDate(p.date);
-			const origin = rangeOf(drafts[index]);
+		if (p.part === 'handle' && p.bid) {
+			const origin = rangeAt(drafts, p.bid);
 			if (!origin) return;
-			drag = { kind: 'resize', date: p.date, edge: p.edge!, origin, min: pos.minute };
-			selected = [p.date];
-		} else if (p.part === 'block') {
-			if (!selected.includes(p.date)) selected = p.additive ? [...selected, p.date] : [p.date];
-			drag = { kind: 'move', sources: [...selected], grabDate: p.date, grabCol: p.col, grabMin: p.minute, col: pos.col, min: pos.minute };
+			drag = { kind: 'resize', id: p.bid, edge: p.edge!, origin, bounds: neighbourBounds(drafts, p.bid), min: pos.minute };
+			selected = [p.bid];
+		} else if (p.part === 'block' && p.bid) {
+			if (!selected.includes(p.bid)) selected = p.additive ? [...selected, p.bid] : [p.bid];
+			drag = { kind: 'move', sources: [...selected], grabId: p.bid, grabCol: p.col, grabMin: p.minute, col: pos.col, min: pos.minute };
 		} else if (tool === 'select' || mods.alt) {
 			const origin = locate(p.x, p.y);
 			drag = { kind: 'marquee', x0: origin.x, y0: origin.y, x1: pos.x, y1: pos.y, base: p.additive ? [...selected] : [] };
@@ -314,14 +329,14 @@
 			}
 			case 'erase': {
 				const block = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-block]');
-				if (block?.dataset.date && !drag.dates.includes(block.dataset.date)) drag = { ...drag, dates: [...drag.dates, block.dataset.date] };
+				if (block?.dataset.id && !drag.ids.includes(block.dataset.id)) drag = { ...drag, ids: [...drag.ids, block.dataset.id] };
 				break;
 			}
 		}
 		press.moved = true;
 	}
 
-	function marqueeSelection(m: Extract<Drag, { kind: 'marquee' }>): string[] {
+	function marqueeSelection(m: Extract<Drag, { kind: 'marquee' }>): BlockId[] {
 		const rect = colsEl!.getBoundingClientRect();
 		const box = boxBetween(m.x0, m.y0, m.x1, m.y1);
 		const hit = [...colsEl!.querySelectorAll<HTMLElement>('[data-block]:not([data-ghost])')]
@@ -329,7 +344,7 @@
 				const r = el.getBoundingClientRect();
 				return boxesIntersect(box, { left: r.left - rect.left, top: r.top - rect.top, right: r.right - rect.left, bottom: r.bottom - rect.top });
 			})
-			.map((el) => el.dataset.date!);
+			.map((el) => el.dataset.id!);
 		return [...new Set([...m.base, ...hit])];
 	}
 
@@ -337,8 +352,7 @@
 	const moveDelta = $derived.by(() => {
 		if (drag?.kind !== 'move') return null;
 		const deltaDays = visible.length > 1 ? visible[drag.col] - visible[drag.grabCol] : 0;
-		const grabIndex = indexOfDate(drag.grabDate);
-		const origin = rangeOf(drafts[grabIndex]);
+		const origin = rangeAt(drafts, drag.grabId);
 		const deltaMinutes = origin ? snap(origin.start + (drag.min - drag.grabMin), step) - origin.start : 0;
 		return { deltaDays, deltaMinutes };
 	});
@@ -346,7 +360,7 @@
 	interface Ghost {
 		date: string;
 		range: MinuteRange;
-		mode: PlanMode;
+		mode: string;
 		status: 'ok' | 'replace' | 'invalid';
 	}
 	const preview = $derived.by((): { ghosts: Ghost[]; hidden: string[]; edges: number[]; column?: string } | null => {
@@ -359,37 +373,39 @@
 				const ghosts = visible.slice(lo, hi + 1).map<Ghost>((i) => ({
 					date: days[i].date,
 					range,
-					mode: brush.mode === 'off' ? 'office' : brush.mode,
+					mode: brush.kind === 'off' ? 'off' : brush.kind,
 					status: days[i].blockedBy !== null ? 'invalid' : drafts[i].mode !== '' ? 'replace' : 'ok'
 				}));
 				return { ghosts, hidden: [], edges: [range.start, range.end] };
 			}
 			case 'move': {
 				const delta = moveDelta!;
-				const { sources, grabDate } = drag;
-				const result = moveBlocks(drafts, days, sources, delta.deltaDays, delta.deltaMinutes, mods.alt);
+				const { sources, grabId } = drag;
+				const result = moveBlocks(drafts, ctx, sources, delta.deltaDays, delta.deltaMinutes, mods.alt);
 				const ghosts: Ghost[] = [];
-				for (const date of sources) {
-					const index = indexOfDate(date);
-					const range = rangeOf(drafts[index]);
-					if (!range) continue;
+				const entries = sources.map((id) => ({ id, ...parseBlockId(id), range: rangeAt(drafts, id) })).filter((e) => e.range !== null);
+				const shift = clampGroupDelta(entries.map((e) => e.range!), delta.deltaMinutes);
+				for (const entry of entries) {
+					const index = indexOfDate(entry.date);
 					const targetIndex = index + delta.deltaDays;
 					if (targetIndex < 0 || targetIndex > 6) continue;
-					const moved = moveRange(range, delta.deltaMinutes, 1);
-					ghosts.push({ date: days[targetIndex].date, range: moved, mode: drafts[index].mode as PlanMode, status: !result.ok ? 'invalid' : result.replaced.includes(days[targetIndex].date) ? 'replace' : 'ok' });
+					const moved = moveRange(entry.range!, shift, 1);
+					const kind = drafts[index].blocks[entry.index]?.kind ?? 'office';
+					ghosts.push({ date: days[targetIndex].date, range: moved, mode: kind, status: !result.ok ? 'invalid' : result.replaced.includes(days[targetIndex].date) ? 'replace' : 'ok' });
 				}
+				const grabDate = parseBlockId(grabId).date;
 				const primary = ghosts.find((g) => g.date === days[indexOfDate(grabDate) + delta.deltaDays]?.date);
 				return { ghosts, hidden: mods.alt ? [] : sources, edges: primary ? [primary.range.start, primary.range.end] : [], column: primary?.date };
 			}
 			case 'resize': {
-				const range = resizeRange(drag.origin, drag.edge, drag.min, step);
-				return { ghosts: [], hidden: [], edges: [drag.edge === 'start' ? range.start : range.end], column: drag.date };
+				const range = resizeRange(drag.origin, drag.edge, drag.min, step, drag.bounds);
+				return { ghosts: [], hidden: [], edges: [drag.edge === 'start' ? range.start : range.end], column: parseBlockId(drag.id).date };
 			}
 			default:
 				return null;
 		}
 	});
-	const resizeOverride = $derived(drag?.kind === 'resize' ? { date: drag.date, range: resizeRange(drag.origin, drag.edge, drag.min, step) } : null);
+	const resizeOverride = $derived(drag?.kind === 'resize' ? { id: drag.id, range: resizeRange(drag.origin, drag.edge, drag.min, step, drag.bounds) } : null);
 
 	function pointerup(e: PointerEvent) {
 		if (!press || e.pointerId !== press.id) return;
@@ -411,14 +427,14 @@
 			onpaint(visible.slice(lo, hi + 1).map((i) => days[i].date), range);
 		} else if (finished?.kind === 'move') {
 			const deltaDays = visible.length > 1 ? visible[finished.col] - visible[finished.grabCol] : 0;
-			const origin = rangeOf(drafts[indexOfDate(finished.grabDate)]);
+			const origin = rangeAt(drafts, finished.grabId);
 			const deltaMinutes = origin ? snap(origin.start + (finished.min - finished.grabMin), step) - origin.start : 0;
 			if (deltaDays !== 0 || deltaMinutes !== 0 || mods.alt) onmove(finished.sources, deltaDays, deltaMinutes, mods.alt);
 		} else if (finished?.kind === 'resize') {
-			const range = resizeRange(finished.origin, finished.edge, finished.min, step);
-			if (range.start !== finished.origin.start || range.end !== finished.origin.end) onresize(finished.date, range);
+			const range = resizeRange(finished.origin, finished.edge, finished.min, step, finished.bounds);
+			if (range.start !== finished.origin.start || range.end !== finished.origin.end) onresize(finished.id, range);
 		} else if (finished?.kind === 'erase') {
-			if (finished.dates.length) onerase(finished.dates);
+			if (finished.ids.length) onerase(finished.ids);
 		} else if (!p.moved && !menuOpen) {
 			click(p, e);
 		}
@@ -432,9 +448,10 @@
 			else selected = [];
 			return;
 		}
-		if (p.part === 'handle') return;
-		if (p.additive || (e.shiftKey || e.ctrlKey || e.metaKey)) selected = selected.includes(p.date) ? selected.filter((d) => d !== p.date) : [...selected, p.date];
-		else selected = [p.date];
+		if (p.part === 'handle' || !p.bid) return;
+		const id = p.bid;
+		if (p.additive || (e.shiftKey || e.ctrlKey || e.metaKey)) selected = selected.includes(id) ? selected.filter((d) => d !== id) : [...selected, id];
+		else selected = [id];
 	}
 
 	function pointercancel() {
@@ -447,8 +464,8 @@
 		const target = document.elementFromPoint(e.clientX, e.clientY) ?? (e.target as Element);
 		if (target.closest('[data-nodrag]')) return;
 		const block = target.closest<HTMLElement>('[data-block]');
-		if (block?.dataset.date) {
-			onedit(block.dataset.date);
+		if (block?.dataset.id) {
+			onedit(block.dataset.id);
 			return;
 		}
 		if (tool === 'draw') {
@@ -490,15 +507,17 @@
 	// ---- keyboard on blocks --------------------------------------------------------------------------------
 	async function keydown(e: KeyboardEvent) {
 		const block = (e.target as Element).closest<HTMLElement>('[data-block]');
-		if (!block?.dataset.date || e.defaultPrevented) return;
-		const date = block.dataset.date;
+		if (!block?.dataset.id || e.defaultPrevented) return;
+		const id = block.dataset.id;
+		const date = block.dataset.date!;
 		const index = indexOfDate(date);
-		const range = rangeOf(drafts[index]);
-		const sources = selected.includes(date) ? [...selected] : [date];
+		const range = rangeAt(drafts, id);
+		const sources = selected.includes(id) ? [...selected] : [id];
 		const small = nudgeStep({ shift: e.shiftKey });
-		const refocus = async (target: string) => {
+		// Edits reorder the blocks of a day, so focus follows the selection instead of the element position.
+		const refocus = async () => {
 			await tick();
-			colsEl?.querySelector<HTMLElement>(`[data-block][data-date="${target}"]:not([data-ghost])`)?.focus();
+			colsEl?.querySelector<HTMLElement>('[data-block][data-selected="true"]:not([data-ghost])')?.focus();
 		};
 		switch (e.key) {
 			case 'ArrowUp':
@@ -506,9 +525,11 @@
 				if (!range) return;
 				const delta = (e.key === 'ArrowUp' ? -1 : 1) * small;
 				e.preventDefault();
-				if (e.altKey) onresize(date, resizeRange(range, 'end', range.end + delta, 1));
-				else if (e.ctrlKey || e.metaKey) onresize(date, resizeRange(range, 'start', range.start + delta, 1));
+				const bounds = neighbourBounds(drafts, id);
+				if (e.altKey) onresize(id, resizeRange(range, 'end', range.end + delta, 1, bounds));
+				else if (e.ctrlKey || e.metaKey) onresize(id, resizeRange(range, 'start', range.start + delta, 1, bounds));
 				else onmove(sources, 0, delta, false);
+				void refocus();
 				break;
 			}
 			case 'ArrowLeft':
@@ -518,10 +539,7 @@
 				const dir = e.key === 'ArrowLeft' ? -1 : 1;
 				const target = days[index + dir];
 				if (!target) return;
-				if (onmove(sources, dir, 0, e.altKey)) {
-					if (!e.altKey) selected = sources.map((s) => days[indexOfDate(s) + dir].date);
-					void refocus(target.date);
-				}
+				if (onmove(sources, dir, 0, e.altKey)) void refocus();
 				break;
 			}
 			case 'Delete':
@@ -532,11 +550,18 @@
 			case 'Enter':
 			case 'F2':
 				e.preventDefault();
-				onedit(date);
+				onedit(id);
+				break;
+			case 's':
+			case 'S':
+				if (e.ctrlKey || e.metaKey || e.altKey || !multi) return;
+				e.preventDefault();
+				onsplit(id);
+				void refocus();
 				break;
 			case ' ':
 				e.preventDefault();
-				selected = e.ctrlKey || e.metaKey || e.shiftKey ? (selected.includes(date) ? selected.filter((d) => d !== date) : [...selected, date]) : [date];
+				selected = e.ctrlKey || e.metaKey || e.shiftKey ? (selected.includes(id) ? selected.filter((d) => d !== id) : [...selected, id]) : [id];
 				break;
 		}
 	}
@@ -546,14 +571,15 @@
 		const block = target.closest<HTMLElement>('[data-block]');
 		const pos = locate(lastPoint.x, lastPoint.y);
 		const date = block?.dataset.date ?? pos.date;
-		if (block) {
-			if (!selected.includes(date)) selected = [date];
+		if (block?.dataset.id) {
+			const id = block.dataset.id;
+			if (!selected.includes(id)) selected = [id];
 			activeDate = date;
-			return menu({ date, minute: pos.minute, onBlock: true });
+			return menu({ date, minute: pos.minute, id });
 		}
 		if (target.closest('[data-nodrag]')) return [];
 		activeDate = date;
-		return menu({ date, minute: pos.minute, onBlock: false });
+		return menu({ date, minute: pos.minute, id: null });
 	}
 
 	// ---- presentation helpers ------------------------------------------------------------------------------
@@ -568,33 +594,35 @@
 		return blockRect({ start: from, end: from + Math.round(day.targetSeconds / 60) + suggestion.breakMinutes }, metrics);
 	};
 	const actualColor: Record<SegmentKind, string> = { work: 'var(--ui-accent)', travel: '#d97706', school: '#4f46e5' };
-	const blockLabel = (i: number, range: MinuteRange) => {
+	/**
+	 * Context for screen readers, read after the block's name. The name itself is the visible content (kind, duration,
+	 * times, place, note), so the accessible name always contains what is shown.
+	 */
+	const blockDescription = (i: number, entry: { range: MinuteRange; block: DraftBlock }, position: number, total: number) => {
 		const draft = drafts[i];
-		const place = placeName(draft.placeId);
 		const parts = [
-			planModeLabel(draft.mode as PlanMode),
 			`${weekdayLabel(days[i].weekday)} ${formatDateNumeric(days[i].date)}`,
-			t('wg.block_time', { start: clock(range.start), end: clock(range.end) }),
-			t('wg.block_net', { time: timeDisplay.duration(netSeconds(draft)) })
+			t('wg.block_time', { start: clock(entry.range.start), end: clock(entry.range.end) }),
+			t('wg.block_net', { time: timeDisplay.duration(multi ? blockSeconds(entry.range) : netSeconds(draft)) })
 		];
-		if (draft.breakMinutes > 0) parts.push(t('wg.block_break', { minutes: draft.breakMinutes }));
-		if (place) parts.push(place);
+		if (total > 1) parts.push(t('wg.block_position', { n: position + 1, total }));
+		if (!multi && draft.breakMinutes > 0) parts.push(t('wg.block_break', { minutes: draft.breakMinutes }));
 		const hint = issues.get(draft.date);
-		if (hint?.some((x) => x.severity === 'warn')) parts.push(t('wg.block_has_hint'));
+		if (position === 0 && hint?.some((x) => x.severity === 'warn')) parts.push(t('wg.block_has_hint'));
 		return parts.join(', ');
 	};
 	const markClass = (block: NonNullable<PlanWeekDay['blockedBy']>) => MARK_CLASSES[block];
 	const timeBubbles = $derived(preview?.edges ?? []);
 	const ghostSummary = (g: Ghost) => `${clock(g.range.start)}–${clock(g.range.end)}`;
 	const marquee = $derived(drag?.kind === 'marquee' ? boxBetween(drag.x0, drag.y0, drag.x1, drag.y1) : null);
-	const eraseSet = $derived(drag?.kind === 'erase' ? drag.dates : []);
+	const eraseSet = $derived(drag?.kind === 'erase' ? drag.ids : []);
 	const compactAt = 40;
-	const blocksOf = (i: number) => {
-		const draft = drafts[i];
-		if (days[i].blockedBy !== null) return null;
-		const range = rangeOf(draft);
-		if (!range) return null;
-		return resizeOverride?.date === draft.date ? resizeOverride.range : range;
+	/** The blocks of a day column, with the live range of a block that is being resized. */
+	const columnBlocks = (i: number) => {
+		if (days[i].blockedBy !== null) return [];
+		return blocksOf(drafts[i])
+			.sort((a, b) => a.range.start - b.range.start)
+			.map((entry) => ({ ...entry, range: resizeOverride?.id === entry.id ? resizeOverride.range : entry.range }));
 	};
 </script>
 
@@ -633,9 +661,10 @@
 						<span class="wg-chip {markClass('vacation')} wg-chip-open" data-testid="vacation-chip-{day.date}" data-status={vacation[day.date]}>{t('weekview.mark.vacation')} ({t(`absence.status.${vacation[day.date]}`)})</span>
 					{:else if holidayNames[day.date]}
 						<span class="wg-chip {markClass('holiday')} {holidayTreatments[day.date] === 'half' ? 'wg-chip-half' : ''}" title={holidayHint(holidayNames[day.date], holidayTreatments[day.date])} data-treatment={holidayTreatments[day.date]} data-testid="holiday-chip-{day.date}">{holidayNames[day.date]}{#if holidayTreatments[day.date] === 'half'}<span aria-hidden="true"> ½</span><span class="sr-only">, {holidayHint(holidayNames[day.date], 'half')}</span>{/if}</span>
-					{:else if draft.mode !== '' && !rangeOf(draft)}
-						<button type="button" class="wg-chip wg-chip-plan" data-nodrag data-plan-mode={draft.mode} onclick={() => onedit(day.date)} data-testid="chip-{day.date}">
-							<span class="wg-dot"></span>{planModeLabel(draft.mode as PlanMode)}{draft.mode === 'off' ? '' : ` · ${t('wg.no_times')}`}
+					{:else if draft.mode !== '' && (draft.blocks.length === 0 || multi)}
+						<!-- day-level mode: always shown with block lists, with the note "ohne Zeiten" for a rough plan -->
+						<button type="button" class="wg-chip wg-chip-plan" data-nodrag data-plan-mode={draft.mode} onclick={() => oneditday(day.date)} aria-label={t('wg.day_mode_edit', { mode: planModeLabel(draft.mode as PlanMode) })} data-testid="chip-{day.date}">
+							<span class="wg-dot"></span>{planModeLabel(draft.mode as PlanMode)}{draft.mode === 'off' || draft.blocks.length > 0 ? '' : ` · ${t('wg.no_times')}`}
 						</button>
 					{/if}
 				</div>
@@ -676,7 +705,7 @@
 				{#each visible as i, col (days[i].date)}
 					{@const day = days[i]}
 					{@const band = sollBand(i)}
-					{@const range = blocksOf(i)}
+					{@const list = columnBlocks(i)}
 					<div class="wg-col" data-date={day.date} data-today={day.date === today} data-blocked={day.blockedBy ?? undefined} data-vacation={!day.blockedBy && vacation[day.date] ? vacation[day.date] : undefined} data-off={day.targetSeconds === 0 && day.blockedBy === null ? '' : undefined} data-testid="col-{day.date}">
 						{#if band}<div class="wg-soll" style="top: {band.top}px; height: {band.height}px" aria-hidden="true"></div>{/if}
 
@@ -687,36 +716,39 @@
 							{/each}
 						{/if}
 
-						{#if range}
-							{@const draft = drafts[i]}
-							{@const rect = blockRect(range, metrics)}
-							{@const hint = issues.get(day.date)?.some((x) => x.severity === 'warn') ?? false}
+						{#each list as entry, position (entry.id)}
+							{@const rect = blockRect(entry.range, metrics)}
+							{@const hint = position === 0 && (issues.get(day.date)?.some((x) => x.severity === 'warn') ?? false)}
+							{@const place = placeName(entry.block.placeId ?? (multi ? null : drafts[i].placeId))}
 							<div
 								class="wg-block"
 								role="button"
 								tabindex="0"
 								data-block
 								data-date={day.date}
-								data-plan-mode={draft.mode}
-								data-selected={selected.includes(day.date)}
-								data-moving={preview?.hidden.includes(day.date) || eraseSet.includes(day.date) || undefined}
+								data-id={entry.id}
+								data-plan-mode={entry.block.kind}
+								data-selected={selected.includes(entry.id)}
+								data-moving={preview?.hidden.includes(entry.id) || eraseSet.includes(entry.id) || undefined}
 								data-compact={rect.height < compactAt}
-								data-testid="block-{day.date}"
-								aria-label={blockLabel(i, range)}
-								aria-pressed={selected.includes(day.date)}
+								data-testid="block-{day.date}-{entry.index}"
+								aria-describedby="wg-desc-{entry.id}"
+								aria-pressed={selected.includes(entry.id)}
 								style="top: {rect.top}px; height: {rect.height}px"
 							>
-								<span class="wg-handle wg-handle-start" data-handle="start" data-testid="handle-start-{day.date}" aria-hidden="true"><i></i></span>
+								<span class="wg-handle wg-handle-start" data-handle="start" data-testid="handle-start-{day.date}-{entry.index}" aria-hidden="true"><i></i></span>
 								<div class="wg-body-text">
-									<p class="wg-title"><span class="wg-mode">{planModeLabel(draft.mode as PlanMode)}</span><span class="wg-net">{timeDisplay.duration(netSeconds(draft))}</span></p>
-									<p class="wg-time" data-testid="block-time-{day.date}">{clock(range.start)}–{clock(range.end)}</p>
-									{#if placeName(draft.placeId)}<p class="wg-meta">{placeName(draft.placeId)}</p>{/if}
-									{#if draft.breakMinutes > 0}<p class="wg-meta wg-break">{t('wg.break_chip', { minutes: draft.breakMinutes })}</p>{/if}
+									<p class="wg-title"><span class="wg-mode"><BlockKindIcon kind={entry.block.kind} class="wg-kind size-3" />{blockKindLabel(entry.block.kind)}</span><span class="wg-net">{timeDisplay.duration(multi ? blockSeconds(entry.range) : netSeconds(drafts[i]))}</span></p>
+									<p class="wg-time" data-testid="block-time-{day.date}-{entry.index}">{clock(entry.range.start)}–{clock(entry.range.end)}</p>
+									{#if place}<p class="wg-meta">{place}</p>{/if}
+									{#if entry.block.note}<p class="wg-meta wg-note">{entry.block.note}</p>{/if}
+									{#if !multi && drafts[i].breakMinutes > 0}<p class="wg-meta wg-break">{t('wg.break_chip', { minutes: drafts[i].breakMinutes })}</p>{/if}
 								</div>
 								{#if hint}<span class="wg-warn" aria-hidden="true"><AlertTriangle class="size-3.5" /></span>{/if}
-								<span class="wg-handle wg-handle-end" data-handle="end" data-testid="handle-end-{day.date}" aria-hidden="true"><i></i></span>
+								<span class="wg-handle wg-handle-end" data-handle="end" data-testid="handle-end-{day.date}-{entry.index}" aria-hidden="true"><i></i></span>
 							</div>
-						{/if}
+							<span id="wg-desc-{entry.id}" class="sr-only" data-testid="block-desc-{day.date}-{entry.index}">{blockDescription(i, entry, position, list.length)}</span>
+						{/each}
 
 						{#each preview?.ghosts.filter((g) => g.date === day.date) ?? [] as ghost (ghost.date + ghost.mode)}
 							{@const gr = blockRect(ghost.range, metrics)}
@@ -872,7 +904,7 @@
 	}
 	.wg-diff[data-sign='under'] {
 		background: color-mix(in srgb, #d97706 16%, transparent);
-		color: #b45309;
+		color: #92400e;
 	}
 	.wg-diff[data-sign='over'] {
 		background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
@@ -1052,6 +1084,32 @@
 		transition: box-shadow 140ms, transform 140ms, opacity 140ms, background-color 140ms;
 		outline: none;
 	}
+	/* Pattern per kind, so kinds differ without colour: stripes = school, dots = travel, lines = home, cross-hatch = customer */
+	.wg-block::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		opacity: 0.55;
+	}
+	.wg-block[data-plan-mode='school']::before {
+		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--pm) 22%, transparent) 0 3px, transparent 3px 9px);
+	}
+	.wg-block[data-plan-mode='travel']::before {
+		background-image: radial-gradient(color-mix(in srgb, var(--pm) 45%, transparent) 1.2px, transparent 1.6px);
+		background-size: 8px 8px;
+	}
+	.wg-block[data-plan-mode='home']::before {
+		background-image: repeating-linear-gradient(0deg, color-mix(in srgb, var(--pm) 20%, transparent) 0 1px, transparent 1px 7px);
+	}
+	.wg-block[data-plan-mode='customer']::before {
+		background-image:
+			repeating-linear-gradient(45deg, color-mix(in srgb, var(--pm) 16%, transparent) 0 1px, transparent 1px 8px),
+			repeating-linear-gradient(135deg, color-mix(in srgb, var(--pm) 16%, transparent) 0 1px, transparent 1px 8px);
+	}
+	.wg-body-text {
+		position: relative;
+	}
 	.wg-block:hover {
 		background: color-mix(in srgb, var(--pm) 22%, var(--card));
 		box-shadow: 0 3px 10px #0002;
@@ -1105,6 +1163,9 @@
 		font-weight: 650;
 	}
 	.wg-mode {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -1141,13 +1202,13 @@
 	.wg-block[data-compact='true'] .wg-meta {
 		display: none;
 	}
-	.wg-warn {
+	.wg-block .wg-warn {
 		position: absolute;
 		top: 4px;
 		right: 5px;
 		color: #d97706;
 	}
-	.wg-handle {
+	.wg-block .wg-handle {
 		position: absolute;
 		left: 0;
 		right: 0;

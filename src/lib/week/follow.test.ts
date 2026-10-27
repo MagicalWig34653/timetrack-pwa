@@ -11,13 +11,19 @@ const target = (extra: Record<number, Partial<PlanWeekDay>> = {}): PlanWeek => (
 	totals: { targetSeconds: 0, plannedSeconds: 0, differenceSeconds: 0 },
 	days: Array.from({ length: 7 }, (_, i) => ({ date: date(i), weekday: i + 1, targetSeconds: 0, plannedSeconds: null, blockedBy: null, plan: null, ...extra[i] }))
 });
-const source: DayDraft[] = Array.from({ length: 7 }, (_, i) => ({ ...emptyDraft(`2026-10-${26 + i}`), ...(i < 3 ? { mode: 'office' as const, start: '08:00', end: '16:30', breakMinutes: 30 } : {}) }));
+const source: DayDraft[] = Array.from({ length: 7 }, (_, i) => ({ ...emptyDraft(`2026-10-${26 + i}`), ...(i < 3 ? { mode: 'office' as const, blocks: [{ start: '08:00', end: '16:30', kind: 'office' as const, placeId: null, note: '' }], breakMinutes: 30 } : {}) }));
 
 describe('followEntries', () => {
 	it('maps weekday to weekday with the target dates', () => {
-		const r = followEntries(source, target(), true);
+		const r = followEntries(source, target(), true, false);
 		expect(r.entries.map((e) => e.date)).toEqual([date(0), date(1), date(2)]);
 		expect(r.entries[0]).toMatchObject({ mode: 'office', plannedStart: '08:00', plannedEnd: '16:30', plannedBreakMinutes: 30 });
+	});
+	it('copies the full block list with block lists', () => {
+		const twoBlocks = source.map((d, i) => (i === 0 ? { ...d, breakMinutes: 0, blocks: [{ ...d.blocks[0], end: '12:00', kind: 'school' as const }, { ...d.blocks[0], start: '13:00', kind: 'work' as const }] } : d));
+		const r = followEntries(twoBlocks, target(), true, true);
+		expect(r.entries[0]).toMatchObject({ date: date(0), blocks: [{ start: '08:00', end: '12:00', kind: 'school' }, { start: '13:00', end: '16:30', kind: 'work' }] });
+		expect(r.entries[0]).not.toHaveProperty('plannedStart');
 	});
 	it('skips blocked target days', () => {
 		const r = followEntries(source, target({ 1: { blockedBy: 'holiday' } }), true);

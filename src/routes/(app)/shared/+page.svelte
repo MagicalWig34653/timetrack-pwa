@@ -10,7 +10,8 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
-	import { PLAN_CLASSES, planModeLabel, SHARE_SCOPE_KEYS, scopeLabel } from '#lib/planning/labels.js';
+	import { BLOCK_KIND_CLASSES, blockKindLabel, PLAN_CLASSES, planModeLabel, SHARE_SCOPE_KEYS, scopeLabel } from '#lib/planning/labels.js';
+	import BlockKindIcon from '#lib/components/week/BlockKindIcon.svelte';
 	import { addDays, formatDateNumeric, formatDateShort, isValidDate, localTimeOf, startOfWeek, todayLocal } from '#lib/time/dates.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
@@ -135,9 +136,23 @@
 								{:else}
 									<ul class="grid gap-1 text-sm sm:grid-cols-2" data-testid="shared-plan">
 										{#each view.plan as day (day.date)}
-											<li class="flex items-center justify-between gap-2 rounded border px-2 py-1">
-												<span class="tabular-nums">{formatDateShort(day.date)}</span>
-												<span class="rounded px-1.5 py-0.5 text-xs {PLAN_CLASSES[day.mode]}">{planModeLabel(day.mode)}</span>
+											<li class="flex flex-col gap-1 rounded border px-2 py-1" data-testid="shared-plan-day">
+												<span class="flex items-center justify-between gap-2">
+													<span class="tabular-nums">{formatDateShort(day.date)}</span>
+													<span class="rounded px-1.5 py-0.5 text-xs {PLAN_CLASSES[day.mode]}">{planModeLabel(day.mode)}</span>
+												</span>
+												{#if day.blocks && day.blocks.length > 0}
+													<!-- places and notes of the owner never reach a share view: start, end and kind only -->
+													<span class="flex flex-wrap gap-1" data-testid="shared-plan-blocks">
+														{#each day.blocks as block, n (n)}
+															<span class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs tabular-nums {BLOCK_KIND_CLASSES[block.kind]}" data-testid="shared-block" data-kind={block.kind}>
+																<BlockKindIcon kind={block.kind} class="size-3" />{blockKindLabel(block.kind)} {block.start}–{block.end}
+															</span>
+														{/each}
+													</span>
+												{:else if day.plannedStart && day.plannedEnd}
+													<span class="text-xs tabular-nums text-muted-foreground">{day.plannedStart}–{day.plannedEnd}</span>
+												{/if}
 											</li>
 										{/each}
 									</ul>

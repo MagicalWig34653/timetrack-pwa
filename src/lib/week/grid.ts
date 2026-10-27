@@ -76,17 +76,28 @@ export function moveRange(range: MinuteRange, deltaMinutes: number, step: number
 	return { start, end: start + duration };
 }
 
-/** One edge dragged to a new minute. The edge stops at the minimum duration instead of flipping. */
-export function resizeRange(range: MinuteRange, edge: 'start' | 'end', toMinute: number, step: number): MinuteRange {
+/**
+ * One edge dragged to a new minute. The edge stops at the minimum duration instead of flipping, and at `bounds` (the
+ * neighbouring blocks of the same day), so resizing never overlaps another block.
+ */
+export function resizeRange(range: MinuteRange, edge: 'start' | 'end', toMinute: number, step: number, bounds: MinuteRange = { start: 0, end: LAST_MINUTE }): MinuteRange {
 	const target = snap(toMinute, step);
-	if (edge === 'start') return { start: clamp(target, 0, range.end - MIN_BLOCK_MINUTES), end: range.end };
-	return { start: range.start, end: clamp(target, range.start + MIN_BLOCK_MINUTES, LAST_MINUTE) };
+	if (edge === 'start') return { start: clamp(target, bounds.start, range.end - MIN_BLOCK_MINUTES), end: range.end };
+	return { start: range.start, end: clamp(target, range.start + MIN_BLOCK_MINUTES, bounds.end) };
+}
+
+/** Largest minute shift (closest to `delta`) that keeps every range of a group inside the day, so a moved group keeps its shape. */
+export function clampGroupDelta(ranges: MinuteRange[], delta: number): number {
+	if (ranges.length === 0) return 0;
+	const lowest = -Math.min(...ranges.map((r) => r.start));
+	const highest = LAST_MINUTE - Math.max(...ranges.map((r) => r.end));
+	return clamp(delta, lowest, Math.max(lowest, highest));
 }
 
 /** Keyboard nudge of a whole range or one edge. */
-export function nudgeRange(range: MinuteRange, part: 'both' | 'start' | 'end', deltaMinutes: number): MinuteRange {
+export function nudgeRange(range: MinuteRange, part: 'both' | 'start' | 'end', deltaMinutes: number, bounds?: MinuteRange): MinuteRange {
 	if (part === 'both') return moveRange(range, deltaMinutes, 1);
-	return resizeRange(range, part, (part === 'start' ? range.start : range.end) + deltaMinutes, 1);
+	return resizeRange(range, part, (part === 'start' ? range.start : range.end) + deltaMinutes, 1, bounds);
 }
 
 export const rangesOverlap = (a: MinuteRange, b: MinuteRange) => a.start < b.end && b.start < a.end;

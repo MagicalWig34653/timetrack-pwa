@@ -7,6 +7,7 @@ import type {
 	AbsenceInput,
 	CalendarDay,
 	PlanDay,
+	PlanTimeBlock,
 	PlanMode,
 	Share,
 	ShareScopes,
@@ -18,6 +19,7 @@ import type {
 import { holidaysFor } from './holidays.ts';
 import { suggestVacation } from './vacation-suggestions.ts';
 import { daysBetween, modelForDate, type DerivedDayContext } from './evaluate.ts';
+import { blockSeconds, legacyBlocks, planHints, validateBlocks } from './plan-blocks.ts';
 
 export interface PlanningRequest {
 	method: string;
@@ -63,7 +65,6 @@ interface StoredShare extends Share {
 	ownerId: string;
 	recipientId: string;
 }
-
 const uuid = () => crypto.randomUUID();
 /** K1: server-side derivation of the planned seconds (end - start - break, never negative). */
 export function plannedSecondsOf(start?: string | null, end?: string | null, breakMinutes?: number | null): number | null {
@@ -77,21 +78,42 @@ export function plannedSecondsOf(start?: string | null, end?: string | null, bre
 	return Math.max(0, (to - from - (breakMinutes ?? 0)) * 60);
 }
 
-/** Validates and normalizes one plan day body (contract v0.17.0): both or neither time, start < end, break 0..600, off ignores times. */
+/**
+ * Validates and normalizes one plan day body (contract 0.35.0): with `blocks` the list wins (ordered, no overlap, at most
+ * 32, none for `off`) and the old window fields are derived from it; without it the old window is validated (both or
+ * neither time, start < end, break 0..600, off ignores times) and converted into blocks like the real server.
+ */
 export function normalizePlanBody(body: any): { day: Omit<PlanDay, 'date'> } | { error: string } {
 	if (!body || !PLAN_MODES.includes(body.mode) || (body.note != null && (typeof body.note !== 'string' || body.note.length > 200))) return { error: 'bad_request' };
 	const base = { mode: body.mode as PlanMode, placeId: body.placeId ?? null, note: body.note ?? null };
+	let start: string | null = null;
+	let end: string | null = null;
+	let breakMinutes: number | null = null;
+	let blocks: PlanTimeBlock[];
+	if (body.blocks !== undefined && body.blocks !== null) {
+		const checked = validateBlocks(body.mode, body.blocks);
+		if ('error' in checked) return checked;
+		({ blocks, start, end, breakMinutes } = checked);
+	} else {
+		const legacy = normalizeWindow(body);
+		if ('error' in legacy) return legacy;
+		({ start, end, breakMinutes } = legacy);
+		blocks = legacyBlocks(start, end, breakMinutes, body.mode, base.placeId, base.note);
+	}
+	const plannedSeconds = blocks.length > 0 ? blockSeconds(blocks) : plannedSecondsOf(start, end, breakMinutes);
+	return { day: { ...base, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes, plannedSeconds, blocks, planHints: planHints(blocks) } };
+}
+
+/** The old window fields of a write (before blocks): both or neither time, start < end, break 0..600, mode off ignores everything. */
+function normalizeWindow(body: any): { start: string | null; end: string | null; breakMinutes: number | null } | { error: string } {
 	const start = body.plannedStart ?? null;
 	const end = body.plannedEnd ?? null;
 	const breakMinutes = body.plannedBreakMinutes ?? null;
-	if (body.mode === 'off') return { day: { ...base, plannedStart: null, plannedEnd: null, plannedBreakMinutes: null, plannedSeconds: null } };
-	if (start === null && end === null) {
-		if (breakMinutes !== null) return { error: 'plan_break_invalid' };
-		return { day: { ...base, plannedStart: null, plannedEnd: null, plannedBreakMinutes: null, plannedSeconds: null } };
-	}
+	if (body.mode === 'off') return { start: null, end: null, breakMinutes: null };
+	if (start === null && end === null) return breakMinutes !== null ? { error: 'plan_break_invalid' } : { start: null, end: null, breakMinutes: null };
 	if (typeof start !== 'string' || typeof end !== 'string' || plannedSecondsOf(start, end, 0) === null) return { error: 'plan_time_invalid' };
 	if (breakMinutes !== null && !(Number.isInteger(breakMinutes) && breakMinutes >= 0 && breakMinutes <= 600)) return { error: 'plan_break_invalid' };
-	return { day: { ...base, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes, plannedSeconds: plannedSecondsOf(start, end, breakMinutes) } };
+	return { start, end, breakMinutes };
 }
 
 const fail = (status: number, code: string, message = code): PlanningResponse => ({ status, body: { error: { code, message } } });
@@ -366,7 +388,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const state = stateOf(share.ownerId);
 		const view: SharedView = {};
 		if (share.scopes.plan) {
-			view.plan = [...state.plan.values()].filter((p) => p.date >= from && p.date <= to).sort((a, b) => a.date.localeCompare(b.date)).map((p) => ({ date: p.date, mode: p.mode, ...(p.plannedStart ? { plannedStart: p.plannedStart, plannedEnd: p.plannedEnd!, ...(p.plannedBreakMinutes != null ? { plannedBreakMinutes: p.plannedBreakMinutes } : {}), plannedSeconds: p.plannedSeconds ?? 0 } : {}) }));
+			view.plan = [...state.plan.values()].filter((p) => p.date >= from && p.date <= to).sort((a, b) => a.date.localeCompare(b.date)).map((p) => ({ date: p.date, mode: p.mode, ...(p.plannedStart ? { plannedStart: p.plannedStart, plannedEnd: p.plannedEnd!, ...(p.plannedBreakMinutes != null ? { plannedBreakMinutes: p.plannedBreakMinutes } : {}), plannedSeconds: p.plannedSeconds ?? 0 } : {}), blocks: (p.blocks ?? []).map(({ start, end, kind }) => ({ start, end, kind })) }));
 		}
 		if (share.scopes.actual) {
 			view.actual = daysBetween(from, to)
@@ -397,8 +419,10 @@ export function createPlanningMock(deps: PlanningDeps) {
 		add({ kind: 'vacation', startDate: addDays(monday, 14), endDate: addDays(monday, 18), status: 'approved' });
 		add({ kind: 'vacation', startDate: addDays(monday, 42), endDate: addDays(monday, 44), halfDayEnd: true, status: 'planned' });
 		state.customDays.push({ id: uuid(), kind: 'school_holiday', startDate: addDays(monday, 21), endDate: addDays(monday, 25), name: 'Berufsschulferien', source: 'custom' });
-		const put = (date: string, mode: PlanMode, start: string | null, end: string | null, breakMinutes: number | null, note: string | null = null) =>
-			state.plan.set(date, { date, mode, placeId: null, note, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes, plannedSeconds: plannedSecondsOf(start, end, breakMinutes) });
+		const put = (date: string, mode: PlanMode, start: string | null, end: string | null, breakMinutes: number | null, note: string | null = null) => {
+			const normalized = normalizePlanBody({ mode, note, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes });
+			if ('day' in normalized) state.plan.set(date, { date, ...normalized.day });
+		};
 		put(addDays(monday, 0), 'office', '08:00', '16:30', 30);
 		put(addDays(monday, 1), 'office', '08:00', '16:30', 30);
 		put(addDays(monday, 2), 'home', '08:30', '17:00', 30);

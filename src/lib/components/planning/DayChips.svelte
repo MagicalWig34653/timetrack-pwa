@@ -4,6 +4,7 @@
 	import type { DayInfo } from '#lib/planning/calendar.js';
 	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS } from '#lib/planning/labels.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
+	import { listsBlocks } from '#lib/week/plan-blocks.js';
 
 	let { info, compact = false, hidden = new Set<string>(), draggable = false }: { info: DayInfo; compact?: boolean; hidden?: Set<string>; draggable?: boolean } = $props();
 
@@ -37,7 +38,7 @@
 	{/each}
 	{#if info.plan && !hidden.has('plan')}
 		<span class="{chip} {PLAN_CLASSES[info.plan.mode]}" data-chip="plan">
-			{planModeLabel(info.plan.mode)}{#if !compact && info.plan.plannedStart && info.plan.plannedEnd}<span class="tabular-nums"> {info.plan.plannedStart}–{info.plan.plannedEnd}</span>{/if}
+			{planModeLabel(info.plan.mode)}{#if !compact && info.plan.plannedStart && info.plan.plannedEnd}<span class="tabular-nums"> {info.plan.plannedStart}–{info.plan.plannedEnd}</span>{#if listsBlocks(info.plan.blocks)}<span> · {t('calendar.plan_blocks', { count: info.plan.blocks?.length ?? 0 })}</span>{/if}{/if}
 		</span>
 	{/if}
 	{#if worked > 0 && !hidden.has('worked')}

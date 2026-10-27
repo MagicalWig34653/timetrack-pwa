@@ -37,9 +37,12 @@
 				mode,
 				placeId: placeId || null,
 				note: note.trim() || null,
-				...(initial?.plannedStart && initial.plannedEnd
-					? { plannedStart: initial.plannedStart, plannedEnd: initial.plannedEnd, plannedBreakMinutes: initial.plannedBreakMinutes ?? null }
-					: {})
+				...(initial && Array.isArray(initial.blocks) && initial.blocks.length > 0
+					? // contract 0.35.0: carry the block list over (a free day takes none)
+						{ blocks: mode === 'off' ? [] : initial.blocks.map((b) => ({ start: b.start, end: b.end, kind: b.kind, placeId: b.placeId ?? null, note: b.note ?? null })) }
+					: initial?.plannedStart && initial.plannedEnd
+						? { plannedStart: initial.plannedStart, plannedEnd: initial.plannedEnd, plannedBreakMinutes: initial.plannedBreakMinutes ?? null }
+						: {})
 			});
 			onsaved();
 		} catch (e) {

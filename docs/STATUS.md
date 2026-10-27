@@ -1,5 +1,8 @@
 # Stand der PWA – 26.10.2026 (Paket P15 im Worktree, uncommittet)
 
+## Paket P13-pwa (27.10.2026, Branch p13-plan-blocks, nicht gemergt)
+Planer (Raster und Liste) mit mehreren Planblöcken pro Tag (Vertrag 0.35.0, ADR-0031): Malen/Teilen/Pause/Verbinden mit Arten (Farbe, Icon, Muster, Tastatur), ganze Blockliste beim Speichern, Planungshinweise, Wochenkarten und Tagesdetail mit Blöcken und Plan-Ist-Differenz, Freigabe ohne Ort/Notiz, Rückfall auf den Einzelblock bei API < 0.35.0, Mock validiert wie das Backend. Details: `docs/handoffs/P13-pwa.md`.
+
 ## Paket N3-pwa (26.10.2026, Branch n3-week-vacation, nicht gemergt)
 Urlaub (geplant/beantragt/genehmigt, auch Halbtage) erscheint in der Wochenübersicht als Icon-Chip (schraffiert bis genehmigt) mit Tooltip/aria-Text, im Tagesdetail mit Link zur Urlaubsübersicht; falscher Warn-Chip an freien Tagen entfernt. Details: `docs/handoffs/N3-pwa.md`.
 

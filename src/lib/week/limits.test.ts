@@ -7,7 +7,8 @@ const date = (i: number) => `2026-10-${26 + i}`;
 const days = (blocked: Record<number, PlanWeekDay['blockedBy']> = {}): PlanWeekDay[] =>
 	Array.from({ length: 7 }, (_, i) => ({ date: date(i), weekday: i + 1, targetSeconds: i < 5 ? 27_720 : 0, plannedSeconds: null, blockedBy: blocked[i] ?? null, plan: null }));
 const week = (over: Record<number, Partial<DayDraft>> = {}): DayDraft[] => Array.from({ length: 7 }, (_, i) => ({ ...emptyDraft(date(i)), ...over[i] }));
-const block = (start: string, end: string, breakMinutes: number): Partial<DayDraft> => ({ mode: 'office', start, end, breakMinutes });
+const block = (start: string, end: string, breakMinutes: number): Partial<DayDraft> => ({ mode: 'office', blocks: [{ start, end, kind: 'office', placeId: null, note: '' }], breakMinutes });
+const blk = (start: string, end: string, kind: DayDraft['blocks'][number]['kind'] = 'work') => ({ start, end, kind, placeId: null, note: '' });
 
 describe('requiredBreak', () => {
 	it('follows the thresholds of the adult profile', () => {
@@ -46,5 +47,28 @@ describe('weekIssues', () => {
 	it('ignores blocked days and notes work on a non-working day', () => {
 		const issues = weekIssues(days({ 0: 'holiday' }), week({ 0: block('00:00', '23:00', 0), 5: block('08:00', '10:00', 0) }));
 		expect(issues).toEqual([{ date: date(5), kind: 'non_working', severity: 'info' }]);
+	});
+});
+
+describe('weekIssues with block lists', () => {
+	const adult = (blocks: DayDraft['blocks']) => week({ 0: { mode: 'office', blocks } });
+	it('counts the sum of the blocks as net time and the gaps as breaks', () => {
+		const issues = weekIssues(days(), adult([blk('06:00', '12:00'), blk('12:30', '18:30')]), () => ADULT_PROFILE, true);
+		expect(issues).toContainEqual({ date: date(0), kind: 'daily_max', severity: 'warn', value: 12 * 60 });
+	});
+	it('leaves the adult break rule to the planning hints, other profiles keep break_short', () => {
+		const blocks = [blk('08:00', '16:30')];
+		expect(weekIssues(days(), adult(blocks), () => ADULT_PROFILE, true).some((i) => i.kind === 'break_short')).toBe(false);
+		const minor = { ...ADULT_PROFILE, id: 'jarbschg-minor-de' as const, breakRules: [{ afterSeconds: 4.5 * 3600, requiredSeconds: 1800 }] };
+		expect(weekIssues(days(), adult(blocks), () => minor, true)).toContainEqual({ date: date(0), kind: 'break_short', severity: 'warn', value: 30 });
+	});
+	it('does not count school time as working time for the break rule and the weekend rule', () => {
+		const minor = { ...ADULT_PROFILE, id: 'jarbschg-minor-de' as const, breakRules: [{ afterSeconds: 4.5 * 3600, requiredSeconds: 1800 }], restrictedWeekdays: [1] };
+		const schoolOnly = weekIssues(days(), adult([blk('08:00', '15:00', 'school')]), () => minor, true);
+		expect(schoolOnly.some((i) => i.kind === 'break_short' || i.kind === 'weekend_work')).toBe(false);
+	});
+	it('takes the first start and the last end of the blocks for the rest time', () => {
+		const week2 = week({ 0: { mode: 'office', blocks: [blk('08:00', '12:00'), blk('18:00', '22:00')] }, 1: { mode: 'office', blocks: [blk('06:00', '10:00')] } });
+		expect(weekIssues(days(), week2, () => ADULT_PROFILE, true)).toContainEqual({ date: date(1), kind: 'rest_short', severity: 'warn', value: 8 * 60 });
 	});
 });

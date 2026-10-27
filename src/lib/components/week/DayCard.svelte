@@ -12,6 +12,9 @@
 	import TreePalm from '@lucide/svelte/icons/tree-palm';
 	import HolidayBadge from './HolidayBadge.svelte';
 	import MarkIcon from './MarkIcon.svelte';
+	import BlockKindIcon from './BlockKindIcon.svelte';
+	import { BLOCK_KIND_CLASSES, blockKindLabel } from '#lib/planning/labels.js';
+	import { listsBlocks } from '#lib/week/plan-blocks.js';
 
 	/** One day of the week overview: weekday and date, mark, hours, worked/planned/target bar, balance, first start to last end. */
 	let { day, timeZone, href = `/time/${day.date}`, selected = false, review = false, vacation = null, onselect }: { day: TimeWeekDay; timeZone: string; /** vacation entries of this day from the absence list; null = not loaded (fall back to the week's own absences) */ vacation?: VacationEntry[] | null; href?: string; selected?: boolean; /** has entries that need a check */ review?: boolean; onselect?: () => void } = $props();
@@ -32,6 +35,8 @@
 	const halfDay = $derived(day.mark === 'vacation' && day.absences.some((a) => a.kind === 'vacation' && a.halfDay));
 	const showHours = $derived(hours > 0 || day.isToday || (!day.isFuture && day.mark === 'work' && day.targetSeconds > 0));
 	const showMode = $derived(!!day.planMode && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark));
+	/** The plan blocks of a day, only when the plan has more than the one window the card already summarizes. */
+	const planBlocks = $derived(listsBlocks(day.planBlocks) ? [...(day.planBlocks ?? [])].sort((a, b) => a.start.localeCompare(b.start)) : []);
 	const dim = $derived(day.mark === 'off' && hours === 0 && day.plannedSeconds === null);
 </script>
 
@@ -102,11 +107,22 @@
 		{:else if day.plannedSeconds}
 			<span class="mt-1 block text-[11px] text-muted-foreground tabular-nums">{t('weekview.planned', { time: timeDisplay.duration(day.plannedSeconds) })}</span>
 		{/if}
+		{#if planBlocks.length > 0}
+			<!-- every plan block of the day (contract 0.35.0): kind icon, label and times; colour is never the only signal -->
+			<span class="mt-1.5 flex flex-wrap gap-1" data-testid="day-blocks">
+				{#each planBlocks as block, n (n)}
+					<span class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] tabular-nums {BLOCK_KIND_CLASSES[block.kind]}" data-testid="day-block" data-kind={block.kind}><BlockKindIcon kind={block.kind} class="size-3" />{blockKindLabel(block.kind)} {block.start}–{block.end}</span>
+				{/each}
+			</span>
+		{/if}
 	</span>
 
 	<span class="balance flex flex-wrap items-center gap-1.5 text-xs">
 		{#if day.balanceSeconds !== null && (day.targetSeconds > 0 || hours > 0)}
 			<StatusChip tone={balanceTone(day.balanceSeconds)} dot={false}>{timeDisplay.delta(day.balanceSeconds)}</StatusChip>
+		{/if}
+		{#if day.planActualDifferenceSeconds !== null && day.planActualDifferenceSeconds !== undefined}
+			<span title={t('weekview.plan_diff_title')} data-testid="day-plan-diff"><StatusChip tone="neutral" dot={false}>{t('weekview.plan_diff', { delta: day.planActualDifferenceSeconds === 0 ? '±0' : timeDisplay.delta(day.planActualDifferenceSeconds) })}</StatusChip></span>
 		{/if}
 		{#if review}<StatusChip tone="warning" dot={false}>{t('segments.needs_review')}</StatusChip>{/if}
 		{#if showMode && day.planMode}<span class="text-muted-foreground">{planModeLabel(day.planMode)}</span>{/if}

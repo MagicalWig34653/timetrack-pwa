@@ -19,6 +19,7 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { planModeLabel } from '#lib/planning/labels.js';
+	import { blocksTimesText, listsBlocks } from '#lib/week/plan-blocks.js';
 	import CalendarClock from '@lucide/svelte/icons/calendar-clock';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { sessionStore } from '#lib/session.svelte.js';
@@ -155,7 +156,7 @@
 				<CalendarClock class="size-4 shrink-0" aria-hidden="true" />
 				<span>
 					{#if todayPlan.plannedStart && todayPlan.plannedEnd}
-						{t('home.plan_today', { time: `${todayPlan.plannedStart}–${todayPlan.plannedEnd}`, mode: planModeLabel(todayPlan.mode) })}
+						{t('home.plan_today', { time: listsBlocks(todayPlan.blocks) ? blocksTimesText(todayPlan.blocks ?? []) : `${todayPlan.plannedStart}–${todayPlan.plannedEnd}`, mode: planModeLabel(todayPlan.mode) })}
 					{:else}
 						{t('home.plan_today_no_time', { mode: planModeLabel(todayPlan.mode) })}
 					{/if}

@@ -1,4 +1,4 @@
-import type { Absence, AbsenceInput, AbsenceKind, AbsenceStatus, PlanDay, PlanDayInput, PlanMode } from '#lib/api/types.js';
+import type { Absence, AbsenceInput, AbsenceKind, AbsenceStatus, PlanDay, PlanDayInput, PlanMode, PlanTimeBlock } from '#lib/api/types.js';
 import type { MessageKey } from '#lib/i18n/index.js';
 import { isValidDate } from '#lib/time/dates.js';
 import { covers } from './calendar.js';
@@ -19,6 +19,12 @@ export interface DialogForm {
 	plannedStart: string;
 	plannedEnd: string;
 	breakMinutes: string;
+	/**
+	 * Blocks of the plan being edited (contract 0.35.0). They are written back unchanged while the window fields still show
+	 * the values derived from them; touching start, end or break replaces them with the single window.
+	 */
+	blocks: PlanTimeBlock[] | null;
+	blocksWindow: string;
 	note: string;
 	status: AbsenceStatus;
 	halfDayStart: boolean;
@@ -39,6 +45,11 @@ export type DialogResult =
 	| { type: 'plan'; dates: string[]; input: PlanDayInput }
 	| { type: 'absence'; runs: DateRange[]; template: Omit<AbsenceInput, 'startDate' | 'endDate'>; editing: Absence | null };
 
+const windowKey = (start: string, end: string, pause: string) => `${start}|${end}|${pause.trim()}`;
+
+/** True while the plan's block list is untouched: the window fields still equal the ones derived from the blocks. */
+export const keepsBlocks = (form: DialogForm) => form.blocks !== null && windowKey(form.plannedStart, form.plannedEnd, String(form.breakMinutes)) === form.blocksWindow;
+
 export function formFromSeed(seed: DialogSeed): DialogForm {
 	const absence = seed.absence ?? null;
 	const plan = seed.plan ?? null;
@@ -53,6 +64,8 @@ export function formFromSeed(seed: DialogSeed): DialogForm {
 		plannedStart: plan?.plannedStart ?? '',
 		plannedEnd: plan?.plannedEnd ?? '',
 		breakMinutes: plan?.plannedBreakMinutes != null ? String(plan.plannedBreakMinutes) : '',
+		blocks: plan && Array.isArray(plan.blocks) && plan.blocks.length > 0 ? plan.blocks : null,
+		blocksWindow: windowKey(plan?.plannedStart ?? '', plan?.plannedEnd ?? '', plan?.plannedBreakMinutes != null ? String(plan.plannedBreakMinutes) : ''),
 		note: absence?.note ?? plan?.note ?? '',
 		status: absence?.status ?? 'planned',
 		halfDayStart: absence?.halfDayStart ?? false,
@@ -108,7 +121,9 @@ export function buildResult(form: DialogForm, ctx: ConflictContext, editing: Abs
 			mode: form.mode,
 			placeId: form.placeId || null,
 			note: form.note.trim() || null,
-			...(timed ? { plannedStart: form.plannedStart, plannedEnd: form.plannedEnd, plannedBreakMinutes: pause === '' ? null : Number(form.breakMinutes) } : {})
+			...(form.mode !== 'off' && keepsBlocks(form)
+				? { blocks: form.blocks!.map((b) => ({ start: b.start, end: b.end, kind: b.kind, placeId: b.placeId ?? null, note: b.note ?? null })) }
+				: timed ? { plannedStart: form.plannedStart, plannedEnd: form.plannedEnd, plannedBreakMinutes: pause === '' ? null : Number(form.breakMinutes) } : {})
 		};
 		return { ok: true, result: { type: 'plan', dates, input } };
 	}

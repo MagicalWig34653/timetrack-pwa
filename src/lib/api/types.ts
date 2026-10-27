@@ -633,8 +633,25 @@ export interface CustomDayInput {
 
 export type PlanMode = 'office' | 'home' | 'customer' | 'school' | 'off';
 
+/** Contract 0.35.0 (P13, ADR-0031): kind of one plan block. */
+export type PlanBlockKind = 'work' | 'school' | 'travel' | 'office' | 'home' | 'customer';
+
+/** Contract 0.35.0: one time block of a plan day; local wall-clock "HH:mm", start < end, no overlap, max 32 per day. */
+export interface PlanTimeBlock {
+	start: string;
+	end: string;
+	kind: PlanBlockKind;
+	placeId?: string | null;
+	note?: string | null;
+}
+
+/** Contract 0.35.0: non-binding planning hints derived from the plan blocks (German texts in the UI). */
+export type PlanHint = 'planned_break_short' | 'planned_work_stretch_long' | 'planned_break_part_short';
+
 export interface PlanDayInput {
 	mode: PlanMode;
+	/** Contract 0.35.0: complete, chronological block list; wins over plannedStart/plannedEnd/plannedBreakMinutes. */
+	blocks?: PlanTimeBlock[];
 	placeId?: string | null;
 	note?: string | null;
 	/** Contract v0.17.0 (K1): rough planned window as local wall-clock "HH:mm"; both or neither, start < end. */
@@ -646,8 +663,10 @@ export interface PlanDayInput {
 
 export interface PlanDay extends PlanDayInput {
 	date: string;
-	/** Derived by the server: end - start - break, never negative; null without times. */
+	/** Derived by the server: end - start - break, never negative; null without times. With blocks: the sum of the block durations. */
 	plannedSeconds?: number | null;
+	/** Contract 0.35.0: absent on older servers. */
+	planHints?: PlanHint[];
 }
 
 /** Contract v0.17.0 (K1): why a day cannot take a plan. */
@@ -698,6 +717,11 @@ export interface TimeWeekDay {
 	targetSeconds: number;
 	plannedSeconds: number | null;
 	planMode: PlanMode | null;
+	/** Contract 0.35.0: the plan blocks of the day (null without a plan); absent on older servers. */
+	planBlocks?: PlanTimeBlock[] | null;
+	planHints?: PlanHint[];
+	/** Contract 0.35.0: evaluated work + credit - effective planned seconds; null for future or blocked days or without a planned duration. */
+	planActualDifferenceSeconds?: number | null;
 	workSeconds: number;
 	creditSeconds: number;
 	rawWorkSeconds: number;
@@ -768,7 +792,8 @@ export interface IncomingShare {
 }
 
 export interface SharedView {
-	plan?: { date: string; mode: PlanMode; plannedStart?: string; plannedEnd?: string; plannedBreakMinutes?: number; plannedSeconds?: number }[];
+	/** `blocks` (contract 0.35.0) carry start, end and kind only: places and notes never reach a share view. */
+	plan?: { date: string; mode: PlanMode; plannedStart?: string; plannedEnd?: string; plannedBreakMinutes?: number; plannedSeconds?: number; blocks?: { start: string; end: string; kind: PlanBlockKind }[] }[];
 	actual?: { date: string; evaluatedStart?: string | null; evaluatedEnd?: string | null; evaluatedWorkSeconds: number }[];
 	vacation?: { startDate: string; endDate: string }[];
 }

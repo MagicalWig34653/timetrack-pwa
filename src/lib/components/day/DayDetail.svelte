@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '#lib/api/client.js';
-	import type { Absence, CalendarDay, DayEvaluation, Place, PlanDay } from '#lib/api/types.js';
+	import type { Absence, CalendarDay, DayEvaluation, Place, PlanDay, TimeWeekDay } from '#lib/api/types.js';
 	import DayPanel from '#lib/components/planning/DayPanel.svelte';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { dayInfo } from '#lib/planning/calendar.js';
@@ -19,9 +19,10 @@
 		places = null,
 		heading = true,
 		refresh = 0,
+		weekDay = null,
 		onchanged,
 		onclose
-	}: { date: string; places?: Place[] | null; heading?: boolean; /** bumped by the host after it wrote something that affects this day */ refresh?: number; onchanged?: () => void; onclose?: () => void } = $props();
+	}: { date: string; places?: Place[] | null; heading?: boolean; /** bumped by the host after it wrote something that affects this day */ refresh?: number; /** the day from the week overview (plan hints, plan-vs-actual difference) */ weekDay?: TimeWeekDay | null; onchanged?: () => void; onclose?: () => void } = $props();
 
 	let holidays = $state<CalendarDay[]>([]);
 	let absences = $state<Absence[]>([]);
@@ -73,7 +74,7 @@
 
 <div class="flex flex-col gap-4" data-testid="day-detail" data-date={date}>
 	{#if !planningOff && planningReady}
-		<DayPanel {info} places={places ?? ownPlaces} {heading} {onclose} onchanged={planningChanged} />
+		<DayPanel {info} places={places ?? ownPlaces} {heading} {weekDay} {onclose} onchanged={planningChanged} />
 	{:else if heading}
 		<h2 class="text-lg font-medium">{formatDateLong(date)}</h2>
 	{/if}

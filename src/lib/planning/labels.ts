@@ -1,17 +1,21 @@
 import { t } from '#lib/i18n/index.js';
 import type { DayWorkState } from '#lib/planning/calendar.js';
-import type { AbsenceKind, AbsenceStatus, DocumentStatus, PlanMode, ShareScopes } from '#lib/api/types.js';
+import type { AbsenceKind, AbsenceStatus, DocumentStatus, PlanBlockKind, PlanHint, PlanMode, ShareScopes } from '#lib/api/types.js';
 
 export const ABSENCE_KINDS: AbsenceKind[] = ['vacation', 'sick', 'excused', 'other'];
 export const ABSENCE_STATUSES: AbsenceStatus[] = ['planned', 'requested', 'approved', 'taken', 'rejected', 'cancelled'];
 export const DOCUMENT_STATUSES: DocumentStatus[] = ['not_needed', 'pending', 'submitted'];
 export const PLAN_MODES: PlanMode[] = ['office', 'home', 'customer', 'school', 'off'];
+/** Kinds of a plan block (contract 0.35.0), in the order of the brush. */
+export const BLOCK_KINDS: PlanBlockKind[] = ['work', 'school', 'travel', 'office', 'home', 'customer'];
 export const SHARE_SCOPE_KEYS: (keyof ShareScopes)[] = ['plan', 'actual', 'vacation'];
 
 export const absenceKindLabel = (kind: AbsenceKind) => t(`absence.kind.${kind}`);
 export const absenceStatusLabel = (status: AbsenceStatus) => t(`absence.status.${status}`);
 export const documentStatusLabel = (status: DocumentStatus) => t(`absence.document.${status}`);
 export const planModeLabel = (mode: PlanMode) => t(`plan.mode.${mode}`);
+export const blockKindLabel = (kind: PlanBlockKind) => t(`plan.kind.${kind}`);
+export const planHintLabel = (hint: PlanHint) => t(`plan.hint.${hint}`);
 export const scopeLabel = (scope: keyof ShareScopes) => t(`share.scope.${scope}`);
 
 /** Statuses that count as booked / planned vacation (ADR-0005). */
@@ -32,6 +36,15 @@ export const PLAN_CLASSES: Record<PlanMode, string> = {
 	customer: 'bg-orange-500/15 text-orange-900 dark:text-orange-200',
 	school: 'bg-indigo-500/15 text-indigo-900 dark:text-indigo-200',
 	off: 'bg-muted text-muted-foreground'
+};
+
+export const BLOCK_KIND_CLASSES: Record<PlanBlockKind, string> = {
+	work: 'bg-blue-500/15 text-blue-900 dark:text-blue-200',
+	school: PLAN_CLASSES.school,
+	travel: 'bg-yellow-500/20 text-yellow-900 dark:text-yellow-200',
+	office: PLAN_CLASSES.office,
+	home: PLAN_CLASSES.home,
+	customer: PLAN_CLASSES.customer
 };
 
 export const HOLIDAY_CLASS = 'bg-amber-500/20 text-amber-900 dark:text-amber-200';

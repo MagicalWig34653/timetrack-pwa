@@ -200,7 +200,7 @@
 					<Button variant="outline" size="sm" href="/time/{selectedDate}" data-testid="week-day-open">{t('n2.day_open_page')}</Button>
 				</div>
 				{#key selectedDate}
-					<DayDetail date={selectedDate} heading={false} onchanged={() => void fetchWeek(isoWeek, true)} />
+					<DayDetail date={selectedDate} heading={false} weekDay={allDays.find((d) => d.date === selectedDate) ?? null} onchanged={() => void fetchWeek(isoWeek, true)} />
 				{/key}
 			</section>
 		{:else if allDays.length > 0}

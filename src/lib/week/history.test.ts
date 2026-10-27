@@ -3,8 +3,9 @@ import { DraftHistory } from './history.js';
 import { emptyDraft, type DayDraft } from './plan-draft.js';
 
 const a: DayDraft[] = [emptyDraft('2026-10-26')];
-const b: DayDraft[] = [{ ...emptyDraft('2026-10-26'), mode: 'office', start: '08:00', end: '16:00' }];
-const c: DayDraft[] = [{ ...b[0], end: '17:00' }];
+const blk = (start: string, end: string) => ({ start, end, kind: 'office' as const, placeId: null, note: '' });
+const b: DayDraft[] = [{ ...emptyDraft('2026-10-26'), mode: 'office', blocks: [blk('08:00', '16:00')] }];
+const c: DayDraft[] = [{ ...b[0], blocks: [blk('08:00', '17:00')] }];
 
 describe('DraftHistory', () => {
 	it('undoes and redoes in order with labels', () => {
