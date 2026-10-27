@@ -136,8 +136,11 @@ export function setModuleDisabledHandler(handler: (() => void) | null): void {
 }
 
 export function setCsrfToken(token: string | null): void {
+	// A session refresh with the same token (route changes re-read the session) must not drop the read cache;
+	// login, logout and account switch change the token.
+	const changed = token !== csrfToken;
 	csrfToken = token;
-	invalidateReadCache();
+	if (changed) invalidateReadCache();
 }
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -258,12 +261,15 @@ export function retryAfterMs(header: string | null, now = Date.now()): number | 
 /** Short-lived cache for expensive, rarely changing reads (time account); any successful write clears it. */
 const readCache = new Map<string, { at: number; value: Promise<unknown> }>();
 const READ_CACHE_TTL_MS = 30_000;
+/** Slow-changing reference data (holidays, places, work models, legal profiles): kept across week switches. */
+const STATIC_CACHE_TTL_MS = 5 * 60_000;
 export function invalidateReadCache(): void {
 	readCache.clear();
 }
-function cachedRead<T>(key: string, load: () => Promise<T>): Promise<T> {
+/** Cached (and in-flight deduplicated) read; every successful write, login and logout clears the cache. */
+export function cachedRead<T>(key: string, load: () => Promise<T>, ttlMs = READ_CACHE_TTL_MS): Promise<T> {
 	const hit = readCache.get(key);
-	if (hit && Date.now() - hit.at < READ_CACHE_TTL_MS) return hit.value as Promise<T>;
+	if (hit && Date.now() - hit.at < ttlMs) return hit.value as Promise<T>;
 	const value = load();
 	readCache.set(key, { at: Date.now(), value });
 	value.catch(() => readCache.delete(key));
@@ -450,8 +456,8 @@ export const api = {
 	revokeInvitation: (id: string) => request<void>('DELETE', `/admin/invitations/${id}`),
 
 	// work models
-	listWorkModels: () => request<WorkModel[]>('GET', '/work-models'),
-	listLegalProfiles: () => request<LegalProfile[]>('GET', '/legal-profiles'),
+	listWorkModels: () => cachedRead('work-models', () => request<WorkModel[]>('GET', '/work-models'), STATIC_CACHE_TTL_MS),
+	listLegalProfiles: () => cachedRead('legal-profiles', () => request<LegalProfile[]>('GET', '/legal-profiles'), STATIC_CACHE_TTL_MS),
 	createWorkModel: (input: WorkModelInput) => request<WorkModel>('POST', '/work-models', input),
 	/** Contract v0.16.0: replaces every editable field of one version (the evaluation of its days changes). */
 	correctWorkModel: (id: string, input: WorkModelInput, version?: number) =>
@@ -460,7 +466,7 @@ export const api = {
 	endWorkModel: (id: string, validTo: string) => request<WorkModel>('PATCH', `/work-models/${id}`, { validTo }),
 
 	// places
-	listPlaces: () => request<Place[]>('GET', '/places'),
+	listPlaces: () => cachedRead('places', () => request<Place[]>('GET', '/places'), STATIC_CACHE_TTL_MS),
 	createPlace: (input: PlaceInput) => request<Place>('POST', '/places', input),
 	updatePlace: (id: string, input: PlaceInput) => request<Place>('PUT', `/places/${id}`, input),
 	archivePlace: (id: string) => request<void>('DELETE', `/places/${id}`),
@@ -513,8 +519,8 @@ export const api = {
 
 	// day evaluations and time account
 	/** time/days allows at most 93 days per request (range_too_large); longer ranges are loaded in chunks. */
-	listDays: async (from: string, to: string) =>
-		(await Promise.all(splitRange(from, to, MAX_DAYS_EVALUATIONS).map((r) => request<DayEvaluation[]>('GET', `/time/days?from=${r.from}&to=${r.to}`)))).flat(),
+	listDays: (from: string, to: string) =>
+		cachedRead(`days:${from}:${to}`, async () => (await Promise.all(splitRange(from, to, MAX_DAYS_EVALUATIONS).map((r) => request<DayEvaluation[]>('GET', `/time/days?from=${r.from}&to=${r.to}`)))).flat()),
 	getDay: (date: string) => request<DayEvaluation>('GET', `/time/days/${date}`),
 	setDayPreferences: (date: string, input: DayPreferences) =>
 		request<DayEvaluation>('PUT', `/time/days/${date}`, input),
@@ -571,9 +577,9 @@ export const api = {
 
 	// absences; `ifMatchVersion` becomes the If-Match header; ranges above 366 days are loaded in chunks
 	// `hasAttachment` is the contract 0.24.0 server filter (older servers ignore it and return everything)
-	listAbsences: async (from: string, to: string, options: { hasAttachment?: boolean } = {}) => {
+	listAbsences: (from: string, to: string, options: { hasAttachment?: boolean } = {}) => {
 		const filter = options.hasAttachment === undefined ? '' : `&hasAttachment=${options.hasAttachment}`;
-		return (await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<Absence[]>('GET', `/absences?from=${r.from}&to=${r.to}${filter}`)))).flat();
+		return cachedRead(`absences:${from}:${to}${filter}`, async () => (await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<Absence[]>('GET', `/absences?from=${r.from}&to=${r.to}${filter}`)))).flat());
 	},
 	getAbsence: (id: string) => request<Absence>('GET', `/absences/${id}`),
 	createAbsence: (input: AbsenceInput) => request<Absence>('POST', '/absences', input),
@@ -583,7 +589,7 @@ export const api = {
 
 	// calendar and plan
 	listHolidays: (year: number, region?: string) =>
-		request<CalendarDay[]>('GET', `/calendar/holidays?year=${year}${region ? `&region=${encodeURIComponent(region)}` : ''}`),
+		cachedRead(`holidays:${year}:${region ?? ''}`, () => request<CalendarDay[]>('GET', `/calendar/holidays?year=${year}${region ? `&region=${encodeURIComponent(region)}` : ''}`), STATIC_CACHE_TTL_MS),
 	createCustomDay: (input: CustomDayInput) => request<CalendarDay>('POST', '/calendar/custom-days', input),
 	deleteCustomDay: (id: string) => request<void>('DELETE', `/calendar/custom-days/${id}`),
 	listPlanDays: async (from: string, to: string) =>

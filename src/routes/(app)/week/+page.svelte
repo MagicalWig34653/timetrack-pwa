@@ -25,6 +25,7 @@
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { entriesForDay, vacationByDay } from '#lib/week/vacation.js';
 	import { absenceRuns, absenceWarning, hasOpenAbsence } from '#lib/week/absences.js';
+	import { prefetchAdjacentWeeks } from '#lib/week/prefetch.js';
 	import { recalledWeek, rememberWeek } from '#lib/week/last-week.js';
 	import { ABSENCE_CLASSES, absenceKindLabel } from '#lib/planning/labels.js';
 	import { isEmptyWeek, summarySentence } from '#lib/week/overview.js';
@@ -43,7 +44,7 @@
 	import Trophy from '@lucide/svelte/icons/trophy';
 	import Target from '@lucide/svelte/icons/target';
 	import Wallet from '@lucide/svelte/icons/wallet';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 
 	const timeZone = $derived(zoneStore.value);
 	const today = $derived(todayLocal(timeZone));
@@ -63,12 +64,18 @@
 
 	let load = $state<LoadState>({ status: 'loading' });
 	let week = $state<TimeWeek | null>(null);
+	/** a different week is loading while the previous one stays visible */
+	let refreshing = $state(false);
 	/** day evaluations of the week, only used to find entries that need a check (the review filter of the former time list) */
 	let reviewDates = $state<string[]>([]);
 	const reviewOnly = $derived(page.url.searchParams.get('review') === '1');
 
 	async function fetchWeek(target: string, silent: boolean) {
-		if (!silent) load = { status: 'loading' };
+		// Stale-while-revalidate: with a week on screen it stays visible (dimmed) until the next one arrives.
+		if (!silent) {
+			if (week) refreshing = true;
+			else load = { status: 'loading' };
+		}
 		try {
 			await zoneStore.ensure();
 			const [result, evaluations] = await Promise.all([api.getTimeWeek(target), api.listDays(monday, addDays(monday, 6)).catch((): DayEvaluation[] => [])]);
@@ -76,13 +83,19 @@
 			week = result;
 			reviewDates = evaluations.filter((day) => day.segments?.some((segment) => segment.needsReview)).map((day) => day.date);
 			load = { status: 'ready' };
+			refreshing = false;
 		} catch (error) {
-			if (target === isoWeek && !(silent && load.status === 'ready')) load = toLoadState(error);
+			if (target === isoWeek && !(silent && load.status === 'ready')) {
+				week = null;
+				load = toLoadState(error);
+			}
+			if (target === isoWeek) refreshing = false;
 		}
 	}
 
 	$effect(() => {
-		void fetchWeek(isoWeek, false);
+		const target = isoWeek;
+		untrack(() => void fetchWeek(target, false));
 	});
 
 	// The running week changes by itself (open segment, provisional day): refresh quietly once a minute.
@@ -98,13 +111,25 @@
 	$effect(() => {
 		const from = monday;
 		let current = true;
-		vacationDays = null;
-		if (!moduleStore.enabled('planning')) return;
+		if (!moduleStore.enabled('planning')) {
+			vacationDays = null;
+			return;
+		}
 		void api
 			.listAbsences(from, addDays(from, 6))
 			.then((list) => current && (vacationDays = vacationByDay(list, from, addDays(from, 6))))
 			.catch(() => current && (vacationDays = null));
 		return () => (current = false);
+	});
+
+	// Warm the neighbouring weeks once this one is on screen (idle, sequential, cancelled on navigation).
+	$effect(() => {
+		if (load.status !== 'ready' || refreshing || !week || week.week !== isoWeek) return;
+		const planning = moduleStore.enabled('planning');
+		return prefetchAdjacentWeeks(monday, {
+			load: (from, label) =>
+				Promise.all([api.getTimeWeek(label), api.listDays(from, addDays(from, 6)), planning ? api.listAbsences(from, addDays(from, 6)) : null])
+		});
 	});
 
 	const summary = $derived(week?.summary ?? null);
@@ -139,7 +164,7 @@
 <WeekTabs current="overview" week={isoWeek} />
 <WeekNav {monday} {currentMonday} basePath="/week" onpick={(picked) => goto(`/week?week=${isoWeekLabel(picked)}`)} />
 
-{#if load.status === 'loading'}
+{#if load.status === 'loading' || (load.status === 'ready' && !summary)}
 	<WeekSkeleton />
 {:else if load.status === 'unavailable'}
 	<Alert variant="warning" data-testid="week-unavailable">{t('weekview.unavailable')}</Alert>
@@ -151,7 +176,7 @@
 		</div>
 	</Alert>
 {:else if summary}
-	<div class="flex flex-col gap-4" data-testid="week-overview" data-week={isoWeek}>
+	<div class="flex flex-col gap-4 transition-opacity {refreshing ? 'opacity-60' : ''}" data-testid="week-overview" data-week={week?.week ?? isoWeek} aria-busy={refreshing}>
 		<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('weekview.summary_label')} data-testid="week-kpis">
 			<KpiCard title={t('weekview.actual')} seconds={workedHours} hint={t('weekview.actual_hint')} icon={Gauge} testid="week-actual" />
 			<KpiCard

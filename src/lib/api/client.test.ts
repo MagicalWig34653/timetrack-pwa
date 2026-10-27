@@ -208,3 +208,52 @@ describe('range helpers', () => {
 		});
 	});
 });
+
+describe('static read cache (W3)', () => {
+	it('dedupes in-flight reads, serves holidays from cache and clears on write', async () => {
+		const { api: a, invalidateReadCache } = await import('./client');
+		invalidateReadCache();
+		const calls: string[] = [];
+		const original = globalThis.fetch;
+		globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+			calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+			return new Response('[]', { status: 200 });
+		}) as typeof fetch;
+		try {
+			await Promise.all([a.listHolidays(2026), a.listHolidays(2026), a.listPlaces(), a.listPlaces()]);
+			await a.listHolidays(2026);
+			expect(calls.filter((c) => c.includes('holidays')).length).toBe(1);
+			expect(calls.filter((c) => c.includes('places')).length).toBe(1);
+			await a.deleteCustomDay('x');
+			await a.listHolidays(2026);
+			expect(calls.filter((c) => c.includes('holidays')).length).toBe(2);
+			invalidateReadCache();
+		} finally {
+			globalThis.fetch = original;
+		}
+	});
+});
+
+describe('setCsrfToken and the read cache (W3)', () => {
+	it('keeps the cache for an unchanged token and clears it on login, logout and account switch', async () => {
+		const original = globalThis.fetch;
+		let count = 0;
+		globalThis.fetch = (async () => (count++, new Response('[]', { status: 200 }))) as typeof fetch;
+		try {
+			setCsrfToken('a');
+			await api.listPlaces();
+			setCsrfToken('a');
+			await api.listPlaces();
+			expect(count).toBe(1);
+			setCsrfToken('b');
+			await api.listPlaces();
+			expect(count).toBe(2);
+			setCsrfToken(null);
+			await api.listPlaces();
+			expect(count).toBe(3);
+		} finally {
+			globalThis.fetch = original;
+			setCsrfToken(null);
+		}
+	});
+});
