@@ -3,6 +3,22 @@ export const deCalendar = {
 	'contextmenu.label': 'Kontextmenü',
 	'day.planning': 'Planung und Abwesenheiten',
 
+	// C2: month calendar overview
+	'c2.summary': 'Monatsübersicht',
+	'c2.ist': 'Ist',
+	'c2.soll': 'Soll',
+	'c2.saldo': 'Saldo',
+	'c2.vacation': 'Urlaub',
+	'c2.vacation_counts': '{booked} genehmigt · {open} offen',
+	'c2.sick': 'Kranktage',
+	'c2.year': 'Jahr',
+	'c2.year_overview': 'Jahresübersicht {year}',
+	'c2.year_month': '{month}: zum Monat wechseln',
+	'c2.year_legend': 'Je dunkler, desto näher am Soll gearbeitet; gestrichelt: Urlaub geplant, Rand: Feiertag.',
+	'c2.year_failed': 'Die Jahresübersicht konnte nicht geladen werden.',
+	'c2.freistellen': 'Freistellen',
+	'c2.actions': 'Aktionen für die Auswahl',
+
 	// views and toolbar
 	'cal.view': 'Ansicht',
 	'cal.view_month': 'Monat',

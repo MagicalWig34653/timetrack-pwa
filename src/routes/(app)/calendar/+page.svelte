@@ -23,6 +23,9 @@
 	import { addRange, emptySelection, rangeDates, selectionRuns, selectOne, selectRangeTo, shiftRange, toggleDate, type DateRange, type Selection } from '#lib/planning/range-select.js';
 	import { combine, UndoStack } from '#lib/planning/undo.js';
 	import { weekBalance } from '#lib/planning/week-balance.js';
+	import YearOverview from '#lib/components/planning/YearOverview.svelte';
+	import { monthSummary, visibleCellText } from '#lib/planning/cell-model.js';
+	import { durationText } from '#lib/planning/week-balance-text.js';
 	import WeekBalanceLabel from '#lib/components/planning/WeekBalanceLabel.svelte';
 	import { addDays, formatDateLong, formatDateNumeric, isoWeekNumber, isValidDate, todayLocal } from '#lib/time/dates.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
@@ -116,36 +119,84 @@
 		}
 	}
 
+	interface Bundle {
+		holidays: CalendarDay[];
+		absences: Absence[];
+		plan: PlanDay[];
+		days: DayEvaluation[];
+	}
+	// Data per visible grid range. The neighbours of the shown month are prefetched, so switching months paints at once
+	// and refreshes in the background. Writes clear the cache.
+	let cache = new Map<string, Bundle>();
+	let cacheToken = 0;
+
+	async function fetchRange(from: string, to: string): Promise<Bundle & { places: Place[]; models: WorkModel[] }> {
+		await zoneStore.ensure();
+		const [h, a, p, d, pl, wm] = await Promise.all([
+			Promise.all(yearsOf(from, to).map((y) => api.listHolidays(y))),
+			api.listAbsences(from, to),
+			api.listPlanDays(from, to),
+			// Evaluation hints are optional: a server without time tracking must not break the calendar.
+			api.listDays(from, to).catch(() => [] as DayEvaluation[]),
+			api.listPlaces().catch(() => [] as Place[]),
+			// Without work models Monday to Friday count as working days.
+			api.listWorkModels().catch(() => [] as WorkModel[])
+		]);
+		return { holidays: h.flat(), absences: a, plan: p, days: d, places: pl.filter((x) => !x.archived), models: wm };
+	}
+
+	function apply(b: Bundle) {
+		holidays = b.holidays;
+		absences = b.absences;
+		plan = b.plan;
+		days = b.days;
+	}
+
 	$effect(() => {
 		const from = gridFrom;
 		const to = gridTo;
-		void reloadToken;
+		const token = reloadToken;
+		if (token !== cacheToken) {
+			cache = new Map();
+			cacheToken = token;
+		}
+		const key = `${from}|${to}`;
+		const hit = cache.get(key);
+		if (hit) {
+			apply(hit);
+			load = { status: 'ready' };
+		}
 		void (async () => {
 			try {
-				await zoneStore.ensure();
-				const [h, a, p, d, pl, wm] = await Promise.all([
-					Promise.all(yearsOf(from, to).map((y) => api.listHolidays(y))),
-					api.listAbsences(from, to),
-					api.listPlanDays(from, to),
-					// Evaluation hints are optional: a server without time tracking must not break the calendar.
-					api.listDays(from, to).catch(() => [] as DayEvaluation[]),
-					api.listPlaces().catch(() => [] as Place[]),
-					// Without work models Monday to Friday count as working days.
-					api.listWorkModels().catch(() => [] as WorkModel[])
-				]);
+				const r = await fetchRange(from, to);
 				if (from !== gridFrom) return;
-				holidays = h.flat();
-				absences = a;
-				plan = p;
-				days = d;
-				places = pl.filter((x) => !x.archived);
-				models = wm;
+				cache.set(key, { holidays: r.holidays, absences: r.absences, plan: r.plan, days: r.days });
+				apply(r);
+				places = r.places;
+				models = r.models;
 				load = { status: 'ready' };
+				if (view === 'month') prefetchNeighbours();
 			} catch (e) {
-				load = toLoadState(e);
+				if (!hit) load = toLoadState(e);
 			}
 		})();
 	});
+
+	function prefetchNeighbours() {
+		const token = cacheToken;
+		for (const delta of [-1, 1]) {
+			const grid = monthGrid(addMonths(anchor, delta));
+			const f = grid[0][0];
+			const t2 = grid[grid.length - 1][6];
+			const key = `${f}|${t2}`;
+			if (cache.has(key)) continue;
+			void fetchRange(f, t2)
+				.then((r) => {
+					if (token === cacheToken) cache.set(key, { holidays: r.holidays, absences: r.absences, plan: r.plan, days: r.days });
+				})
+				.catch(() => undefined);
+		}
+	}
 
 	$effect(() => {
 		if (!cursor) cursor = anchor;
@@ -154,16 +205,26 @@
 	const data = $derived({ holidays, absences, plan, days });
 	const ctx = $derived<ConflictContext>({ holidays, absences, plan, models });
 	const infoOf = (date: string): DayInfo => dayInfo(date, data);
+	const cellLabels = {
+		absence: (a: Absence) => absenceKindLabel(a.kind),
+		plan: (p: PlanDay) => planModeLabel(p.mode),
+		worked: (seconds: number) => t('calendar.worked', { time: timeDisplay.duration(seconds) }),
+		holidayHint: (name: string, treatment: string | null | undefined) => holidayHint(name, treatment as never)
+	};
+	// Accessible name of a month cell: visible text first, then the full description (WCAG 2.5.3).
+	const cellName = (info: DayInfo) => (view === 'month' ? `${visibleCellText(info, hidden, cellLabels)}, ${describe(info)}` : describe(info));
 	const stateOf = (info: DayInfo) => dayWorkState(info, models);
 	const selectedSet = $derived(new Set(selection.dates));
 	// Phone: the week list below the month grid follows the selected day (when it lies in the shown grid).
 	const phoneWeek = $derived(weekOf(view === 'month' && selection.anchor && selection.anchor >= gridFrom && selection.anchor <= gridTo ? selection.anchor : anchor));
 	const focusDate = $derived(selection.anchor);
 	const absenceById = (id: string) => absences.find((a) => a.id === id);
+	const summary = $derived(monthSummary(weeks.flat().filter((d) => d.slice(0, 7) === anchor.slice(0, 7)), data, models, today));
+	let yearOpen = $state(false);
 	const balanceOf = (week: string[]) => weekBalance(week, days, today);
 
 	function describe(info: DayInfo): string {
-		const parts: string[] = [formatDateLong(info.date), workStateLabel(stateOf(info))];
+		const parts: string[] = [formatDateLong(info.date).replace(/\d\d\.\d\d\.\d{4}/, `${Number(info.date.slice(8))}. ${MONTHS[Number(info.date.slice(5, 7)) - 1]} ${info.date.slice(0, 4)}`), workStateLabel(stateOf(info))];
 		for (const h of info.holidays) parts.push(`${t('calendar.holiday')} ${holidayHint(h.name, h.companyTreatment)}`);
 		for (const h of info.schoolHolidays) parts.push(h.name);
 		for (const a of info.absences) parts.push(absenceKindLabel(a.kind));
@@ -502,6 +563,7 @@
 		{ key: 'vacation', kind: 'vacation', label: () => absenceKindLabel('vacation') },
 		{ key: 'sick', kind: 'sick', label: () => absenceKindLabel('sick') },
 		{ key: 'plan', kind: 'plan', label: () => t('cal.kind_plan') },
+		{ key: 'excused', kind: 'excused', label: () => t('c2.freistellen') },
 		{ key: 'other', kind: 'other', label: () => absenceKindLabel('other') }
 	];
 
@@ -571,12 +633,23 @@
 						<Button variant={view === 'month' ? 'default' : 'outline'} size="sm" class="rounded-r-none" aria-pressed={view === 'month'} onclick={() => setView('month')} data-testid="view-month">{t('cal.view_month')}</Button>
 						<Button variant={view === 'week' ? 'default' : 'outline'} size="sm" class="-ml-px rounded-l-none" aria-pressed={view === 'week'} onclick={() => setView('week')} data-testid="view-week">{t('cal.view_week')}</Button>
 					</div>
+					{#if view === 'month'}<Button variant={yearOpen ? 'default' : 'outline'} size="sm" aria-pressed={yearOpen} onclick={() => (yearOpen = !yearOpen)} data-testid="year-toggle">{t('c2.year')}</Button>{/if}
 					<Button variant={rangeMode ? 'default' : 'outline'} size="sm" aria-pressed={rangeMode} onclick={() => (rangeMode = !rangeMode)} title={t('cal.range_mode_hint')} data-testid="range-mode">{t('cal.range_mode')}</Button>
 					<Button variant="outline" size="icon" aria-label={undoLabel ? t('cal.menu_undo', { label: undoLabel }) : t('cal.undo')} title={t('cal.undo')} disabled={!undoLabel || busy} onclick={() => void undo()} data-testid="undo"><Undo2 /></Button>
 					<Button variant="outline" size="icon" aria-label={redoLabel ? t('cal.menu_redo', { label: redoLabel }) : t('cal.redo')} title={t('cal.redo')} disabled={!redoLabel || busy} onclick={() => void redo()} data-testid="redo"><Redo2 /></Button>
 					<Button variant="outline" size="sm" aria-label={t('cal.sc.title')} onclick={(e) => (helpOpen = e.currentTarget)} data-testid="shortcuts-open">?</Button>
 				</div>
 			</div>
+
+			{#if view === 'month'}
+				<section class="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl border bg-card px-4 py-3 text-sm sm:grid-cols-5" aria-label={t('c2.summary')} data-testid="month-summary" style="min-height:4.25rem">
+					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.ist')}</span><span class="font-medium tabular-nums" data-testid="sum-ist">{summary.complete || summary.actualSeconds > 0 ? timeDisplay.duration(summary.actualSeconds) : '–'}</span></p>
+					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.soll')}</span><span class="font-medium tabular-nums" data-testid="sum-soll">{summary.complete ? timeDisplay.duration(summary.targetSeconds) : '–'}</span></p>
+					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.saldo')}</span><span class="font-medium tabular-nums {summary.balanceSeconds < 0 ? 'text-amber-700 dark:text-amber-300' : summary.balanceSeconds > 0 ? 'text-emerald-700 dark:text-emerald-300' : ''}" data-testid="sum-saldo">{summary.complete ? timeDisplay.delta(summary.balanceSeconds) : '–'}</span></p>
+					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.vacation')}</span><span class="font-medium tabular-nums" data-testid="sum-vacation">{t('c2.vacation_counts', { booked: String(summary.vacationBooked).replace('.', ','), open: String(summary.vacationOpen).replace('.', ',') })}</span></p>
+					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.sick')}</span><span class="font-medium tabular-nums" data-testid="sum-sick">{summary.sickDays}</span></p>
+				</section>
+			{/if}
 
 			<details bind:open={legendOpen} class="rounded-lg border px-3 py-2 text-sm" data-testid="calendar-legends">
 				<summary class="cursor-pointer font-medium select-none">{t('n2.legend_title')}</summary>
@@ -610,10 +683,6 @@
 					</p>
 				{:else if selection.dates.length > 0}
 					<p class="text-sm" data-testid="selection-count">{t('cal.selected', { count: selection.dates.length })}</p>
-					{#each quickKinds as q (q.key)}
-						<Button variant="outline" size="sm" onclick={(e) => openDialog(selection.dates, q.kind, e.currentTarget)} data-testid="select-{q.key}">{q.label()}…</Button>
-					{/each}
-					<Button variant="ghost" size="sm" onclick={() => (selection = emptySelection)}>{t('cal.clear_selection')}</Button>
 				{:else}
 					<p class="text-xs text-muted-foreground">{t('cal.hint')}</p>
 				{/if}
@@ -627,6 +696,10 @@
 				</Alert>
 			{/if}
 
+			{#if yearOpen && view === 'month'}
+				<YearOverview year={Number(anchor.slice(0, 4))} {today} {models} onpick={(d) => { yearOpen = false; void goto(href(d), { replace: true, reset: false }); }} />
+			{/if}
+			<div class="sm:min-h-[calc(6*8rem+2rem)]" class:hidden={yearOpen && view === 'month'} data-testid="board-wrap">
 			<CalendarBoard
 				{weeks}
 				variant={view}
@@ -636,7 +709,7 @@
 				{phoneWeek}
 				{infoOf}
 				{stateOf}
-				{describe}
+				describe={cellName}
 				selected={selectedSet}
 				{cursor}
 				ghost={ghost ? { dates: ghost.dates, severity: ghost.severity } : null}
@@ -645,6 +718,8 @@
 				{absenceById}
 				{menuFor}
 				{balanceOf}
+				{models}
+				{timeZone}
 				bind:op
 				onpick={pick}
 				ondrag={dragSelect}
@@ -653,6 +728,7 @@
 				oncursor={extendCursor}
 				onquick={(date, el) => openDialog([date], 'plan', el)}
 			/>
+			</div>
 		</div>
 
 		<aside bind:this={panelEl} class="mt-4 min-[1400px]:sticky min-[1400px]:top-20 min-[1400px]:mt-0 min-[1400px]:max-h-[calc(100dvh-6rem)] min-[1400px]:overflow-y-auto" aria-label={t('cal.inspector')} data-testid="inspector">
@@ -671,6 +747,17 @@
 		</aside>
 	</div>
 
+	{#if selection.dates.length > 0 && !ghost}
+		<div class="fixed inset-x-0 bottom-20 z-30 flex justify-center px-3 sm:bottom-3" data-testid="selection-bar">
+			<div class="flex max-w-full flex-wrap items-center gap-2 rounded-2xl border bg-card/95 px-3 py-2 shadow-lg backdrop-blur" role="toolbar" aria-label={t('c2.actions')}>
+				<span class="text-sm font-medium" data-testid="bar-count">{t('cal.selected', { count: selection.dates.length })}</span>
+				{#each quickKinds as q (q.key)}
+					<Button variant="outline" size="sm" onclick={(e) => openDialog(selection.dates, q.kind, e.currentTarget)} data-testid="select-{q.key}">{q.label()}…</Button>
+				{/each}
+				<Button variant="ghost" size="sm" onclick={() => { selection = emptySelection; rangeMode = false; }}>{t('cal.clear_selection')}</Button>
+			</div>
+		</div>
+	{/if}
 	{#if dialog}
 		<PlanDialog seed={dialog.seed} {places} {ctx} anchor={dialog.anchor} returnFocus={dialog.opener} {busy} error={dialogError} onsubmit={submitDialog} onclose={() => (dialog = null)} />
 	{/if}
