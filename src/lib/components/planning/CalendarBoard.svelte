@@ -12,7 +12,10 @@
 	import { weekdayLabel } from '#lib/time/labels.js';
 	import { tick } from 'svelte';
 	import type { WeekBalance } from '#lib/planning/week-balance.js';
+	import { cellModel, type CellModel } from '#lib/planning/cell-model.js';
+	import type { WorkModel } from '#lib/api/types.js';
 	import DayChips from './DayChips.svelte';
+	import MiniTimeline from './MiniTimeline.svelte';
 	import WeekBalanceLabel from './WeekBalanceLabel.svelte';
 
 	/**
@@ -38,6 +41,8 @@
 		absenceById,
 		menuFor,
 		balanceOf,
+		models = [],
+		timeZone = 'Europe/Berlin',
 		op = $bindable(null),
 		onpick,
 		ondrag,
@@ -65,6 +70,8 @@
 		menuFor: (date: string, target: Element) => MenuEntry[] | null;
 		/** hour difference of a week against its Soll (shown under the KW number) */
 		balanceOf: (week: string[]) => WeekBalance | null;
+		models?: WorkModel[];
+		timeZone?: string;
 		op?: DragOp | null;
 		onpick: (date: string, mods: { shift: boolean; meta: boolean }) => void;
 		ondrag: (range: DateRange, additive: boolean) => void;
@@ -79,6 +86,12 @@
 	let pending: DragOp | null = null;
 	let origin = { x: 0, y: 0 };
 	let suppressClick = false;
+
+	// One view model per visible day, computed once per data change instead of once per render of a cell.
+	const models_ = $derived(models);
+	const cellOf = (date: string): CellModel => cellModel(infoOf(date), models_, timeZone);
+	const cells = $derived(new Map(weeks.flat().map((d) => [d, cellOf(d)])));
+	const cellClass = (m: CellModel | undefined) => (m ? `${m.vacation === 'open' ? 'cell-vac-open' : ''} ${m.vacation === 'booked' ? 'cell-vac-booked' : ''} ${m.holiday !== 'none' ? 'cell-holiday' : ''} ${m.free ? 'cell-free' : ''}` : '');
 
 	const compact = $derived(variant === 'month');
 	const phoneBalance = $derived(balanceOf(phoneWeek));
@@ -217,10 +230,11 @@
 				</th>
 				{#each week as date (date)}
 					{@const info = infoOf(date)}
-					<td class="{variant === 'week' ? 'h-60' : 'h-28'} border p-0 align-top">
+					{@const cell = cells.get(date)}
+					<td class="{variant === 'week' ? 'h-60' : 'h-32'} border p-0 align-top">
 						<button
 							type="button"
-							class="{base} {WORK_STATE_CLASSES[stateOf(info)]} {isOtherMonth(date) ? 'bg-muted/30' : ''} {selected.has(date) ? 'ring-2 ring-primary ring-inset' : ''} {ghostClass(date)}"
+							class="{base} {WORK_STATE_CLASSES[stateOf(info)]} {isOtherMonth(date) ? 'bg-muted/30' : ''} {cellClass(cell)} {selected.has(date) ? 'ring-2 ring-primary ring-inset' : ''} {ghostClass(date)}"
 							aria-label={describe(info)}
 							data-work-state={stateOf(info)}
 							aria-pressed={selected.has(date)}
@@ -236,6 +250,7 @@
 						>
 							<span class="text-xs {date === today ? 'inline-flex size-5 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground' : isOtherMonth(date) ? 'text-muted-foreground' : 'font-medium'}">{Number(date.slice(8))}</span>
 							<DayChips {info} {compact} {hidden} draggable />
+							{#if cell?.hasTimeline && variant === 'month'}<MiniTimeline model={cell} tall />{/if}
 						</button>
 					</td>
 				{/each}
@@ -256,10 +271,11 @@
 					{@const info = infoOf(date)}
 					{@const state = stateOf(info)}
 					{@const dots = dotsOf(info, hidden)}
+					{@const pcell = cells.get(date)}
 					<div role="gridcell" class="p-px">
 						<button
 							type="button"
-							class="relative flex h-14 w-full flex-col items-center gap-1 rounded-lg px-0.5 pt-1.5 select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {state === 'free' ? 'bg-muted/70' : ''} {state === 'sick' ? 'bg-rose-500/10' : ''} {state === 'vacation_booked' ? 'bg-sky-500/15' : ''} {isOtherMonth(date) ? 'opacity-45' : ''} {selected.has(date) ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''} {ghostClass(date)}"
+							class="relative flex h-16 w-full flex-col items-center gap-1 rounded-lg px-0.5 pt-1.5 select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {state === 'free' ? 'bg-muted/70' : ''} {state === 'sick' ? 'bg-rose-500/10' : ''} {state === 'vacation_booked' ? 'bg-sky-500/15' : ''} {cellClass(pcell)} {isOtherMonth(date) ? 'bg-muted/20' : ''} {selected.has(date) ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''} {ghostClass(date)}"
 							aria-label={describe(info)}
 							aria-pressed={selected.has(date)}
 							data-date={date}
@@ -270,12 +286,13 @@
 							ondblclick={(e) => onquick(date, e.currentTarget)}
 							use:contextmenu={(target) => menuFor(date, target)}
 						>
-							<span class="text-sm tabular-nums {date === today ? 'inline-flex size-6 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground' : 'font-medium'}">{Number(date.slice(8))}</span>
+							<span class="text-sm tabular-nums {date === today ? 'inline-flex size-6 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground' : isOtherMonth(date) ? 'font-normal text-muted-foreground' : 'font-medium'}">{Number(date.slice(8))}</span>
 							<span class="flex min-h-2 flex-wrap items-center justify-center gap-0.5" aria-hidden="true">
 								{#each dots.slice(0, 4) as dot, index (index)}
 									<span class="size-1.5 rounded-full {DOT_CLASSES[dot.color]} {dot.hollow ? 'bg-transparent! ring-1 ring-current' : ''}" data-dot={dot.kind}></span>
 								{/each}
 							</span>
+							{#if pcell?.hasTimeline}<span class="mt-auto w-full px-0.5 pb-0.5"><MiniTimeline model={pcell} /></span>{/if}
 						</button>
 					</div>
 				{/each}
@@ -298,7 +315,7 @@
 			<button
 				type="button"
 				class="flex min-h-14 w-full items-start gap-3 rounded-lg border bg-card p-3 text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {WORK_STATE_CLASSES[stateOf(info)]} {selected.has(date) ? 'ring-2 ring-primary' : ''} {ghostClass(date)}"
-				aria-label={describe(info)}
+				aria-describedby="wk-{date}"
 				data-work-state={stateOf(info)}
 				aria-pressed={selected.has(date)}
 				data-date={date}
@@ -307,9 +324,27 @@
 				ondblclick={(e) => onquick(date, e.currentTarget)}
 				use:contextmenu={(target) => menuFor(date, target)}
 			>
-				<span class="w-16 shrink-0 text-sm {date === today ? 'font-semibold' : 'text-muted-foreground'}">{formatDateShort(date)}</span>
+				<span id="wk-{date}" class="sr-only">{describe(info)}</span>
+				<span class="w-16 shrink-0 text-sm {date === today ? 'font-semibold' : 'text-foreground/80'}">{formatDateShort(date)}</span>
 				<DayChips {info} {hidden} />
 			</button>
 		</li>
 	{/each}
 </ul>
+
+<style>
+	/* Vacation planned or requested: hatched like the planner column; booked: solid tint. Holidays: warm tint. */
+	:global(.cell-vac-open) {
+		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, #0ea5e9 14%, transparent) 0 6px, transparent 6px 14px);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, #0ea5e9 35%, transparent);
+	}
+	:global(.cell-vac-booked) {
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, #0ea5e9 55%, transparent);
+	}
+	:global(.cell-holiday) {
+		box-shadow: inset 0 3px 0 0 color-mix(in srgb, #f59e0b 70%, transparent);
+	}
+	:global(.cell-free) {
+		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 5%, transparent) 0 6px, transparent 6px 14px);
+	}
+</style>

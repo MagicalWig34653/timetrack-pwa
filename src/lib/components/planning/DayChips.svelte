@@ -6,14 +6,14 @@
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { listsBlocks } from '#lib/week/plan-blocks.js';
 
-	let { info, compact = false, hidden = new Set<string>(), draggable = false }: { info: DayInfo; compact?: boolean; hidden?: Set<string>; draggable?: boolean } = $props();
+	let { info, compact = false, hidden = new Set<string>(), draggable = false, decorative = false }: { info: DayInfo; compact?: boolean; hidden?: Set<string>; draggable?: boolean; /** hidden from assistive technology: the surrounding cell carries the full accessible name */ decorative?: boolean } = $props();
 
 	const chip = 'block max-w-full truncate rounded px-1.5 py-0.5 text-left leading-tight';
 	const text = $derived(compact ? 'text-[11px]' : 'text-xs');
 	const worked = $derived(info.evaluation && info.evaluation.evaluatedWorkSeconds > 0 ? info.evaluation.evaluatedWorkSeconds : 0);
 </script>
 
-<span class="flex min-w-0 flex-col gap-0.5 {text}">
+<span class="flex min-w-0 flex-col gap-0.5 {text}" aria-hidden={decorative ? 'true' : undefined}>
 	{#if !hidden.has('holiday')}
 		{#each info.holidays as holiday (holiday.name + holiday.startDate)}
 			<span class="{chip} {HOLIDAY_CLASS} {holiday.companyTreatment === 'half' ? 'border border-dashed border-current' : ''}" data-chip="holiday" data-treatment={holiday.companyTreatment ?? undefined} title={holidayHint(holiday.name, holiday.companyTreatment)}>{holiday.name}{#if holiday.companyTreatment === 'half'}<span aria-hidden="true"> ½</span><span class="sr-only">, {holidayHint(holiday.name, 'half')}</span>{/if}</span>

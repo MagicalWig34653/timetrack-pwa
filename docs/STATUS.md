@@ -2,6 +2,8 @@
 
 ## Paket W3-perf (27.10.2026, Branch w3-week-perf, nicht gemergt)
 Wochenwechsel schneller: Lesecache für Referenzdaten und Wochen, Prefetch der Nachbarwochen im Leerlauf, Stale-while-revalidate statt Skelett. Details und Messung: `docs/handoffs/W3-perf.md`.
+## Paket C2-pwa (27.10.2026, Branch c2-month-calendar, nicht gemergt)
+Monatskalender im Stil des Wochenplaners: Mini-Zeitleisten je Tag, schraffierter Urlaub, Monatskopf mit Ist/Soll/Saldo, schwebende Aktionsleiste, Jahresübersicht, Nachbarmonate vorgeladen, axe sauber. Details: `docs/handoffs/C2-pwa.md`.
 
 ## Paket P13-pwa (27.10.2026, Branch p13-plan-blocks, nicht gemergt)
 Planer (Raster und Liste) mit mehreren Planblöcken pro Tag (Vertrag 0.35.0, ADR-0031): Malen/Teilen/Pause/Verbinden mit Arten (Farbe, Icon, Muster, Tastatur), ganze Blockliste beim Speichern, Planungshinweise, Wochenkarten und Tagesdetail mit Blöcken und Plan-Ist-Differenz, Freigabe ohne Ort/Notiz, Rückfall auf den Einzelblock bei API < 0.35.0, Mock validiert wie das Backend. Details: `docs/handoffs/P13-pwa.md`.
