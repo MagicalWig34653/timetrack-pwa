@@ -17,3 +17,6 @@
 - Kein echtes Touch-Gerät, kein echtes Backend (nur Mock).
 - Fokus-Pixeltests nur über Playwright-Viewports; Zwischengrößen 1280–1365 px nicht einzeln gemessen.
 - Auf 1366x768 zeigt das Planerraster etwa 6 Stunden gleichzeitig (Rest scrollt im Raster).
+
+## Prüfstand
+`npm run check` 0 Fehler/0 Warnungen; `npm test` 1250 Tests (121 Dateien) grün. Mock-E2E: erster Volllauf 197 bestanden, 5 Fehler (alle durch die Umbauten; behoben: Legende im Popover, `selection-count`, Nachbarmonat-Kacheln, Phone-Überlauf der Planer-Hilfe, Viewport-Höhe in p13/calendar-power); danach `u1-fit`, `c2-month`, `calendar-power`, `absences-p5`, `planning`, `p13`, `week-grid` einzeln grün. Der zweite Volllauf lief wegen hoher Rechnerlast bei Abschluss noch (83 grün, keine Fehler bis dahin) und ist nicht abgewartet.
