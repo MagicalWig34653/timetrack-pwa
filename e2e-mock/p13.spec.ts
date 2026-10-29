@@ -42,7 +42,7 @@ const paint = async (page: Page, date: string, from: number, to: number) => drag
 const blockCount = (page: Page) => page.getByTestId('week-grid').locator('[data-block]:not([data-ghost])');
 
 test('paint a school block and a work block on one day, save the full list, reload', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1500 } });
 	await openGrid(page, '2034-W20');
 	await page.getByTestId('brush-school').click();
 	await paint(page, day(1), 8 * 60, 12 * 60);
@@ -90,7 +90,7 @@ test('paint a school block and a work block on one day, save the full list, relo
 });
 
 test('split with the keyboard, insert a break, merge, resize stops at the neighbour, undo', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1500 } });
 	await openGrid(page, '2034-W21');
 	await paint(page, day(0, '2034-05-22'), 8 * 60, 16 * 60);
 	const monday = day(0, '2034-05-22');
@@ -133,7 +133,7 @@ test('split with the keyboard, insert a break, merge, resize stops at the neighb
 });
 
 test('edit one block in the dialog: kind, place and note; the day mode is separate; overlaps are refused', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1500 } });
 	await openGrid(page, '2034-W22');
 	// Whit Monday (29.05.2034) is a public holiday, so the Tuesday is used
 	const monday = day(1, '2034-05-29');
@@ -185,7 +185,7 @@ test('edit one block in the dialog: kind, place and note; the day mode is separa
 });
 
 test('list view: several blocks per day with kind, times, place and note; problems are named', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1500 } });
 	await page.goto('/plan?week=2034-W23&view=list');
 	await expect(page.getByTestId('plan-rows')).toBeVisible();
 	const date = day(0, '2034-06-05');
@@ -223,7 +223,7 @@ test('list view: several blocks per day with kind, times, place and note; proble
 });
 
 test('week overview and day detail show every block and the difference between plan and actual', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1500 } });
 	const worked = seededWorkDays()[0];
 	const iso = await page.evaluate((d) => {
 		const date = new Date(`${d}T00:00:00Z`);
@@ -328,7 +328,7 @@ test('an older server (before 0.35.0) keeps the single window with a break', asy
 });
 
 test('the planner with blocks has no accessibility violations', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1500 } });
 	await openGrid(page, '2034-W20');
 	await expect(page.getByTestId(`block-${day(1)}-1`)).toBeVisible();
 	const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
