@@ -659,6 +659,7 @@
 	/>
 
 	{#if issues.length > 0}
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex (scrollable region must be keyboard reachable) -->
 		<section tabindex="0" class="rounded-lg border bg-card p-3 fit:max-h-24 fit:shrink-0 fit:overflow-y-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" aria-label={t('wg.issues')} data-testid="plan-issues">
 			<h3 class="mb-1.5 text-[13px] font-semibold">{t('wg.issues')}</h3>
 			<ul class="flex flex-col gap-1">
@@ -673,6 +674,7 @@
 	{/if}
 
 	{#if planHints.length > 0}
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex (scrollable region must be keyboard reachable) -->
 		<section tabindex="0" class="rounded-lg border bg-card p-3 fit:max-h-24 fit:shrink-0 fit:overflow-y-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" aria-label={t('wg.plan_hints')} data-testid="plan-hints">
 			<h3 class="mb-1.5 text-[13px] font-semibold">{t('wg.plan_hints')}</h3>
 			<ul class="flex flex-col gap-1">
