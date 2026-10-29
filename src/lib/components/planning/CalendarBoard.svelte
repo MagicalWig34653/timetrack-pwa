@@ -5,8 +5,11 @@
 	import type { DayInfo, DayWorkState } from '#lib/planning/calendar.js';
 	import type { ConflictSeverity } from '#lib/planning/conflicts.js';
 	import { beginMove, beginResize, beginSelect, dragTo, exceedsThreshold, isNoop, previewRange, type DragOp } from '#lib/planning/drag.js';
-	import { WORK_STATE_CLASSES } from '#lib/planning/labels.js';
+	import { ABSENCE_CLASSES, absenceKindLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS, WORK_STATE_CLASSES } from '#lib/planning/labels.js';
+	import { holidayHint } from '#lib/planning/company-days.js';
+	import { monthPills, visibleText } from '#lib/planning/month-pills.js';
 	import { moveCursor, type CursorMove, type DateRange } from '#lib/planning/range-select.js';
+	import { weekdayIndex } from '#lib/planning/month-pills.js';
 	import { formatDateShort, isoWeekNumber } from '#lib/time/dates.js';
 	import { dotsOf, DOT_CLASSES } from '#lib/planning/dots.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
@@ -15,17 +18,15 @@
 	import { cellModel, type CellModel } from '#lib/planning/cell-model.js';
 	import type { WorkModel } from '#lib/api/types.js';
 	import DayChips from './DayChips.svelte';
-	import MiniTimeline from './MiniTimeline.svelte';
 	import WeekBalanceLabel from './WeekBalanceLabel.svelte';
 
 	/**
-	 * Month/week grid (tablet and desktop) and week list (phone) with pointer drag (select, move, resize), roving keyboard
+	 * Month grid (tablet and desktop) and week list (phone) with pointer drag (select, move, resize), roving keyboard
 	 * cursor and per-day context menus. It holds no data: the page owns data, selection and writes and reacts to the
 	 * callbacks. Drag state lives in `op` (bindable) so the page can show conflicts for the ghost.
 	 */
 	let {
 		weeks,
-		variant,
 		today,
 		monthOf,
 		label,
@@ -42,7 +43,7 @@
 		menuFor,
 		balanceOf,
 		models = [],
-		timeZone = 'Europe/Berlin',
+		weekHref,
 		op = $bindable(null),
 		onpick,
 		ondrag,
@@ -52,9 +53,8 @@
 		onquick
 	}: {
 		weeks: string[][];
-		variant: 'month' | 'week';
 		today: string;
-		/** YYYY-MM of the shown month; days of other months are dimmed (month view only) */
+		/** YYYY-MM of the shown month; days of other months are dimmed */
 		monthOf: string;
 		label: string;
 		phoneWeek: string[];
@@ -71,7 +71,8 @@
 		/** hour difference of a week against its Soll (shown under the KW number) */
 		balanceOf: (week: string[]) => WeekBalance | null;
 		models?: WorkModel[];
-		timeZone?: string;
+		/** link target that opens the week of a date (week number click) */
+		weekHref: (date: string) => string;
 		op?: DragOp | null;
 		onpick: (date: string, mods: { shift: boolean; meta: boolean }) => void;
 		ondrag: (range: DateRange, additive: boolean) => void;
@@ -89,13 +90,42 @@
 
 	// One view model per visible day, computed once per data change instead of once per render of a cell.
 	const models_ = $derived(models);
-	const cellOf = (date: string): CellModel => cellModel(infoOf(date), models_, timeZone);
+	const cellOf = (date: string): CellModel => cellModel(infoOf(date), models_);
 	const cells = $derived(new Map(weeks.flat().map((d) => [d, cellOf(d)])));
 	const cellClass = (m: CellModel | undefined) => (m ? `${m.vacation === 'open' ? 'cell-vac-open' : ''} ${m.vacation === 'booked' ? 'cell-vac-booked' : ''} ${m.holiday !== 'none' ? 'cell-holiday' : ''} ${m.free ? 'cell-free' : ''}` : '');
 
-	const compact = $derived(variant === 'month');
 	const phoneBalance = $derived(balanceOf(phoneWeek));
-	const isOtherMonth = (date: string) => variant === 'month' && date.slice(0, 7) !== monthOf;
+	const isOtherMonth = (date: string) => date.slice(0, 7) !== monthOf;
+	const isWeekend = (date: string) => weekdayIndex(date) >= 5;
+
+	// Pills per cell as many as the row height allows (measured), so nothing is cut off mid-pill.
+	let gridHeight = $state(0);
+	const maxPills = $derived(gridHeight > 0 ? Math.min(5, Math.max(1, Math.floor((gridHeight / weeks.length - 30) / 19))) : 3);
+	const pillLabels = {
+		absence: (a: Absence) => absenceKindLabel(a.kind),
+		plan: planModeLabel,
+		holidayHint: (name: string, treatment: string | null | undefined) => holidayHint(name, treatment as never)
+	};
+	const pillsOf = (date: string) => monthPills(infoOf(date), hidden, pillLabels, maxPills);
+
+	// Soft fade when the month changes; skipped for reduced motion. The grid stays mounted, so focus and drag survive.
+	let body = $state<HTMLElement | null>(null);
+	$effect(() => {
+		const el = body;
+		if (!el || typeof ResizeObserver === 'undefined') return;
+		const observer = new ResizeObserver(() => (gridHeight = el.clientHeight));
+		observer.observe(el);
+		gridHeight = el.clientHeight;
+		return () => observer.disconnect();
+	});
+	let lastMonth = '';
+	$effect(() => {
+		const month = monthOf;
+		if (lastMonth && lastMonth !== month && body && typeof body.animate === 'function' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+			body.animate([{ opacity: 0.35, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'ease-out' });
+		}
+		lastMonth = month;
+	});
 
 	function dateAt(x: number, y: number): string | null {
 		return document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-date]')?.dataset.date ?? null;
@@ -199,47 +229,55 @@
 		if (severity === 'warn') return 'ring-2 ring-inset ring-amber-500 bg-amber-500/15';
 		return 'ring-2 ring-inset ring-primary bg-primary/15';
 	};
-	const base = 'flex h-full w-full flex-col gap-1 p-1.5 text-left transition-[background-color,box-shadow] duration-150 hover:brightness-95 dark:hover:brightness-125 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none select-none';
+	const base = 'relative flex h-full w-full flex-col gap-1 px-1.5 py-1 text-left shadow-[inset_1px_0_0_var(--grid-line)] transition-colors duration-150 hover:bg-foreground/[0.06] focus-visible:z-10 focus-visible:ring-[3px] focus-visible:ring-ring/60 focus-visible:outline-none focus-visible:ring-inset select-none';
+	/** Calm per-state tints of the cell; the legend keeps the stronger tile colours. */
+	const TINT: Record<DayWorkState, string> = { work: '', free: 'bg-muted/60', vacation_booked: 'bg-sky-500/10', vacation_planned: 'bg-sky-500/[0.06]', sick: 'bg-rose-500/10', absence: 'bg-violet-500/10' };
 </script>
 
-<!-- month/week grid (tablet and desktop) -->
-<table
+<!-- month grid (tablet and desktop): CSS grid with ARIA grid roles; rows share the available height (1fr) on landscape desktops -->
+<div
 	bind:this={table}
-	class="hidden w-full table-fixed border-collapse sm:table {op ? (op.type === 'select' ? 'cursor-crosshair' : 'cursor-grabbing') : ''}"
+	class="wg-month hidden h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border bg-card sm:flex {op ? (op.type === 'select' ? 'cursor-crosshair' : 'cursor-grabbing') : ''}"
 	style={rangeMode ? 'touch-action: none' : ''}
 	data-testid="month-grid"
-	data-variant={variant}
+	data-variant="month"
 	data-dragging={op ? op.type : undefined}
+	role="grid"
 	aria-label={label}
 >
-	<thead>
-		<tr>
-			<th scope="col" class="w-[5.5rem] border-b px-1 py-1.5 text-left text-[11px] font-normal text-muted-foreground"><abbr title={t('cal.week_number')} class="no-underline">{t('cal.week_short')}</abbr></th>
-			{#each [1, 2, 3, 4, 5, 6, 7] as weekday (weekday)}
-				<th scope="col" class="border-b px-1 py-1.5 text-left text-xs font-medium text-muted-foreground">{weekdayLabel(weekday)}</th>
-			{/each}
-		</tr>
-	</thead>
-	<tbody>
+	<div class="grid grid-cols-[4.5rem_repeat(7,minmax(0,1fr))] border-b bg-muted/30" role="row">
+		<span role="columnheader" class="px-2 py-1.5 text-[11px] font-medium text-muted-foreground"><abbr title={t('cal.week_number')} class="no-underline">{t('cal.week_short')}</abbr></span>
+		{#each [1, 2, 3, 4, 5, 6, 7] as weekday (weekday)}
+			<span role="columnheader" class="px-2 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{weekdayLabel(weekday)}</span>
+		{/each}
+	</div>
+	<div bind:this={body} class="grid min-h-0 flex-1" style="grid-template-rows: repeat({weeks.length}, minmax(var(--row-min, 6.75rem), 1fr)); min-height: calc(6 * var(--row-min, 6.75rem))" data-testid="month-rows">
 		{#each weeks as week (week[0])}
 			{@const balance = balanceOf(week)}
-			<tr>
-				<th scope="row" class="border border-r-0 px-1 py-1.5 text-left align-top text-[11px] font-normal text-muted-foreground tabular-nums" data-testid="week-number" aria-label={t('cal.week_n', { n: isoWeekNumber(week[0]) })}>
-					{isoWeekNumber(week[0])}
-					{#if balance}<WeekBalanceLabel {balance} week={isoWeekNumber(week[0])} class="mt-0.5" />{/if}
-				</th>
+			<div class="grid min-h-0 grid-cols-[4.5rem_repeat(7,minmax(0,1fr))] border-b last:border-b-0" role="row">
+				<div role="rowheader" class="flex min-w-0 flex-col items-start gap-0.5 bg-muted/20 px-2 py-1.5" data-testid="week-number">
+					<a
+						href={weekHref(week[0])}
+						class="rounded px-1 text-[12px] font-semibold text-muted-foreground tabular-nums hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+						aria-label={t('cal.open_week_n', { n: isoWeekNumber(week[0]) })}
+						title={t('cal.open_week')}
+						data-testid="week-link">{isoWeekNumber(week[0])}</a>
+					{#if balance}<WeekBalanceLabel {balance} week={isoWeekNumber(week[0])} />{/if}
+				</div>
 				{#each week as date (date)}
 					{@const info = infoOf(date)}
 					{@const cell = cells.get(date)}
-					<td class="{variant === 'week' ? 'h-60' : 'h-32'} border p-0 align-top">
+					{@const shown = pillsOf(date)}
+					<div role="gridcell" class="min-h-0 min-w-0">
 						<button
 							type="button"
-							class="{base} {WORK_STATE_CLASSES[stateOf(info)]} {isOtherMonth(date) ? 'bg-muted/30' : ''} {cellClass(cell)} {selected.has(date) ? 'ring-2 ring-primary ring-inset' : ''} {ghostClass(date)}"
-							aria-label={describe(info)}
+							class="{base} {TINT[stateOf(info)]} {isOtherMonth(date) ? 'bg-muted/40' : ''} {cellClass(cell)} {selected.has(date) ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''} {ghostClass(date)}"
+							aria-label="{visibleText(date, shown.pills)}, {describe(info)}"
 							data-work-state={stateOf(info)}
 							aria-pressed={selected.has(date)}
 							data-date={date}
 							data-today={date === today ? 'true' : undefined}
+							data-other-month={isOtherMonth(date) ? 'true' : undefined}
 							tabindex={date === cursor ? 0 : -1}
 							onpointerdown={(e) => down(e, date)}
 							onclick={(e) => click(e, date)}
@@ -248,19 +286,42 @@
 							onfocus={() => date !== cursor && oncursor(date, false)}
 							use:contextmenu={(target) => menuFor(date, target)}
 						>
-							<span class="text-xs {date === today ? 'inline-flex size-5 items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground' : isOtherMonth(date) ? 'text-muted-foreground' : 'font-medium'}">{Number(date.slice(8))}</span>
-							<DayChips {info} {compact} {hidden} draggable />
-							{#if cell?.hasTimeline && variant === 'month'}<MiniTimeline model={cell} tall />{/if}
+							<span class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[12px] tabular-nums {date === today ? 'font-semibold text-primary ring-2 ring-primary' : isOtherMonth(date) || isWeekend(date) ? 'font-normal text-muted-foreground' : 'font-medium'}">{Number(date.slice(8))}</span>
+							<span class="-mx-1.5 flex min-h-0 min-w-0 flex-col gap-[3px] overflow-hidden">
+								{#each shown.pills as pill (pill.key)}
+									{#if pill.kind === 'absence' && pill.absence}
+										{@const absence = pill.absence}
+										<span
+											class="pill relative {ABSENCE_CLASSES[absence.kind]} {pill.open ? 'pill-open' : ''} {pill.continuesLeft ? 'rounded-l-none' : 'ml-1.5 rounded-l-md'} {pill.continuesRight ? 'rounded-r-none' : 'mr-1.5 rounded-r-md'} cursor-grab active:cursor-grabbing"
+											data-chip="absence"
+											data-absence-id={absence.id}
+											data-status={absence.status}
+											data-continues-left={pill.continuesLeft ? 'true' : undefined}
+											data-continues-right={pill.continuesRight ? 'true' : undefined}
+										>
+											{#if absence.startDate === date}<span class="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize rounded-l bg-current/0 hover:bg-current/30" data-resize="start" aria-hidden="true"></span>{/if}
+											{pill.label}{#if pill.half && pill.label}<span aria-hidden="true"> ½</span>{/if}
+											{#if absence.endDate === date}<span class="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize rounded-r bg-current/0 hover:bg-current/30" data-resize="end" aria-hidden="true"></span>{/if}
+										</span>
+									{:else if pill.kind === 'holiday'}
+										<span class="pill mx-1.5 rounded-md {HOLIDAY_CLASS} {pill.half ? 'border border-dashed border-current' : ''}" data-chip="holiday" data-treatment={pill.treatment ?? undefined} title={holidayHint(pill.label, pill.treatment as never)}>{pill.label}{#if pill.half}<span aria-hidden="true"> ½</span><span class="sr-only">, {holidayHint(pill.label, 'half')}</span>{/if}</span>
+									{:else if pill.kind === 'school_holiday'}
+										<span class="pill mx-1.5 rounded-md {SCHOOL_HOLIDAY_CLASS}" data-chip="school-holiday">{pill.label}</span>
+									{:else if pill.planMode}
+										<span class="pill mx-1.5 gap-1 rounded-md {PLAN_CLASSES[pill.planMode]}" data-chip="plan"><span class="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true"></span>{pill.label}</span>
+									{/if}
+								{/each}
+								{#if shown.more > 0}<span class="mx-1.5 px-1 text-[11px] leading-[18px] text-muted-foreground" aria-hidden="true" data-testid="pill-more">+{shown.more}</span>{/if}
+							</span>
 						</button>
-					</td>
+					</div>
 				{/each}
-			</tr>
+			</div>
 		{/each}
-	</tbody>
-</table>
+	</div>
+</div>
 
 <!-- compact month grid (phone): iOS-like cells with coloured dots; the week list below shows the details of one week -->
-{#if variant === 'month'}
 	<div class="sm:hidden" data-testid="phone-month" role="grid" aria-label={label} style={rangeMode ? 'touch-action: none' : ''}>
 		<div class="grid grid-cols-7 text-center text-[11px] font-medium text-muted-foreground" role="row">
 			{#each [1, 2, 3, 4, 5, 6, 7] as weekday (weekday)}<span role="columnheader" class="py-1">{weekdayLabel(weekday)}</span>{/each}
@@ -292,14 +353,12 @@
 									<span class="size-1.5 rounded-full {DOT_CLASSES[dot.color]} {dot.hollow ? 'bg-transparent! ring-1 ring-current' : ''}" data-dot={dot.kind}></span>
 								{/each}
 							</span>
-							{#if pcell?.hasTimeline}<span class="mt-auto w-full px-0.5 pb-0.5"><MiniTimeline model={pcell} /></span>{/if}
 						</button>
 					</div>
 				{/each}
 			</div>
 		{/each}
 	</div>
-{/if}
 
 <!-- week list (phone) -->
 {#if phoneBalance}
@@ -308,7 +367,7 @@
 		<WeekBalanceLabel balance={phoneBalance} week={isoWeekNumber(phoneWeek[0])} class="text-xs" />
 	</p>
 {/if}
-<ul class="flex flex-col gap-2 sm:hidden {variant === 'month' ? 'mt-4' : ''}" data-testid="week-days" style={rangeMode ? 'touch-action: none' : ''}>
+<ul class="mt-4 flex flex-col gap-2 sm:hidden" data-testid="week-days" style={rangeMode ? 'touch-action: none' : ''}>
 	{#each phoneWeek as date (date)}
 		{@const info = infoOf(date)}
 		<li>
@@ -333,18 +392,41 @@
 </ul>
 
 <style>
-	/* Vacation planned or requested: hatched like the planner column; booked: solid tint. Holidays: warm tint. */
+	.wg-month {
+		--grid-line: color-mix(in srgb, var(--foreground) 9%, transparent);
+	}
+	/* One pill: fixed height, truncated label. Absence bars reach over the cell padding to join their neighbours. */
+	.pill {
+		display: flex;
+		align-items: center;
+		height: 18px;
+		flex: none;
+		min-width: 0;
+		padding: 0 6px;
+		overflow: hidden;
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 18px;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+	/* Planned or requested vacation: hatched; booked: solid. */
+	.pill-open {
+		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, currentColor 16%, transparent) 0 4px, transparent 4px 9px);
+	}
+	/* Cell level cues stay light: the bar carries the status, the cell only hints at it. */
 	:global(.cell-vac-open) {
-		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, #0ea5e9 14%, transparent) 0 6px, transparent 6px 14px);
-		box-shadow: inset 0 0 0 1px color-mix(in srgb, #0ea5e9 35%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, #0ea5e9 22%, transparent);
 	}
 	:global(.cell-vac-booked) {
-		box-shadow: inset 0 0 0 1px color-mix(in srgb, #0ea5e9 55%, transparent);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, #0ea5e9 40%, transparent);
 	}
 	:global(.cell-holiday) {
-		box-shadow: inset 0 3px 0 0 color-mix(in srgb, #f59e0b 70%, transparent);
+		background-color: color-mix(in srgb, #f59e0b 9%, transparent);
 	}
-	:global(.cell-free) {
-		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 5%, transparent) 0 6px, transparent 6px 14px);
+	@media (prefers-reduced-motion: reduce) {
+		.pill {
+			transition: none;
+		}
 	}
 </style>

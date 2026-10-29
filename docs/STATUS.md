@@ -1,5 +1,8 @@
 # Stand der PWA – 26.10.2026 (Paket P15 im Worktree, uncommittet)
 
+## Paket U1-pwa (29.10.2026, Branch u1-calendar-planner, nicht gemergt)
+Kalender und Planer passen ohne Seitenscroll in 1366x768 und 1920x1080 (Variante `fit`); Monatsraster neu (Pills statt Mini-Zeitleisten, durchgehende Abwesenheitsbalken, KW-Spalte mit Link auf /week), Wochenmodus entfernt, ein Segmented-Umschalter (Monat/Jahr, Raster/Liste). Details: `docs/handoffs/U1-pwa.md`.
+
 ## Paket W3-perf (27.10.2026, Branch w3-week-perf, nicht gemergt)
 Wochenwechsel schneller: Lesecache für Referenzdaten und Wochen, Prefetch der Nachbarwochen im Leerlauf, Stale-while-revalidate statt Skelett. Details und Messung: `docs/handoffs/W3-perf.md`.
 ## Paket C2-pwa (27.10.2026, Branch c2-month-calendar, nicht gemergt)

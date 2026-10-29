@@ -10,13 +10,14 @@
 		monday,
 		currentMonday,
 		basePath,
-		onpick
-	}: { monday: string; currentMonday: string; basePath: string; onpick: (date: string) => void } = $props();
+		onpick,
+		compact = false
+	}: { monday: string; currentMonday: string; basePath: string; onpick: (date: string) => void; /** no bottom margin and growing in a header row on landscape desktops */ compact?: boolean } = $props();
 
 	const href = (date: string) => `${basePath}?week=${isoWeekLabel(date)}`;
 </script>
 
-<nav class="mb-5 flex flex-wrap items-center gap-2 print:hidden" aria-label={t('weekview.nav_label')} data-testid="week-nav">
+<nav class="mb-5 flex flex-wrap items-center gap-2 print:hidden {compact ? 'fit:mb-0 fit:min-w-0 fit:flex-1' : ''}" aria-label={t('weekview.nav_label')} data-testid="week-nav">
 	<Button variant="outline" size="icon" href={href(addDays(monday, -7))} aria-label={t('weekview.prev')} data-testid="week-prev"><ChevronLeft /></Button>
 	<Button variant="outline" size="icon" href={href(addDays(monday, 7))} aria-label={t('weekview.next')} data-testid="week-next"><ChevronRight /></Button>
 	<div class="mx-1 min-w-0 flex-1 basis-40 sm:flex-none">

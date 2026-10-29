@@ -14,7 +14,7 @@ const viewports = [
 test('calendar tiles differ by work state in the computed background', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser, { viewport: viewports[1][1] });
 	await page.goto('/calendar');
-	const tiles = page.getByTestId('month-grid').locator('button[data-work-state]');
+	const tiles = page.getByTestId('month-grid').locator('button[data-work-state]:not([data-other-month])');
 	await expect(tiles.first()).toBeVisible();
 	const backgrounds = async (state: string) => tiles.evaluateAll((els, s) => els.filter((e) => e.getAttribute('data-work-state') === s).map((e) => getComputedStyle(e).backgroundColor), state);
 	const work = await backgrounds('work');
@@ -22,6 +22,7 @@ test('calendar tiles differ by work state in the computed background', async ({ 
 	expect(work.length).toBeGreaterThan(0);
 	expect(free.length).toBeGreaterThan(0);
 	expect(work[0]).not.toBe(free[0]);
+	await page.getByTestId('calendar-legends').locator('summary').click();
 	await expect(page.getByTestId('tile-legend').getByRole('listitem')).toHaveCount(6);
 	await context.close();
 });
@@ -58,6 +59,7 @@ for (const [name, viewport] of viewports) {
 			const day = (offset: number) => new Date(monday.getTime() + offset * 86_400_000).toISOString().slice(0, 10);
 			for (const [label, offset] of [['approved', 15], ['planned', 43]] as const) {
 				await page.goto(`/calendar?date=${day(offset)}`);
+				await page.getByTestId('calendar-legends').locator('summary').click();
 				await expect(page.getByTestId('tile-legend')).toBeVisible();
 				await page.waitForTimeout(400);
 				await page.screenshot({ path: `${dir}/calendar-${label}-${name}-${scheme}.png`, fullPage: true });

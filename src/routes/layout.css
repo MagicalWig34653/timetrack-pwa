@@ -4,6 +4,8 @@
 @import "@fontsource-variable/inter";
 
 @custom-variant dark (&:is(.dark *));
+/* U1: landscape desktops (sidebar shell, 1280 px wide, at least 640 px high): calendar and planner fill the viewport height instead of scrolling the page. */
+@custom-variant fit (@media (min-width: 1280px) and (min-height: 640px));
 
 /* Design language (docs/DESIGN.md in the backend repo, ADR-0014): Zinc tokens in OKLCH. */
 :root {

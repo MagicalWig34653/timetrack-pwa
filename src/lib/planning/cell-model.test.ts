@@ -1,72 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import type { Absence, DayEvaluation, PlanDay } from '#lib/api/types.js';
+import type { Absence, DayEvaluation } from '#lib/api/types.js';
 import type { DayInfo } from './calendar';
-import { actualBar, cellModel, heatLevel, lineSpan, monthSummary, planBars } from './cell-model';
+import { cellModel, heatLevel, monthSummary } from './cell-model';
 
 const info = (extra: Partial<DayInfo> = {}): DayInfo => ({ date: '2026-10-14', holidays: [], schoolHolidays: [], absences: [], plan: null, evaluation: null, ...extra });
 const absence = (extra: Partial<Absence>): Absence => ({ id: 'a', kind: 'vacation', status: 'approved', startDate: '2026-10-14', endDate: '2026-10-14', halfDayStart: false, halfDayEnd: false, ...extra }) as Absence;
 const evaluation = (extra: Partial<DayEvaluation> = {}): DayEvaluation => ({ date: '2026-10-14', targetSeconds: 28800, evaluatedWorkSeconds: 0, creditSeconds: 0, ...extra }) as DayEvaluation;
 
-describe('lineSpan', () => {
-	it('maps minutes into the 06-22 window in percent', () => {
-		expect(lineSpan(6 * 60, 14 * 60)).toEqual({ left: 0, width: 50 });
-		expect(lineSpan(14 * 60, 22 * 60)).toEqual({ left: 50, width: 50 });
-	});
-	it('clamps to the window, rejects empty and outside ranges and keeps tiny blocks visible', () => {
-		expect(lineSpan(4 * 60, 8 * 60)).toEqual({ left: 0, width: 12.5 });
-		expect(lineSpan(23 * 60, 23 * 60 + 30)).toBeNull();
-		expect(lineSpan(600, 600)).toBeNull();
-		expect(lineSpan(600, 605)?.width).toBe(3);
-		const edge = lineSpan(21 * 60 + 58, 22 * 60)!;
-		expect(edge.left + edge.width).toBeLessThanOrEqual(100);
-	});
-});
-
-describe('planBars', () => {
-	it('uses the block list with the kind of each block', () => {
-		const plan = { mode: 'office', blocks: [{ start: '08:00', end: '12:00', kind: 'school' }, { start: '13:00', end: '16:00', kind: 'office' }] } as PlanDay;
-		expect(planBars(plan).map((b) => b.kind)).toEqual(['school', 'office']);
-	});
-	it('falls back to the rough window in the plan mode and draws nothing for free days', () => {
-		expect(planBars({ mode: 'home', plannedStart: '08:00', plannedEnd: '16:00' } as PlanDay)).toHaveLength(1);
-		expect(planBars({ mode: 'off', plannedStart: '08:00', plannedEnd: '16:00' } as PlanDay)).toEqual([]);
-		expect(planBars(null)).toEqual([]);
-	});
-});
-
-describe('actualBar', () => {
-	it('converts the evaluated start and end into the time zone', () => {
-		const bar = actualBar(evaluation({ evaluatedWorkSeconds: 3600, evaluatedStart: '2026-10-14T06:00:00Z', evaluatedEnd: '2026-10-14T14:00:00Z' }), 'Europe/Berlin');
-		expect(bar).toEqual({ left: 12.5, width: 50 });
-	});
-	it('is null without time', () => {
-		expect(actualBar(evaluation(), 'Europe/Berlin')).toBeNull();
-		expect(actualBar(null, 'Europe/Berlin')).toBeNull();
-	});
-});
-
 describe('cellModel', () => {
 	it('separates open (hatched) from booked vacation and flags half days', () => {
-		expect(cellModel(info({ absences: [absence({ status: 'planned' })] }), [], 'UTC').vacation).toBe('open');
-		expect(cellModel(info({ absences: [absence({ status: 'requested' })] }), [], 'UTC').vacation).toBe('open');
-		const booked = cellModel(info({ absences: [absence({ halfDayStart: true })] }), [], 'UTC');
+		expect(cellModel(info({ absences: [absence({ status: 'planned' })] }), []).vacation).toBe('open');
+		expect(cellModel(info({ absences: [absence({ status: 'requested' })] }), []).vacation).toBe('open');
+		const booked = cellModel(info({ absences: [absence({ halfDayStart: true })] }), []);
 		expect(booked.vacation).toBe('booked');
 		expect(booked.vacationHalf).toBe(true);
 	});
 	it('marks company half days, sickness, school holidays and free days', () => {
 		const h = { startDate: '2026-10-14', endDate: '2026-10-14', name: 'Heiligabend', kind: 'holiday', companyTreatment: 'half' } as DayInfo['holidays'][number];
-		expect(cellModel(info({ holidays: [h] }), [], 'UTC').holiday).toBe('half');
-		expect(cellModel(info({ holidays: [{ ...h, companyTreatment: null }] }), [], 'UTC').holiday).toBe('full');
-		expect(cellModel(info({ absences: [absence({ kind: 'sick' })] }), [], 'UTC').sick).toBe(true);
-		expect(cellModel(info({ schoolHolidays: [h] }), [], 'UTC').schoolHoliday).toBe(true);
-		expect(cellModel(info({ date: '2026-10-17' }), [], 'UTC').free).toBe(true);
-		expect(cellModel(info(), [], 'UTC').free).toBe(false);
-	});
-	it('lists the distinct plan kinds in painting order', () => {
-		const plan = { mode: 'office', blocks: [{ start: '08:00', end: '09:00', kind: 'office' }, { start: '10:00', end: '11:00', kind: 'work' }, { start: '12:00', end: '13:00', kind: 'office' }] } as PlanDay;
-		const model = cellModel(info({ plan }), [], 'UTC');
-		expect(model.kinds).toEqual(['work', 'office']);
-		expect(model.hasTimeline).toBe(true);
+		expect(cellModel(info({ holidays: [h] }), []).holiday).toBe('half');
+		expect(cellModel(info({ holidays: [{ ...h, companyTreatment: null }] }), []).holiday).toBe('full');
+		expect(cellModel(info({ absences: [absence({ kind: 'sick' })] }), []).sick).toBe(true);
+		expect(cellModel(info({ schoolHolidays: [h] }), []).schoolHoliday).toBe(true);
+		expect(cellModel(info({ date: '2026-10-17' }), []).free).toBe(true);
+		expect(cellModel(info(), []).free).toBe(false);
 	});
 });
 

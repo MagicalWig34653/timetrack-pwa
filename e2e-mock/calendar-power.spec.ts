@@ -193,16 +193,14 @@ test('context menu: keyboard operable, closes on Escape, keeps the system menu i
 	await page.getByRole('menuitem', { name: 'Abwesenheit löschen' }).click();
 	await expect(tile(page, '2032-07-07').locator('[data-chip="absence"]')).toHaveCount(0);
 
-	// a menu at the viewport edge stays inside the viewport
+	// a menu at the viewport edge stays inside the viewport (a low viewport: the page scrolls normally, cells keep 6.75 rem)
+	await page.setViewportSize({ width: 1280, height: 600 });
 	await tile(page, '2032-07-09').scrollIntoViewIfNeeded();
-	const t = (await tile(page, '2032-07-09').boundingBox())!;
-	// shrink the viewport so the tile's lower edge is the viewport edge (cells are taller since C2)
-	const edgeY = Math.round(t.y + t.height - 4);
-	await page.setViewportSize({ width: 1280, height: edgeY + 10 });
+	await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
 	const t2 = (await tile(page, '2032-07-09').boundingBox())!;
-	await page.mouse.click(Math.min(t2.x + t2.width - 4, 1275), Math.round(t2.y + t2.height - 4), { button: 'right' });
+	await page.mouse.click(Math.min(t2.x + t2.width - 4, 1275), Math.min(Math.round(t2.y + t2.height - 4), 595), { button: 'right' });
 	const box = (await page.getByRole('menu').boundingBox())!;
-	expect(box.y + box.height).toBeLessThanOrEqual(edgeY + 10);
+	expect(box.y + box.height).toBeLessThanOrEqual(600);
 	expect(box.x + box.width).toBeLessThanOrEqual(1280);
 	await page.mouse.wheel(0, 100);
 	await expect(page.getByRole('menu')).toHaveCount(0);

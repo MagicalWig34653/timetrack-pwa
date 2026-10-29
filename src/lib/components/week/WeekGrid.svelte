@@ -794,6 +794,20 @@
 		height: clamp(440px, calc(100dvh - 19rem), 900px);
 		overscroll-behavior: contain;
 	}
+	/* U1: on landscape desktops the grid takes the remaining viewport height (the board is a flex column); it scrolls inside. */
+	@media (min-width: 1280px) and (min-height: 640px) {
+		.wg {
+			display: flex;
+			flex: 1 1 0;
+			flex-direction: column;
+			min-height: 11rem;
+		}
+		.wg-scroll {
+			flex: 1 1 0;
+			height: auto;
+			min-height: 0;
+		}
+	}
 	.wg-head {
 		position: sticky;
 		top: 0;

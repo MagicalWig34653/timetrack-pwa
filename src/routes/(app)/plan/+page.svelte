@@ -6,6 +6,7 @@
 	import type { Place, PlanWeek, TimeWeekSummary } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
 	import Panel from '#lib/components/app/Panel.svelte';
+	import Segmented from '#lib/components/app/Segmented.svelte';
 	import StatusChip from '#lib/components/app/StatusChip.svelte';
 	import Toast from '#lib/components/app/Toast.svelte';
 	import FollowWeeksDialog from '#lib/components/week/FollowWeeksDialog.svelte';
@@ -312,16 +313,18 @@
 		}
 	}
 
-	const viewButton =
-		'inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 	const differenceText = $derived(
 		totals.differenceSeconds === 0 ? t('weekplan.diff_equal') : t(totals.differenceSeconds < 0 ? 'weekplan.diff_under' : 'weekplan.diff_over', { time: timeDisplay.duration(Math.abs(totals.differenceSeconds)) })
 	);
 </script>
 
-<PageHeader title={t('weekplan.title')} description={view === 'grid' ? undefined : t('weekplan.description')} />
-<WeekTabs current="plan" week={isoWeek} />
-<WeekNav {monday} {currentMonday} basePath="/plan" onpick={(picked) => goto(`/plan?week=${isoWeekLabel(picked)}`)} />
+<!-- U1: on landscape desktops the planner fills the viewport height (header row, grid with the remaining height, sticky save bar). -->
+<div class="fit:flex fit:h-[calc(100dvh-60px-4.5rem)] fit:flex-col fit:gap-2.5" data-testid="plan-page">
+<div class="fit:flex fit:shrink-0 fit:flex-wrap fit:items-center fit:gap-x-5 fit:gap-y-1">
+	<PageHeader compact title={t('weekplan.title')} description={view === 'grid' ? undefined : t('weekplan.description')} />
+	<WeekTabs compact current="plan" week={isoWeek} />
+	<WeekNav compact {monday} {currentMonday} basePath="/plan" onpick={(picked) => goto(`/plan?week=${isoWeekLabel(picked)}`)} />
+</div>
 
 {#if load.status === 'loading'}
 	<WeekSkeleton rows="rows" />
@@ -335,21 +338,23 @@
 		</div>
 	</Alert>
 {:else if week}
-	<div class="flex flex-col gap-4" data-testid="week-planner" data-week={isoWeek}>
+	<div class="flex flex-col gap-4 fit:min-h-0 fit:flex-1 fit:gap-2.5" data-testid="week-planner" data-week={isoWeek}>
 		{#if isPast}<Alert variant="warning">{t('weekplan.past_hint')}</Alert>{/if}
 		{#if saveError}<Alert variant="destructive" data-testid="plan-error">{saveError}</Alert>{/if}
 
+		<!-- Grid view on landscape desktops: week sum, actions and the view switch share one row, so the grid keeps the height. -->
+		<div class="flex flex-col gap-4 {view === 'grid' ? 'fit:flex-row fit:items-center fit:gap-4 fit:shrink-0' : ''}">
 		{#if view === 'grid'}
 			<!-- Compact week sum above the grid: the grid itself needs the height. -->
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="plan-total">
+			<div class="flex flex-wrap items-center gap-x-4 gap-y-2 fit:shrink-0" data-testid="plan-total">
 				<p class="text-[15px] font-semibold tabular-nums" data-testid="plan-total-text">
 					{t('weekplan.total_text', { planned: timeDisplay.duration(totals.plannedSeconds), target: timeDisplay.duration(totals.targetSeconds) })}
 				</p>
 				<StatusChip tone={totals.differenceSeconds === 0 ? 'success' : totals.differenceSeconds < 0 ? 'warning' : 'accent'} dot={false}>
 					<span data-testid="plan-diff">{differenceText}</span>
 				</StatusChip>
-				<div class="h-1.5 w-32 overflow-hidden rounded-full bg-muted max-sm:hidden" aria-hidden="true"><div class="h-full rounded-full bg-ui-accent" style="width: {progress}%"></div></div>
-				<p class="text-[13px] text-muted-foreground max-2xl:hidden" data-testid="plan-suggestion">
+				<div class="h-1.5 w-32 overflow-hidden rounded-full bg-muted max-sm:hidden fit:w-20" aria-hidden="true"><div class="h-full rounded-full bg-ui-accent" style="width: {progress}%"></div></div>
+				<p class="text-[13px] text-muted-foreground max-[1700px]:hidden" data-testid="plan-suggestion">
 					{suggestion.source === 'history'
 						? t('weekplan.suggestion_history', { start: suggestion.start, end: suggestion.end, break: suggestion.breakMinutes })
 						: t('weekplan.suggestion_fallback', { start: suggestion.start, break: suggestion.breakMinutes })}
@@ -377,18 +382,25 @@
 		</Panel>
 		{/if}
 
-		<div class="flex items-center gap-2 max-sm:flex-nowrap max-sm:overflow-x-auto sm:flex-wrap">
+		<div class="flex items-center gap-2 max-sm:flex-nowrap max-sm:overflow-x-auto sm:flex-wrap fit:min-w-0 fit:flex-1 fit:flex-nowrap">
 			<div class="flex gap-2 max-sm:flex-nowrap sm:flex-wrap" role="group" aria-label={t('weekplan.actions_label')}>
-				<Button variant="outline" size="sm" onclick={applyStandard} data-testid="plan-standard"><WandSparkles />{t('weekplan.action_standard')}</Button>
-				<Button variant="outline" size="sm" onclick={applyCopy} data-testid="plan-copy"><Copy />{t('weekplan.action_copy')}</Button>
-				<Button variant="outline" size="sm" onclick={openFollow} data-testid="plan-follow"><Layers />{t('wg.follow_action')}</Button>
-				<Button variant="outline" size="sm" onclick={applySame} data-testid="plan-same"><Equal />{t('weekplan.action_same')}</Button>
-				<Button variant="outline" size="sm" onclick={applyClear} data-testid="plan-clear"><Eraser />{t('weekplan.action_clear')}</Button>
+				<Button variant="outline" size="sm" onclick={applyStandard} title={t('weekplan.action_standard')} data-testid="plan-standard"><WandSparkles /><span class="fit:max-[1599px]:sr-only">{t('weekplan.action_standard')}</span></Button>
+				<Button variant="outline" size="sm" onclick={applyCopy} title={t('weekplan.action_copy')} data-testid="plan-copy"><Copy /><span class="fit:max-[1599px]:sr-only">{t('weekplan.action_copy')}</span></Button>
+				<Button variant="outline" size="sm" onclick={openFollow} title={t('wg.follow_action')} data-testid="plan-follow"><Layers /><span class="fit:max-[1599px]:sr-only">{t('wg.follow_action')}</span></Button>
+				<Button variant="outline" size="sm" onclick={applySame} title={t('weekplan.action_same')} data-testid="plan-same"><Equal /><span class="fit:max-[1599px]:sr-only">{t('weekplan.action_same')}</span></Button>
+				<Button variant="outline" size="sm" onclick={applyClear} title={t('weekplan.action_clear')} data-testid="plan-clear"><Eraser /><span class="fit:max-[1599px]:sr-only">{t('weekplan.action_clear')}</span></Button>
 			</div>
-			<div class="ml-auto inline-flex rounded-lg bg-muted p-0.5" role="group" aria-label={t('wg.view_label')}>
-				<button type="button" class={viewButton} aria-pressed={view === 'grid'} onclick={() => pickView('grid')} data-testid="view-grid"><CalendarRange class="size-4" />{t('wg.view_grid')}</button>
-				<button type="button" class={viewButton} aria-pressed={view === 'list'} onclick={() => pickView('list')} data-testid="view-list"><LayoutList class="size-4" />{t('wg.view_list')}</button>
-			</div>
+			<Segmented
+				class="ml-auto"
+				label={t('wg.view_label')}
+				value={view}
+				items={[
+					{ id: 'grid', label: t('wg.view_grid'), icon: CalendarRange, testid: 'view-grid' },
+					{ id: 'list', label: t('wg.view_list'), icon: LayoutList, testid: 'view-list' }
+				]}
+				onchange={(id) => pickView(id as 'grid' | 'list')}
+			/>
+		</div>
 		</div>
 
 		{#if view === 'grid'}
@@ -412,7 +424,7 @@
 				oncopylast={applyCopy}
 			/>
 		{:else}
-			<ul class="flex flex-col gap-2.5" data-testid="plan-rows">
+			<ul class="relative flex flex-col gap-2.5 fit:min-h-0 fit:flex-1 fit:overflow-y-auto" data-testid="plan-rows">
 				{#each days as day, index (day.date)}
 					<PlanRow {day} {multi} {places} holiday={holidays[day.date] ?? null} draft={drafts[index]} {showProblems} onmode={(mode) => setMode(index, mode)} onchange={(next) => setDraft(index, next)} />
 				{/each}
@@ -420,7 +432,7 @@
 		{/if}
 
 		<!-- Save bar: stays at the bottom of the viewport while the week scrolls, so saving never needs a scroll back to the top. -->
-		<div class="sticky bottom-0 z-30 -mx-4 flex flex-wrap items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:mx-0 sm:rounded-lg sm:border" data-testid="plan-savebar">
+		<div class="sticky bottom-0 z-30 -mx-4 flex flex-wrap items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:mx-0 sm:rounded-lg sm:border fit:shrink-0 fit:py-2" data-testid="plan-savebar">
 			<span class="mr-auto text-sm {dirty ? 'font-medium text-foreground' : 'text-muted-foreground'}" role="status" data-testid="plan-dirty" data-dirty={dirty}>{dirty ? t('weekplan.dirty') : t('weekplan.clean')}</span>
 			{#if dirty}<Button variant="ghost" onclick={discard} data-testid="plan-discard">{t('weekplan.discard')}</Button>{/if}
 			<Button onclick={save} disabled={saving || !dirty} aria-busy={saving} data-testid="plan-save"><Save />{saving ? t('weekplan.saving') : t('weekplan.save')}</Button>
@@ -433,3 +445,4 @@
 {/if}
 
 <Toast message={toast} />
+</div>

@@ -581,7 +581,7 @@
 	const swipe = (direction: -1 | 1) => (dayIndex = Math.min(6, Math.max(0, dayIndex + direction)));
 </script>
 
-<div class="flex flex-col gap-3" data-testid="planner-board">
+<div class="flex flex-col gap-3 fit:h-full fit:min-h-0 fit:gap-2" data-testid="planner-board">
 	<PlannerToolbar bind:tool bind:kind={brushKind} bind:placeId={brushPlace} bind:showActuals {multi} {places} {canUndo} {canRedo} {undoLabel} {redoLabel} onundo={undo} onredo={redo} onadd={() => openAdd()} />
 
 	{#if phone}
@@ -604,7 +604,7 @@
 	{/if}
 
 	<!-- Fixed height: neither the notice nor the selection actions may push the grid around while painting. -->
-	<div class="flex h-8 items-center gap-3">
+	<div class="flex h-8 items-center gap-3 fit:h-7 fit:shrink-0">
 		<p class="min-w-0 flex-1 truncate text-[13px] text-muted-foreground" role="status" aria-live="polite" data-testid="plan-notice">{notice}</p>
 		{#if selected.length > 0}
 			<div class="flex shrink-0 items-center gap-1.5" role="group" aria-label={t('wg.selection_bar')} data-testid="selection-bar">
@@ -616,6 +616,14 @@
 				<Button variant="ghost" size="sm" class="px-2" onclick={() => (selected = [])} aria-label={t('wg.selection_clear')}><X /></Button>
 			</div>
 		{/if}
+		<details class="relative shrink-0 text-[13px]" data-testid="grid-help">
+			<summary class="flex h-7 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 font-medium text-muted-foreground select-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"><Keyboard class="size-4" /><span class="max-sm:sr-only">{t('wg.help_title')}</span></summary>
+			<ul class="absolute top-full right-0 z-40 mt-1 grid w-[min(34rem,calc(100vw-2rem))] max-sm:fixed max-sm:inset-x-4 max-sm:top-auto max-sm:bottom-24 max-sm:w-auto gap-x-6 gap-y-1 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg sm:grid-cols-2">
+				{#each multi ? ['paint', 'move', 'resize', 'split', 'copy', 'select', 'snap', 'menu', 'keys', 'undo', 'touch'] : ['paint', 'move', 'resize', 'copy', 'select', 'snap_single', 'menu', 'keys', 'undo', 'touch'] as key (key)}
+					<li>{t(`wg.help.${key}` as 'wg.help.paint')}</li>
+				{/each}
+			</ul>
+		</details>
 	</div>
 
 	<WeekGrid
@@ -651,7 +659,7 @@
 	/>
 
 	{#if issues.length > 0}
-		<section class="rounded-lg border bg-card p-3" aria-label={t('wg.issues')} data-testid="plan-issues">
+		<section class="rounded-lg border bg-card p-3 fit:max-h-24 fit:shrink-0 fit:overflow-y-auto" aria-label={t('wg.issues')} data-testid="plan-issues">
 			<h3 class="mb-1.5 text-[13px] font-semibold">{t('wg.issues')}</h3>
 			<ul class="flex flex-col gap-1">
 				{#each issues as issue, n (n)}
@@ -665,7 +673,7 @@
 	{/if}
 
 	{#if planHints.length > 0}
-		<section class="rounded-lg border bg-card p-3" aria-label={t('wg.plan_hints')} data-testid="plan-hints">
+		<section class="rounded-lg border bg-card p-3 fit:max-h-24 fit:shrink-0 fit:overflow-y-auto" aria-label={t('wg.plan_hints')} data-testid="plan-hints">
 			<h3 class="mb-1.5 text-[13px] font-semibold">{t('wg.plan_hints')}</h3>
 			<ul class="flex flex-col gap-1">
 				{#each planHints as item, n (n)}
@@ -678,14 +686,6 @@
 		</section>
 	{/if}
 
-	<details class="rounded-lg border bg-card px-3 py-2 text-[13px]" data-testid="grid-help">
-		<summary class="flex cursor-pointer items-center gap-2 font-medium"><Keyboard class="size-4" />{t('wg.help_title')}</summary>
-		<ul class="mt-2 grid gap-x-6 gap-y-1 text-muted-foreground sm:grid-cols-2">
-			{#each multi ? ['paint', 'move', 'resize', 'split', 'copy', 'select', 'snap', 'menu', 'keys', 'undo', 'touch'] : ['paint', 'move', 'resize', 'copy', 'select', 'snap_single', 'menu', 'keys', 'undo', 'touch'] as key (key)}
-				<li>{t(`wg.help.${key}` as 'wg.help.paint')}</li>
-			{/each}
-		</ul>
-	</details>
 </div>
 
 {#if dialog}

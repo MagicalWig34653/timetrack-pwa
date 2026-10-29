@@ -79,25 +79,12 @@ test('switching the month keeps the layout in place', async ({ browser }) => {
 test('year overview toggles and jumps to a month', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
 	await page.goto('/calendar?date=2033-05-10');
-	await page.getByTestId('year-toggle').click();
+	await page.getByTestId('view-year').click();
 	await expect(page.getByTestId('year-overview')).toBeVisible();
 	await expect(page.getByTestId('year-overview').locator('[data-date]')).toHaveCount(365);
 	await page.getByTestId('year-month-9').getByRole('button').click();
 	await expect(page.getByTestId('year-overview')).toHaveCount(0);
 	await expect(page.getByTestId('calendar-month')).toHaveText('September 2033');
-	await context.close();
-});
-
-test('mini timeline shows plan blocks and tracked time', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
-	await page.goto('/calendar?date=2033-06-06');
-	await tile(page, '2033-06-07').dblclick();
-	const dialog = page.getByRole('dialog');
-	await dialog.getByLabel('Beginn').fill('08:00');
-	await dialog.getByLabel('Ende').fill('16:00');
-	await dialog.getByTestId('pd-submit').click();
-	await expect(dialog).toHaveCount(0);
-	await expect(tile(page, '2033-06-07').getByTestId('mini-timeline')).toHaveAttribute('data-has-plan', 'true');
 	await context.close();
 });
 
@@ -123,7 +110,7 @@ test('screenshots', async ({ browser }) => {
 			await expect(page.getByTestId('month-summary')).toBeVisible();
 			await page.screenshot({ path: `${dir}/c2-month-${name}-${scheme}.png`, fullPage: name === 'phone' });
 			if (name === 'desktop') {
-				await page.getByTestId('year-toggle').click();
+				await page.getByTestId('view-year').click();
 				await expect(page.getByTestId('year-overview')).toBeVisible();
 				await page.screenshot({ path: `${dir}/c2-year-${scheme}.png` });
 			}

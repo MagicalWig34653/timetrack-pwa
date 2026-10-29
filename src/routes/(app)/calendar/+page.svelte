@@ -5,6 +5,7 @@
 	import { api } from '#lib/api/client.js';
 	import type { Absence, AbsenceInput, AbsenceKind, AbsenceStatus, CalendarDay, DayEvaluation, Place, PlanDay, WorkModel } from '#lib/api/types.js';
 	import PageHeader from '#lib/components/app/PageHeader.svelte';
+	import Segmented from '#lib/components/app/Segmented.svelte';
 	import DayDetail from '#lib/components/day/DayDetail.svelte';
 	import CalendarBoard from '#lib/components/planning/CalendarBoard.svelte';
 	import CalendarShortcuts from '#lib/components/planning/CalendarShortcuts.svelte';
@@ -24,16 +25,18 @@
 	import { combine, UndoStack } from '#lib/planning/undo.js';
 	import { weekBalance } from '#lib/planning/week-balance.js';
 	import YearOverview from '#lib/components/planning/YearOverview.svelte';
-	import { monthSummary, visibleCellText } from '#lib/planning/cell-model.js';
+	import { monthSummary } from '#lib/planning/cell-model.js';
 	import { durationText } from '#lib/planning/week-balance-text.js';
 	import WeekBalanceLabel from '#lib/components/planning/WeekBalanceLabel.svelte';
-	import { addDays, formatDateLong, formatDateNumeric, isoWeekNumber, isValidDate, todayLocal } from '#lib/time/dates.js';
+	import { addDays, formatDateLong, formatDateNumeric, isoWeekLabel, isoWeekNumber, isValidDate, todayLocal } from '#lib/time/dates.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
+	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import CalendarPlus from '@lucide/svelte/icons/calendar-plus';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import ListFilter from '@lucide/svelte/icons/list-filter';
 	import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
 	import Copy from '@lucide/svelte/icons/copy';
 	import ExternalLink from '@lucide/svelte/icons/external-link';
@@ -47,23 +50,14 @@
 	const requested = $derived(page.url.searchParams.get('date') ?? '');
 	const anchor = $derived(isValidDate(requested) ? requested : today);
 
-	function storedView(): 'month' | 'week' {
-		try {
-			return localStorage.getItem('timetrack.calendar.view') === 'week' ? 'week' : 'month';
-		} catch {
-			return 'month';
-		}
-	}
-	const viewParam = $derived(page.url.searchParams.get('view'));
-	const view = $derived<'month' | 'week'>(viewParam === 'week' || viewParam === 'month' ? viewParam : storedView());
-	const weeks = $derived(view === 'week' ? [weekOf(anchor)] : monthGrid(anchor));
+	// Month and year only (U1): the week lives on /week, reached by the week number or "Woche öffnen".
+	const weeks = $derived(monthGrid(anchor));
 	const gridFrom = $derived(weeks[0][0]);
 	const gridTo = $derived(weeks[weeks.length - 1][6]);
 
 	const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 	const monthTitle = $derived(`${MONTHS[Number(anchor.slice(5, 7)) - 1]} ${anchor.slice(0, 4)}`);
-	const anchorWeek = $derived(weekOf(anchor));
-	const weekTitle = $derived(t('cal.week_title', { n: isoWeekNumber(anchorWeek[0]), from: formatDateNumeric(anchorWeek[0]), to: formatDateNumeric(anchorWeek[6]) }));
+	const weekHref = (date: string) => `/week?week=${isoWeekLabel(date)}&day=${date}`;
 
 	let load = $state<LoadState>({ status: 'loading' });
 	let holidays = $state<CalendarDay[]>([]);
@@ -79,8 +73,8 @@
 	let cursor = $state('');
 	let op = $state<DragOp | null>(null);
 	let rangeMode = $state(false);
-	// Legend and filters: open on tablets and desktops, collapsed on phones where the month grid needs the space.
-	let legendOpen = $state(typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(min-width: 640px)').matches : true);
+	// Legend and filters live in a popover next to the toolbar, closed by default.
+	let legendOpen = $state(false);
 	let dialog = $state<{ seed: DialogSeed; anchor: DOMRect | null; opener: HTMLElement | null } | null>(null);
 	let dialogError = $state('');
 	let helpOpen = $state<HTMLElement | null | false>(false);
@@ -175,7 +169,7 @@
 				places = r.places;
 				models = r.models;
 				load = { status: 'ready' };
-				if (view === 'month') prefetchNeighbours();
+				prefetchNeighbours();
 			} catch (e) {
 				if (!hit) load = toLoadState(e);
 			}
@@ -205,22 +199,15 @@
 	const data = $derived({ holidays, absences, plan, days });
 	const ctx = $derived<ConflictContext>({ holidays, absences, plan, models });
 	const infoOf = (date: string): DayInfo => dayInfo(date, data);
-	const cellLabels = {
-		absence: (a: Absence) => absenceKindLabel(a.kind),
-		plan: (p: PlanDay) => planModeLabel(p.mode),
-		worked: (seconds: number) => t('calendar.worked', { time: timeDisplay.duration(seconds) }),
-		holidayHint: (name: string, treatment: string | null | undefined) => holidayHint(name, treatment as never)
-	};
-	// Accessible name of a month cell: visible text first, then the full description (WCAG 2.5.3).
-	const cellName = (info: DayInfo) => (view === 'month' ? `${visibleCellText(info, hidden, cellLabels)}, ${describe(info)}` : describe(info));
 	const stateOf = (info: DayInfo) => dayWorkState(info, models);
 	const selectedSet = $derived(new Set(selection.dates));
 	// Phone: the week list below the month grid follows the selected day (when it lies in the shown grid).
-	const phoneWeek = $derived(weekOf(view === 'month' && selection.anchor && selection.anchor >= gridFrom && selection.anchor <= gridTo ? selection.anchor : anchor));
+	const phoneWeek = $derived(weekOf(selection.anchor && selection.anchor >= gridFrom && selection.anchor <= gridTo ? selection.anchor : anchor));
 	const focusDate = $derived(selection.anchor);
 	const absenceById = (id: string) => absences.find((a) => a.id === id);
 	const summary = $derived(monthSummary(weeks.flat().filter((d) => d.slice(0, 7) === anchor.slice(0, 7)), data, models, today));
 	let yearOpen = $state(false);
+	const mode = $derived(yearOpen ? 'year' : 'month');
 	const balanceOf = (week: string[]) => weekBalance(week, days, today);
 
 	function describe(info: DayInfo): string {
@@ -246,16 +233,7 @@
 
 	// --- navigation -----------------------------------------------------------------------------------------------
 
-	const href = (date: string, v: 'month' | 'week' = view) => `/calendar?date=${date}${v === 'week' ? '&view=week' : ''}`;
-
-	function setView(next: 'month' | 'week') {
-		try {
-			localStorage.setItem('timetrack.calendar.view', next);
-		} catch {
-			// remembering is a convenience only
-		}
-		void goto(`/calendar?date=${cursor || anchor}&view=${next}`, { replace: true, reset: false });
-	}
+	const href = (date: string) => `/calendar?date=${date}`;
 
 	function moveCursorTo(date: string) {
 		cursor = date;
@@ -550,8 +528,9 @@
 				event.preventDefault();
 				cursor = today;
 				void goto(href(today), { replace: true, reset: false });
-			} else if (k === 'm') setView('month');
-			else if (k === 'w') setView('week');
+			} else if (k === 'm') yearOpen = false;
+				else if (k === 'j') yearOpen = true;
+				else if (k === 'w') void goto(weekHref(cursor || today));
 			else if (key === '?') {
 				event.preventDefault();
 				helpOpen = (document.activeElement as HTMLElement | null) ?? null;
@@ -580,174 +559,159 @@
 
 <svelte:window onkeydown={onWindowKeydown} />
 
-<PageHeader title={t('calendar.title')} description={t('calendar.description')} />
+<!--
+	Layout (U1): on landscape desktops (fit variant: 1280 x 640 and larger) the page fills the viewport height: compact
+	header, toolbar and summary on top, the month grid takes the remaining height with equal rows, the day details sit in a
+	fixed 20 rem column on the right (reserved even without selection, so selecting a day never shifts the grid). Below
+	that the details follow the grid and the page scrolls (phones, tablets).
+-->
+<div class="fit:flex fit:h-[calc(100dvh-60px-4.5rem)] fit:flex-col fit:gap-3" data-testid="calendar-page">
+	<PageHeader compact title={t('calendar.title')} description={t('calendar.description')} />
 
-{#if load.status === 'loading'}
-	<p class="text-sm text-muted-foreground">{t('common.loading')}</p>
-{:else if load.status === 'unavailable'}
-	<Unavailable />
-{:else if load.status === 'error'}
-	<Alert variant="destructive">{load.message}</Alert>
-{:else}
-	<!--
-		Layout: below 1400 px the day details sit under the grid. From 1400 px they move into a fixed 22 rem inspector on the
-		right (shell content is then 1064 px wide: grid about 690 px = 86 px per day column). The column is reserved even
-		without a selection, so selecting a day never shifts the grid.
-	-->
-	<div class="min-[1400px]:grid min-[1400px]:grid-cols-[minmax(0,1fr)_22rem] min-[1400px]:items-start min-[1400px]:gap-6" data-testid="calendar-layout">
-		<div class="flex min-w-0 flex-col gap-4">
-			<div class="flex flex-wrap items-center gap-2">
-				{#if view === 'month'}
-					<nav class="hidden items-center gap-2 sm:flex" aria-label={t('calendar.nav_month')}>
-						<Button variant="outline" size="icon" href={href(addMonths(anchor, -1))} aria-label={t('calendar.previous_month')}><ChevronLeft /></Button>
-						<h2 class="min-w-40 text-center text-lg font-medium" data-testid="calendar-month">{monthTitle}</h2>
-						<Button variant="outline" size="icon" href={href(addMonths(anchor, 1))} aria-label={t('calendar.next_month')}><ChevronRight /></Button>
+	{#if load.status === 'loading'}
+		<p class="text-sm text-muted-foreground">{t('common.loading')}</p>
+	{:else if load.status === 'unavailable'}
+		<Unavailable />
+	{:else if load.status === 'error'}
+		<Alert variant="destructive">{load.message}</Alert>
+	{:else}
+		<div class="fit:grid fit:min-h-0 fit:flex-1 fit:grid-cols-[minmax(0,1fr)_19rem] fit:gap-5" data-testid="calendar-layout">
+			<div class="flex min-w-0 flex-col gap-3 fit:min-h-0">
+				<div class="flex flex-wrap items-center gap-2">
+					<nav class="flex items-center gap-1.5" aria-label={t('calendar.nav_month')}>
+						<Button variant="outline" size="icon" class="size-8" href={href(addMonths(anchor, -1))} aria-label={t('calendar.previous_month')}><ChevronLeft /></Button>
+						<h2 class="min-w-32 text-center text-[17px] font-semibold tracking-tight" data-testid="calendar-month" aria-live="polite">{monthTitle}</h2>
+						<Button variant="outline" size="icon" class="size-8" href={href(addMonths(anchor, 1))} aria-label={t('calendar.next_month')}><ChevronRight /></Button>
 						<Button variant="outline" size="sm" href={href(today)}>{t('datenav.today')}</Button>
 					</nav>
-				{:else}
-					<nav class="hidden items-center gap-2 sm:flex" aria-label={t('calendar.nav_week')}>
-						<Button variant="outline" size="icon" href={href(addDays(anchor, -7))} aria-label={t('calendar.previous_week')}><ChevronLeft /></Button>
-						<h2 class="min-w-56 text-center text-lg font-medium" data-testid="calendar-week-title">{weekTitle}</h2>
-						<Button variant="outline" size="icon" href={href(addDays(anchor, 7))} aria-label={t('calendar.next_week')}><ChevronRight /></Button>
-						<Button variant="outline" size="sm" href={href(today)}>{t('datenav.today')}</Button>
-					</nav>
-				{/if}
-				{#if view === 'month'}
-					<nav class="flex items-center gap-2 sm:hidden" aria-label={t('calendar.nav_month')}>
-						<Button variant="outline" size="icon" href={href(addMonths(anchor, -1))} aria-label={t('calendar.previous_month')}><ChevronLeft /></Button>
-						<p class="flex-1 text-center text-sm font-medium" data-testid="calendar-month-phone">{monthTitle}</p>
-						<Button variant="outline" size="icon" href={href(addMonths(anchor, 1))} aria-label={t('calendar.next_month')}><ChevronRight /></Button>
-						<Button variant="outline" size="sm" href={href(today)}>{t('datenav.today')}</Button>
-					</nav>
-				{:else}
-					<nav class="flex items-center gap-2 sm:hidden" aria-label={t('calendar.nav_week')}>
-						<Button variant="outline" size="icon" href={href(addDays(anchor, -7))} aria-label={t('calendar.previous_week')}><ChevronLeft /></Button>
-						<p class="flex-1 text-center text-sm font-medium" data-testid="calendar-week">{formatDateNumeric(phoneWeek[0])}–{formatDateNumeric(phoneWeek[6])}</p>
-						<Button variant="outline" size="icon" href={href(addDays(anchor, 7))} aria-label={t('calendar.next_week')}><ChevronRight /></Button>
-						<Button variant="outline" size="sm" href={href(today)}>{t('datenav.today')}</Button>
-					</nav>
-				{/if}
 
-				<div class="ml-auto flex flex-wrap items-center gap-2">
-					<div class="inline-flex" role="group" aria-label={t('cal.view')}>
-						<Button variant={view === 'month' ? 'default' : 'outline'} size="sm" class="rounded-r-none" aria-pressed={view === 'month'} onclick={() => setView('month')} data-testid="view-month">{t('cal.view_month')}</Button>
-						<Button variant={view === 'week' ? 'default' : 'outline'} size="sm" class="-ml-px rounded-l-none" aria-pressed={view === 'week'} onclick={() => setView('week')} data-testid="view-week">{t('cal.view_week')}</Button>
+					<div class="ml-auto flex flex-wrap items-center gap-2">
+						<Segmented
+							label={t('cal.view')}
+							value={mode}
+							items={[
+								{ id: 'month', label: t('cal.view_month'), testid: 'view-month' },
+								{ id: 'year', label: t('c2.year'), testid: 'view-year' }
+							]}
+							onchange={(id) => (yearOpen = id === 'year')}
+						/>
+						<Button variant={rangeMode ? 'default' : 'outline'} size="sm" aria-pressed={rangeMode} onclick={() => (rangeMode = !rangeMode)} title={t('cal.range_mode_hint')} data-testid="range-mode">{t('cal.range_mode')}</Button>
+						<Button variant="outline" size="icon" class="size-8" aria-label={undoLabel ? t('cal.menu_undo', { label: undoLabel }) : t('cal.undo')} title={t('cal.undo')} disabled={!undoLabel || busy} onclick={() => void undo()} data-testid="undo"><Undo2 /></Button>
+						<Button variant="outline" size="icon" class="size-8" aria-label={redoLabel ? t('cal.menu_redo', { label: redoLabel }) : t('cal.redo')} title={t('cal.redo')} disabled={!redoLabel || busy} onclick={() => void redo()} data-testid="redo"><Redo2 /></Button>
+						<Button variant="outline" size="sm" class="size-8 px-0" aria-label={t('cal.sc.title')} onclick={(e) => (helpOpen = e.currentTarget)} data-testid="shortcuts-open">?</Button>
+						<details bind:open={legendOpen} class="relative" data-testid="calendar-legends">
+							<summary class="inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-lg border bg-background px-2.5 text-[13px] font-medium select-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none dark:bg-input/30" title={t('n2.legend_title')}><ListFilter class="size-4" aria-hidden="true" /><span class="fit:max-[1599px]:sr-only">{t('n2.legend_title')}</span></summary>
+							<div class="absolute right-0 z-40 mt-1.5 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-3 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg">
+								<ul class="flex flex-wrap gap-2 text-xs" aria-label={t('calendar.legend')} data-testid="calendar-legend">
+									{#each legend as item (item.key)}
+										<li>
+											<button type="button" class="rounded px-1.5 py-0.5 {item.cls} {hidden.has(item.key) ? 'line-through opacity-40' : ''} focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none" aria-pressed={!hidden.has(item.key)} title={t('cal.legend_toggle')} onclick={() => toggleHidden(item.key)}>{item.label()}</button>
+										</li>
+									{/each}
+								</ul>
+								<ul class="flex flex-wrap gap-x-3 gap-y-1.5 text-xs" aria-label={t('calendar.tile_legend')} data-testid="tile-legend">
+									{#each WORK_STATE_ORDER as state (state)}
+										<li class="flex items-center gap-1.5" data-state={state}>
+											<span class="inline-block size-4 rounded-sm border border-border {WORK_STATE_CLASSES[state]}" aria-hidden="true"></span>
+											{workStateLabel(state)}
+										</li>
+									{/each}
+								</ul>
+							</div>
+						</details>
 					</div>
-					{#if view === 'month'}<Button variant={yearOpen ? 'default' : 'outline'} size="sm" aria-pressed={yearOpen} onclick={() => (yearOpen = !yearOpen)} data-testid="year-toggle">{t('c2.year')}</Button>{/if}
-					<Button variant={rangeMode ? 'default' : 'outline'} size="sm" aria-pressed={rangeMode} onclick={() => (rangeMode = !rangeMode)} title={t('cal.range_mode_hint')} data-testid="range-mode">{t('cal.range_mode')}</Button>
-					<Button variant="outline" size="icon" aria-label={undoLabel ? t('cal.menu_undo', { label: undoLabel }) : t('cal.undo')} title={t('cal.undo')} disabled={!undoLabel || busy} onclick={() => void undo()} data-testid="undo"><Undo2 /></Button>
-					<Button variant="outline" size="icon" aria-label={redoLabel ? t('cal.menu_redo', { label: redoLabel }) : t('cal.redo')} title={t('cal.redo')} disabled={!redoLabel || busy} onclick={() => void redo()} data-testid="redo"><Redo2 /></Button>
-					<Button variant="outline" size="sm" aria-label={t('cal.sc.title')} onclick={(e) => (helpOpen = e.currentTarget)} data-testid="shortcuts-open">?</Button>
 				</div>
-			</div>
 
-			{#if view === 'month'}
-				<section class="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl border bg-card px-4 py-3 text-sm sm:grid-cols-5" aria-label={t('c2.summary')} data-testid="month-summary" style="min-height:4.25rem">
-					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.ist')}</span><span class="font-medium tabular-nums" data-testid="sum-ist">{summary.complete || summary.actualSeconds > 0 ? timeDisplay.duration(summary.actualSeconds) : '–'}</span></p>
-					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.soll')}</span><span class="font-medium tabular-nums" data-testid="sum-soll">{summary.complete ? timeDisplay.duration(summary.targetSeconds) : '–'}</span></p>
-					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.saldo')}</span><span class="font-medium tabular-nums {summary.balanceSeconds < 0 ? 'text-amber-700 dark:text-amber-300' : summary.balanceSeconds > 0 ? 'text-emerald-700 dark:text-emerald-300' : ''}" data-testid="sum-saldo">{summary.complete ? timeDisplay.delta(summary.balanceSeconds) : '–'}</span></p>
-					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.vacation')}</span><span class="font-medium tabular-nums" data-testid="sum-vacation">{t('c2.vacation_counts', { booked: String(summary.vacationBooked).replace('.', ','), open: String(summary.vacationOpen).replace('.', ',') })}</span></p>
-					<p class="flex flex-col"><span class="text-xs text-muted-foreground">{t('c2.sick')}</span><span class="font-medium tabular-nums" data-testid="sum-sick">{summary.sickDays}</span></p>
+				<section class="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border bg-card px-3.5 py-2 text-sm" aria-label={t('c2.summary')} data-testid="month-summary">
+					<p class="flex items-baseline gap-1.5"><span class="text-xs text-muted-foreground">{t('c2.ist')}</span><span class="font-medium tabular-nums" data-testid="sum-ist">{summary.complete || summary.actualSeconds > 0 ? timeDisplay.duration(summary.actualSeconds) : '–'}</span></p>
+					<p class="flex items-baseline gap-1.5"><span class="text-xs text-muted-foreground">{t('c2.soll')}</span><span class="font-medium tabular-nums" data-testid="sum-soll">{summary.complete ? timeDisplay.duration(summary.targetSeconds) : '–'}</span></p>
+					<p class="flex items-baseline gap-1.5"><span class="text-xs text-muted-foreground">{t('c2.saldo')}</span><span class="font-medium tabular-nums {summary.balanceSeconds < 0 ? 'text-amber-700 dark:text-amber-300' : summary.balanceSeconds > 0 ? 'text-emerald-700 dark:text-emerald-300' : ''}" data-testid="sum-saldo">{summary.complete ? timeDisplay.delta(summary.balanceSeconds) : '–'}</span></p>
+					<p class="flex items-baseline gap-1.5"><span class="text-xs text-muted-foreground">{t('c2.vacation')}</span><span class="font-medium tabular-nums" data-testid="sum-vacation">{t('c2.vacation_counts', { booked: String(summary.vacationBooked).replace('.', ','), open: String(summary.vacationOpen).replace('.', ',') })}</span></p>
+					<p class="flex items-baseline gap-1.5"><span class="text-xs text-muted-foreground">{t('c2.sick')}</span><span class="font-medium tabular-nums" data-testid="sum-sick">{summary.sickDays}</span></p>
+					<!-- live status: drag preview, selection count or a short hint -->
+					<div class="ml-auto min-w-0 max-w-full truncate text-xs" aria-live="polite" data-testid="calendar-status" title={t('cal.hint')}>
+						{#if ghost}
+							<span class="text-sm" data-testid="drag-status">
+								{t('cal.drag_range', { from: formatDateNumeric(ghost.range.start), to: formatDateNumeric(ghost.range.end), count: ghost.count })}
+								{#if ghost.blocked}<span class="font-medium text-destructive"> · {t('pd.blocked')}</span>{/if}
+							</span>
+						{:else if selection.dates.length > 0}
+							<!-- the floating bar shows the count; the live region announces it -->
+							<span class="sr-only" data-testid="selection-count">{t('cal.selected', { count: selection.dates.length })}</span>
+						{:else}
+							<span class="sr-only">{t('cal.hint_short')}</span>
+						{/if}
+					</div>
 				</section>
-			{/if}
 
-			<details bind:open={legendOpen} class="rounded-lg border px-3 py-2 text-sm" data-testid="calendar-legends">
-				<summary class="cursor-pointer font-medium select-none">{t('n2.legend_title')}</summary>
-				<div class="mt-2 flex flex-col gap-3">
-					<ul class="flex flex-wrap gap-2 text-xs" aria-label={t('calendar.legend')} data-testid="calendar-legend">
-						{#each legend as item (item.key)}
-							<li>
-								<button type="button" class="rounded px-1.5 py-0.5 {item.cls} {hidden.has(item.key) ? 'line-through opacity-40' : ''} focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none" aria-pressed={!hidden.has(item.key)} title={t('cal.legend_toggle')} onclick={() => toggleHidden(item.key)}>{item.label()}</button>
-							</li>
-						{/each}
-					</ul>
-
-					<ul class="flex flex-wrap gap-x-3 gap-y-1.5 text-xs" aria-label={t('calendar.tile_legend')} data-testid="tile-legend">
-						{#each WORK_STATE_ORDER as state (state)}
-							<li class="flex items-center gap-1.5" data-state={state}>
-								<span class="inline-block size-4 rounded-sm border border-border {WORK_STATE_CLASSES[state]}" aria-hidden="true"></span>
-								{workStateLabel(state)}
-							</li>
-						{/each}
-					</ul>
-
+				{#if yearOpen}
+					<div class="relative fit:min-h-0 fit:flex-1 fit:overflow-y-auto">
+						<YearOverview year={Number(anchor.slice(0, 4))} {today} {models} onpick={(d) => { yearOpen = false; void goto(href(d), { replace: true, reset: false }); }} />
+					</div>
+				{/if}
+				<div class="fit:min-h-0 fit:flex-1 fit:[--row-min:0px]" class:hidden={yearOpen} data-testid="board-wrap">
+					<CalendarBoard
+						{weeks}
+						{today}
+						monthOf={anchor.slice(0, 7)}
+						label={monthTitle}
+						{phoneWeek}
+						{infoOf}
+						{stateOf}
+						{describe}
+						selected={selectedSet}
+						{cursor}
+						ghost={ghost ? { dates: ghost.dates, severity: ghost.severity } : null}
+						{hidden}
+						{rangeMode}
+						{absenceById}
+						{menuFor}
+						{balanceOf}
+						{models}
+						{weekHref}
+						bind:op
+						onpick={pick}
+						ondrag={dragSelect}
+						onmove={(a, range) => applyAbsenceRange(a, range, t('cal.op_move'))}
+						onresize={(a, range) => applyAbsenceRange(a, range, t('cal.op_resize'))}
+						oncursor={extendCursor}
+						onquick={(date, el) => openDialog([date], 'plan', el)}
+					/>
 				</div>
-			</details>
+			</div>
 
-			<!-- live status: drag preview, selection actions, results -->
-			<div class="flex min-h-9 flex-wrap items-center gap-2" aria-live="polite" data-testid="calendar-status">
-				{#if ghost}
-					<p class="text-sm" data-testid="drag-status">
-						{t('cal.drag_range', { from: formatDateNumeric(ghost.range.start), to: formatDateNumeric(ghost.range.end), count: ghost.count })}
-						{#if ghost.blocked}<span class="font-medium text-destructive"> · {t('pd.blocked')}</span>{/if}
-					</p>
-				{:else if selection.dates.length > 0}
-					<p class="text-sm" data-testid="selection-count">{t('cal.selected', { count: selection.dates.length })}</p>
+			<aside bind:this={panelEl} class="relative mt-1 fit:mt-0 fit:min-h-0 fit:overflow-y-auto fit:pr-1" aria-label={t('cal.inspector')} data-testid="inspector">
+				{#if focusDate}
+					{@const focusBalance = balanceOf(weekOf(focusDate))}
+					<div class="mb-2 flex items-center justify-between gap-2">
+						<p class="flex items-baseline gap-2 text-xs text-muted-foreground" data-testid="inspector-week-balance">
+							<span>{t('cal.week_balance_inspector', { n: isoWeekNumber(focusDate) })}</span>
+							{#if focusBalance}<WeekBalanceLabel balance={focusBalance} week={isoWeekNumber(focusDate)} class="text-xs" />{/if}
+						</p>
+						<Button variant="outline" size="sm" href={weekHref(focusDate)} data-testid="open-week"><CalendarDays />{t('cal.open_week')}</Button>
+					</div>
+					<DayDetail date={focusDate} {places} refresh={reloadToken} onchanged={() => reloadToken++} onclose={() => (selection = emptySelection)} />
 				{:else}
-					<p class="text-xs text-muted-foreground">{t('cal.hint')}</p>
+					<p class="text-sm text-muted-foreground">{t('calendar.pick_day')}</p>
 				{/if}
-			</div>
-			{#if error}
-				<Alert variant="destructive" data-testid="calendar-error">{error}</Alert>
-			{:else if notice}
-				<Alert variant="success" data-testid="calendar-notice">
-					{notice}
-					{#if undoLabel}<Button class="ml-2" variant="outline" size="sm" onclick={() => void undo()} disabled={busy}>{t('cal.undo')}</Button>{/if}
-				</Alert>
-			{/if}
-
-			{#if yearOpen && view === 'month'}
-				<YearOverview year={Number(anchor.slice(0, 4))} {today} {models} onpick={(d) => { yearOpen = false; void goto(href(d), { replace: true, reset: false }); }} />
-			{/if}
-			<div class="sm:min-h-[calc(6*8rem+2rem)]" class:hidden={yearOpen && view === 'month'} data-testid="board-wrap">
-			<CalendarBoard
-				{weeks}
-				variant={view}
-				{today}
-				monthOf={anchor.slice(0, 7)}
-				label={view === 'week' ? weekTitle : monthTitle}
-				{phoneWeek}
-				{infoOf}
-				{stateOf}
-				describe={cellName}
-				selected={selectedSet}
-				{cursor}
-				ghost={ghost ? { dates: ghost.dates, severity: ghost.severity } : null}
-				{hidden}
-				{rangeMode}
-				{absenceById}
-				{menuFor}
-				{balanceOf}
-				{models}
-				{timeZone}
-				bind:op
-				onpick={pick}
-				ondrag={dragSelect}
-				onmove={(a, range) => applyAbsenceRange(a, range, t('cal.op_move'))}
-				onresize={(a, range) => applyAbsenceRange(a, range, t('cal.op_resize'))}
-				oncursor={extendCursor}
-				onquick={(date, el) => openDialog([date], 'plan', el)}
-			/>
-			</div>
+			</aside>
 		</div>
+	{/if}
+</div>
 
-		<aside bind:this={panelEl} class="mt-4 min-[1400px]:sticky min-[1400px]:top-20 min-[1400px]:mt-0 min-[1400px]:max-h-[calc(100dvh-6rem)] min-[1400px]:overflow-y-auto" aria-label={t('cal.inspector')} data-testid="inspector">
-			{#if focusDate}
-				{@const focusBalance = balanceOf(weekOf(focusDate))}
-				{#if focusBalance}
-					<p class="mb-2 flex items-baseline gap-2 text-xs text-muted-foreground" data-testid="inspector-week-balance">
-						<span>{t('cal.week_balance_inspector', { n: isoWeekNumber(focusDate) })}</span>
-						<WeekBalanceLabel balance={focusBalance} week={isoWeekNumber(focusDate)} class="text-xs" />
-					</p>
-				{/if}
-				<DayDetail date={focusDate} {places} refresh={reloadToken} onchanged={() => reloadToken++} onclose={() => (selection = emptySelection)} />
-			{:else}
-				<p class="text-sm text-muted-foreground">{t('calendar.pick_day')}</p>
-			{/if}
-		</aside>
+<!-- results appear as a toast so they never push the grid -->
+{#if error}
+	<div class="fixed inset-x-3 bottom-36 z-40 sm:inset-x-auto sm:right-4 sm:bottom-16 sm:max-w-sm"><Alert variant="destructive" data-testid="calendar-error">{error}</Alert></div>
+{:else if notice}
+	<div class="fixed inset-x-3 bottom-36 z-40 sm:inset-x-auto sm:right-4 sm:bottom-16 sm:max-w-sm">
+		<Alert variant="success" data-testid="calendar-notice">
+			{notice}
+			{#if undoLabel}<Button class="ml-2" variant="outline" size="sm" onclick={() => void undo()} disabled={busy}>{t('cal.undo')}</Button>{/if}
+		</Alert>
 	</div>
+{/if}
 
-	{#if selection.dates.length > 0 && !ghost}
+{#if selection.dates.length > 0 && !ghost}
 		<div class="fixed inset-x-0 bottom-20 z-30 flex justify-center px-3 sm:bottom-3" data-testid="selection-bar">
 			<div class="flex max-w-full flex-wrap items-center gap-2 rounded-2xl border bg-card/95 px-3 py-2 shadow-lg backdrop-blur" role="toolbar" aria-label={t('c2.actions')}>
 				<span class="text-sm font-medium" data-testid="bar-count">{t('cal.selected', { count: selection.dates.length })}</span>
@@ -764,4 +728,3 @@
 	{#if helpOpen !== false}
 		<CalendarShortcuts returnFocus={helpOpen} onclose={() => (helpOpen = false)} />
 	{/if}
-{/if}

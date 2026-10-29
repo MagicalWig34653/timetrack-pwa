@@ -272,7 +272,7 @@ test('a shared plan shows the blocks with kind and times only', async ({ browser
 });
 
 test('an older server (before 0.35.0) keeps the single window with a break', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1100 } });
+	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1440, height: 1500 } });
 	await page.route('**/api/v1/system/info', async (route) => {
 		const response = await route.fetch();
 		const json = await response.json();
