@@ -99,7 +99,11 @@ export interface RequestOptions {
 export interface RecoveryStatus {
 	recoveryCodes: { active: boolean; remaining?: number };
 	fallbackPassword: { active: boolean };
-	email: { available: boolean; active: boolean; verified?: boolean };
+	/**
+	 * Contract 0.36.0: the account e-mail is the only recovery address. `verified` means that address is confirmed;
+	 * `accountEmail` is null without one. Both are absent on older servers.
+	 */
+	email: { available: boolean; active: boolean; verified?: boolean; accountEmail?: string | null; usesAccountEmail?: boolean };
 }
 
 export type RecoveryMethod = 'email' | 'recovery-code' | 'fallback-password';

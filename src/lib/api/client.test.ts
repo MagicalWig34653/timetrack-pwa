@@ -21,7 +21,16 @@ describe('api client', () => {
 
 	it('accepts a bodyless 202 response (PUT /me/recovery/email)', async () => {
 		vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 202 })));
-		await expect(api.enableEmailRecovery('user@example.org')).resolves.toBeUndefined();
+		await expect(api.enableEmailRecovery()).resolves.toBe('code');
+	});
+
+	it('tells an immediately active recovery (204) from a code request (202) and sends no body', async () => {
+		const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+		vi.stubGlobal('fetch', fetchMock);
+		await expect(api.enableEmailRecovery()).resolves.toBe('active');
+		const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
+		expect(init.method).toBe('PUT');
+		expect(init.body).toBeUndefined();
 	});
 
 	it('adopts the CSRF token from a session response and sends it on mutating calls', async () => {

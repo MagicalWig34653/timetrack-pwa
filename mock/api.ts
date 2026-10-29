@@ -751,6 +751,7 @@ export function createMockApi(options: MockOptions = {}) {
 				account.email = undefined;
 				account.emailVerified = false;
 				account.pendingEmail = undefined;
+				account.emailRecovery = { active: false, verified: false }; // removing the account address switches e-mail recovery off
 				return { status: 204 };
 			}
 		}
@@ -818,7 +819,9 @@ export function createMockApi(options: MockOptions = {}) {
 					email: {
 						available: mailAvailable,
 						active: account.emailRecovery.active,
-						verified: account.emailRecovery.verified
+						verified: !!account.emailVerified && !!account.email,
+						accountEmail: account.email ?? null,
+						usesAccountEmail: true
 					}
 				}
 			};
@@ -849,7 +852,14 @@ export function createMockApi(options: MockOptions = {}) {
 		if (path === '/api/v1/me/recovery/email') {
 			if (method === 'PUT') {
 				if (!mailAvailable) return error(501, 'not_implemented');
-				account.email = body.email;
+				// contract 0.36.0: the account e-mail is the recovery address; the call needs no body
+				if (!account.email) return error(409, 'account_email_missing');
+				const given = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+				if (given && given !== account.email && account.emailVerified) return error(409, 'recovery_email_must_be_account_email');
+				if (account.emailVerified) {
+					account.emailRecovery = { active: true, verified: true };
+					return { status: 204 };
+				}
 				account.emailRecovery = { active: false, verified: false };
 				return { status: 202 };
 			}
@@ -860,6 +870,7 @@ export function createMockApi(options: MockOptions = {}) {
 		}
 		if (path === '/api/v1/me/recovery/email/verify' && method === 'POST') {
 			if (body.code !== '123456') return error(400, 'invalid_code');
+			account.emailVerified = true; // the code went to the account address, so it confirms that too
 			account.emailRecovery = { active: true, verified: true };
 			return { status: 204 };
 		}

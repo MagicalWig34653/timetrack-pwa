@@ -39,7 +39,7 @@ export const deProfile = {
 	'profile.email_confirm': 'Bestätigen',
 	'profile.email_cancel': 'Abbrechen',
 	'profile.email_confirmed': 'E-Mail-Adresse bestätigt und übernommen.',
-	'profile.email_recovery_note': 'Die Adresse für die Wiederherstellung per E-Mail richtest du getrennt unter „Wiederherstellung“ ein.',
+	'profile.email_recovery_note': 'Diese Kontomail ist auch die Adresse für die Wiederherstellung per E-Mail. Einschalten kannst du sie unter „Wiederherstellung“; ändern oder entfernen wirkt sich dort sofort aus.',
 	'profile.setup_title': 'Einrichtung',
 	'profile.setup_state_pending': 'Die geführte Einrichtung wurde noch nicht durchlaufen.',
 	'profile.setup_state_completed': 'Die geführte Einrichtung ist abgeschlossen.',

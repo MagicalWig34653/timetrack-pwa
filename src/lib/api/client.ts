@@ -276,12 +276,17 @@ export function cachedRead<T>(key: string, load: () => Promise<T>, ttlMs = READ_
 	return value;
 }
 
-async function request<T>(
+async function request<T>(method: Method, path: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<T> {
+	return (await requestWithStatus<T>(method, path, body, extraHeaders)).data;
+}
+
+/** Like `request`, but also returns the HTTP status for endpoints whose 2xx codes mean different things (204 vs 202). */
+async function requestWithStatus<T>(
 	method: Method,
 	path: string,
 	body?: unknown,
 	extraHeaders: Record<string, string> = {}
-): Promise<T> {
+): Promise<{ status: number; data: T }> {
 	const headers: Record<string, string> = { Accept: 'application/json', ...extraHeaders };
 	if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
 	if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -318,7 +323,7 @@ async function request<T>(
 	if (method !== 'GET') invalidateReadCache();
 	// 204 and bodyless 202 (e.g. PUT /me/recovery/email) carry no JSON.
 	const text = await response.text();
-	return (text ? JSON.parse(text) : undefined) as T;
+	return { status: response.status, data: (text ? JSON.parse(text) : undefined) as T };
 }
 
 /** Session-returning calls refresh the CSRF token held by the client. */
@@ -438,7 +443,11 @@ export const api = {
 	setFallbackPassword: (password: string) =>
 		request<void>('PUT', '/me/recovery/fallback-password', { password }),
 	removeFallbackPassword: () => request<void>('DELETE', '/me/recovery/fallback-password'),
-	enableEmailRecovery: (email: string) => request<void>('PUT', '/me/recovery/email', { email }),
+	/**
+	 * Contract 0.36.0: the account e-mail is the recovery address, so the call has no body. 'active' = 204 (confirmed account
+	 * address, recovery is on), 'code' = 202 (a code went to the account address; confirm it with verifyRecoveryEmail).
+	 */
+	enableEmailRecovery: async (): Promise<'active' | 'code'> => ((await requestWithStatus<void>('PUT', '/me/recovery/email')).status === 202 ? 'code' : 'active'),
 	disableEmailRecovery: () => request<void>('DELETE', '/me/recovery/email'),
 	verifyRecoveryEmail: (code: string) =>
 		request<void>('POST', '/me/recovery/email/verify', { code }),

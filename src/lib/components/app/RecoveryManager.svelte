@@ -27,7 +27,6 @@
 	let passwordRepeat = $state('');
 	let passwordError = $state('');
 
-	let email = $state('');
 	let emailCodeSent = $state(false);
 	let emailCode = $state('');
 
@@ -89,12 +88,16 @@
 	const removePassword = () =>
 		run(() => api.removeFallbackPassword(), t('recovery.password.removed'));
 
+	// The account e-mail is the recovery address (contract 0.36.0): no address input here. 204 = active at once, 202 = code entry.
 	function startEmail(event: Event) {
 		event.preventDefault();
+		let activated = false;
 		return run(async () => {
-			await api.enableEmailRecovery(email);
-			emailCodeSent = true;
-		}, t('recovery.email.code_sent'));
+			activated = (await api.enableEmailRecovery()) === 'active';
+			emailCodeSent = !activated;
+		}, t('recovery.email.code_sent')).then(() => {
+			if (activated && !error) notice = t('recovery.email.verified');
+		});
 	}
 
 	function verifyEmail(event: Event) {
@@ -108,6 +111,7 @@
 
 	const disableEmail = () => run(() => api.disableEmailRecovery(), t('recovery.email.disabled'));
 
+	const accountEmail = $derived(status?.email.accountEmail ?? null);
 	const codesText = $derived(freshCodes?.join('\n') ?? '');
 </script>
 
@@ -239,8 +243,16 @@
 			<CardContent>
 				{#if !status.email.available}
 					<Alert>{t('recovery.email.unavailable')}</Alert>
+				{:else if !accountEmail}
+					<div class="flex flex-col gap-3" data-testid="recovery-no-account-email">
+						<p class="text-sm">{t('recovery.email.no_account_mail')}</p>
+						<div><Button variant="outline" href="/settings/profile" data-testid="recovery-profile-link">{t('recovery.email.add_in_profile')}</Button></div>
+					</div>
 				{:else if status.email.active}
-					<Button variant="destructive" onclick={disableEmail} disabled={busy}>{t('common.disable')}</Button>
+					<div class="flex flex-col gap-3">
+						<p class="text-sm" data-testid="recovery-account-email">{t('recovery.email.uses_account_mail', { email: accountEmail })} <a class="underline underline-offset-4" href="/settings/profile">{t('recovery.email.profile_link')}</a></p>
+						<div><Button variant="destructive" onclick={disableEmail} disabled={busy}>{t('common.disable')}</Button></div>
+					</div>
 				{:else if emailCodeSent}
 					<form class="flex flex-col gap-3" onsubmit={verifyEmail}>
 						<Field
@@ -258,15 +270,14 @@
 					</form>
 				{:else}
 					<form class="flex flex-col gap-3" onsubmit={startEmail}>
-						<Field
-							id="recovery-email"
-							type="email"
-							label={t('recovery.email.address')}
-							bind:value={email}
-							autocomplete="email"
-							required
-						/>
-						<div><Button type="submit" disabled={busy}>{t('recovery.email.send_code')}</Button></div>
+						<p class="text-sm" data-testid="recovery-account-email">{t('recovery.email.uses_account_mail', { email: accountEmail })} <a class="underline underline-offset-4" href="/settings/profile">{t('recovery.email.profile_link')}</a></p>
+						{#if status.email.verified === false}
+							<Alert variant="warning" data-testid="recovery-email-unconfirmed">
+								{t('recovery.email.unconfirmed')}
+								<a class="mt-1 block font-medium underline underline-offset-2" href="/settings/profile" data-testid="recovery-confirm-link">{t('recovery.email.confirm_in_profile')}</a>
+							</Alert>
+						{/if}
+						<div><Button type="submit" disabled={busy || status.email.verified === false} data-testid="recovery-email-enable">{t('recovery.email.enable')}</Button></div>
 					</form>
 				{/if}
 			</CardContent>
