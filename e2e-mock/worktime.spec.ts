@@ -158,7 +158,7 @@ test('excused: absence form hint, list filter and vacation balance stays untouch
 	await page.getByTestId('day-panel').getByRole('button', { name: 'Abwesenheit anlegen' }).click();
 	await page.getByLabel('Art').selectOption('excused');
 	await expect(page.getByTestId('absence-excused-hint')).toContainText('verbraucht keinen Urlaub');
-	await page.locator('#abs-status').selectOption('approved');
+	await expect(page.locator('#abs-status')).toHaveCount(0); // excused leave has no approval workflow
 	await page.getByTestId('absence-form').getByRole('button', { name: 'Speichern' }).click();
 	await page.goto('/absences');
 	for (let i = new Date().getFullYear(); i < 2036; i++) await page.getByRole('button', { name: 'Folgejahr' }).click();

@@ -119,15 +119,14 @@
 	});
 
 	// While a filter control has the focus the list keeps its height, so a shrinking result never shifts the page under the cursor.
-	let filtering = $state(false);
-	let listHeight = $state(0);
+	let resultsEl = $state<HTMLElement>();
 	let reservedHeight = $state(0);
-	$effect(() => {
-		if (filtering) reservedHeight = Math.max(untrack(() => reservedHeight), listHeight);
-		else reservedHeight = 0;
-	});
+	/** Called before a filter change is rendered (input/change bubble up here first): remember the tallest list seen while filtering. */
+	function holdHeight() {
+		reservedHeight = Math.max(reservedHeight, resultsEl?.offsetHeight ?? 0);
+	}
 	function filterFocusOut(event: FocusEvent) {
-		if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) filtering = false;
+		if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) reservedHeight = 0;
 	}
 
 	// Remember the filters and mirror them in the URL (replace, no history entries; the focus and the scroll position stay).
@@ -255,7 +254,7 @@
 			<Button class="sm:ml-auto" onclick={() => (editing = 'new')}>{t('absence.create_title')}</Button>
 		</div>
 
-		<section class="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('absences.filters')} data-testid="absence-filters" onfocusin={() => (filtering = true)} onfocusout={filterFocusOut}>
+		<section class="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('absences.filters')} data-testid="absence-filters" onfocusin={holdHeight} oninput={holdHeight} onchange={holdHeight} onfocusout={filterFocusOut}>
 			<div class="flex flex-col gap-1.5 lg:col-span-2">
 				<Label for="filter-q">{t('absences.filter_q')}</Label>
 				<Input id="filter-q" type="search" bind:value={qDraft} oninput={onQInput} placeholder={t('absences.filter_q_placeholder')} autocomplete="off" />
@@ -310,7 +309,7 @@
 			<AbsenceForm date={today} onsaved={saved} oncancel={() => (editing = null)} />
 		{/if}
 
-		<div bind:clientHeight={listHeight} style:min-height={reservedHeight > 0 ? `${reservedHeight}px` : undefined} data-testid="absence-results">
+		<div bind:this={resultsEl} style:min-height={reservedHeight > 0 ? `${reservedHeight}px` : undefined} data-testid="absence-results">
 		{#if visible.length === 0}
 			<div class="flex flex-col items-start gap-2 rounded-lg border border-dashed p-4" data-testid="absences-empty">
 				<p class="text-sm text-muted-foreground">{absences.length === 0 ? t('absences.empty_year', { year }) : t('absences.empty')}</p>

@@ -189,7 +189,9 @@ test('context menu: keyboard operable, closes on Escape, keeps the system menu i
 
 	// right-click on an absence chip: its own menu with status entries
 	await tile(page, '2032-07-07').locator('[data-chip="absence"]').click({ button: 'right' });
-	await expect(page.getByRole('menuitem', { name: 'Status: Genehmigt' })).toBeVisible();
+	// sick leave is only recorded or cancelled: no approval entries (contract 0.36.0)
+	await expect(page.getByRole('menuitem', { name: 'Status: Storniert' })).toBeVisible();
+	await expect(page.getByRole('menuitem', { name: 'Status: Genehmigt' })).toHaveCount(0);
 	await page.getByRole('menuitem', { name: 'Abwesenheit löschen' }).click();
 	await expect(tile(page, '2032-07-07').locator('[data-chip="absence"]')).toHaveCount(0);
 

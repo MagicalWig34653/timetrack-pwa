@@ -63,9 +63,12 @@ describe('absences list: sort and filter', () => {
 		render(AbsencesPage);
 		await screen.findByTestId('absence-list');
 		await userEvent.type(screen.getByLabelText('Suche in der Notiz'), 'erkält');
-		expect(rows()).toHaveLength(1);
+		// the list follows after a short pause (debounce); the URL is replaced without resetting focus and scroll (reset: false)
+		expect(rows()).toHaveLength(4);
+		await waitFor(() => expect(rows()).toHaveLength(1));
 		expect(screen.getByTestId('absences-count')).toHaveTextContent('1 von 4 Abwesenheiten');
-		await waitFor(() => expect(gotoMock).toHaveBeenLastCalledWith('/absences?q=erk%C3%A4lt', { replace: true }));
+		await waitFor(() => expect(gotoMock).toHaveBeenLastCalledWith('/absences?q=erk%C3%A4lt', { replace: true, reset: false }));
+		expect(gotoMock).toHaveBeenCalledTimes(1);
 		expect(JSON.parse(localStorage.getItem(ABSENCE_FILTER_STORAGE_KEY) ?? '{}').q).toBe('erkält');
 		await userEvent.click(screen.getByTestId('absences-reset'));
 		expect(rows()).toHaveLength(4);

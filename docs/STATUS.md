@@ -1,5 +1,8 @@
 # Stand der PWA – 26.10.2026 (Paket P15 im Worktree, uncommittet)
 
+## Paket U4-pwa (29.10.2026, Branch u4-pwa-bugs, nicht gemergt)
+Vertrag 0.36.0: Abwesenheitsstatus je Art (`recorded`/„erfasst“, Statusauswahl nur bei Urlaub, unbekannte Status tolerant), Zeitkonto ohne laufenden Tag mit getrenntem „Heute: …, fließt morgen ein“, Konto-Mail als einzige Recovery-Adresse, Zeigercursor für klickbare Elemente, stabile /absences-Filter (Fokus bleibt beim Tippen). Details: `docs/handoffs/U4-pwa.md`.
+
 ## Paket U1-pwa (29.10.2026, Branch u1-calendar-planner, nicht gemergt)
 Kalender und Planer passen ohne Seitenscroll in 1366x768 und 1920x1080 (Variante `fit`); Monatsraster neu (Pills statt Mini-Zeitleisten, durchgehende Abwesenheitsbalken, KW-Spalte mit Link auf /week), Wochenmodus entfernt, ein Segmented-Umschalter (Monat/Jahr, Raster/Liste). Details: `docs/handoffs/U1-pwa.md`.
 
