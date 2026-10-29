@@ -31,6 +31,9 @@ export interface StatsPoint {
 }
 
 export interface StatsData {
+	/** Contract 0.36.0: the series counts completed days only; the running day's difference stands apart (null/absent: none). */
+	includesToday?: boolean;
+	todayDeltaSeconds?: number | null;
 	from: string;
 	to: string;
 	granularity: Granularity;

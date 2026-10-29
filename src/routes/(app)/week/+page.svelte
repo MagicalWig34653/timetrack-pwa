@@ -44,6 +44,7 @@
 	import Trophy from '@lucide/svelte/icons/trophy';
 	import Target from '@lucide/svelte/icons/target';
 	import Wallet from '@lucide/svelte/icons/wallet';
+	import { todayDeltaNote } from '#lib/time/today-delta.js';
 	import { onMount, untrack } from 'svelte';
 
 	const timeZone = $derived(zoneStore.value);
@@ -186,7 +187,7 @@
 				icon={Target}
 				testid="week-target"
 			/>
-			<KpiCard title={t('weekview.balance')} seconds={summary.balanceSeconds} delta hint={isCurrent ? t('weekview.balance_hint') : t('weekview.balance_hint_past')} icon={Scale} tone={summary.balanceSeconds < 0 ? 'negative' : 'default'} testid="week-balance" />
+			<KpiCard title={t('weekview.balance')} seconds={summary.balanceSeconds} delta hint={isCurrent ? t('weekview.balance_hint') : t('weekview.balance_hint_past')} icon={Scale} note={todayDeltaNote(summary)} tone={summary.balanceSeconds < 0 ? 'negative' : 'default'} testid="week-balance" />
 			<KpiCard
 				title={t('weekview.account')}
 				seconds={summary.accountBalanceAfterSeconds} delta

@@ -77,6 +77,7 @@ export const deP12 = {
 	'stats.kpi.target': 'Soll',
 	'stats.kpi.balance': 'Differenz',
 	'stats.kpi.account': 'Zeitkonto am Ende',
+	'stats.kpi.account_hint': 'ohne den laufenden Tag',
 	'stats.kpi.avg_start': 'Ø Beginn',
 	'stats.kpi.avg_end': 'Ø Ende',
 	'stats.kpi.breaks': 'Pausen gesamt',

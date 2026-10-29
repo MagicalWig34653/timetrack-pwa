@@ -27,6 +27,7 @@
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { continuableSegment } from '#lib/time/continue.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
+	import { todayDeltaNote } from '#lib/time/today-delta.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { onMount } from 'svelte';
 
@@ -145,6 +146,7 @@
 					seconds={account.balanceSeconds} delta
 					hint={account.provisional ? t('home.balance_provisional') : account.accountStart ? t('home.balance_since', { date: account.accountStart.split('-').reverse().join('.') }) : t('home.balance_no_start')}
 					icon={Wallet}
+					note={todayDeltaNote(account)}
 					tone={account.balanceSeconds < 0 ? 'negative' : 'default'}
 					testid="balance"
 				/>

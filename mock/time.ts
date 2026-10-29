@@ -234,16 +234,20 @@ export function createTimeMock(clock: () => number) {
 		const start = opening?.date ?? [state.models.map((model) => model.validFrom).sort()[0], state.segments.map((segment) => localDateOf(segment.startedAt, DEFAULT_TIMEZONE)).sort()[0], state.adjustments.map((item) => item.date).sort()[0]].filter((date): date is string => !!date).sort()[0] ?? null;
 		let total = (opening && opening.date <= asOf ? opening.seconds : 0) + adjustmentSeconds;
 		if (start && start <= asOf) {
-			const last = asOf < today ? asOf : today;
-			for (const date of daysBetween(start, last)) total += evaluate(state, date).deltaSeconds;
+			// contract 0.36.0: the running day is not part of the balance, only the days through yesterday
+			const last = asOf < today ? asOf : addDays(today, -1);
+			if (last >= start) for (const date of daysBetween(start, last)) total += evaluate(state, date).deltaSeconds;
 		}
+		const todayDeltaSeconds = start && start <= today && asOf >= today ? evaluate(state, today).deltaSeconds : null;
 		return {
 			asOf,
 			accountStart: start,
 			balanceSeconds: total,
 			openingSeconds: opening?.seconds ?? 0,
 			adjustmentSeconds,
-			provisional: asOf >= today
+			provisional: false,
+			includesToday: false,
+			todayDeltaSeconds
 		};
 	}
 
@@ -263,6 +267,7 @@ export function createTimeMock(clock: () => number) {
 		const buckets = new Map<string, any>();
 		const totals = { targetSeconds: 0, targetToDateSeconds: 0, actualSeconds: 0, creditSeconds: 0, deltaSeconds: 0, overtimeSeconds: 0, undertimeSeconds: 0, breakSeconds: 0, breakDeductionSeconds: 0, kindSeconds: { work: 0, school: 0, travel: 0 }, absenceDays: 0 };
 		let running = openingBalance ?? 0;
+		let todayDeltaSeconds: number | null = null;
 		for (const date of dates) {
 			const key = bucketKey(date, granularity);
 			let b = buckets.get(key);
@@ -275,6 +280,11 @@ export function createTimeMock(clock: () => number) {
 			b.days += 1;
 			b.targetSeconds += ev.targetSeconds;
 			if (date > today) continue;
+			if (date === today) {
+				// the running day stands apart (contract 0.36.0): neither in the sums nor in the cumulative balance
+				todayDeltaSeconds = (basis === 'raw' ? ev.evaluatedWorkSeconds - (ev.startAdjustSeconds + ev.endAdjustSeconds) : ev.evaluatedWorkSeconds) + ev.creditSeconds - ev.targetSeconds;
+				continue;
+			}
 			const rounding = ev.startAdjustSeconds + ev.endAdjustSeconds;
 			const actual = basis === 'raw' ? ev.evaluatedWorkSeconds - rounding : ev.evaluatedWorkSeconds;
 			const delta = actual + ev.creditSeconds - ev.targetSeconds;
@@ -317,7 +327,7 @@ export function createTimeMock(clock: () => number) {
 			totals.kindSeconds.school += f.school;
 			totals.absenceDays += mark === 'vacation' || mark === 'sick' || mark === 'excused' ? weight : 0;
 		}
-		return ok({ from, to, granularity, basis, timezone: DEFAULT_TIMEZONE, accountStart: opening?.date ?? null, openingBalanceSeconds: openingBalance, buckets: [...buckets.values()], totals });
+		return ok({ from, to, granularity, basis, timezone: DEFAULT_TIMEZONE, accountStart: opening?.date ?? null, openingBalanceSeconds: openingBalance, includesToday: false, todayDeltaSeconds, buckets: [...buckets.values()], totals });
 	}
 
 	function findOverlap(state: TimeState, startedAt: number, endedAt: number | null, ignoreId?: string): Segment | undefined {

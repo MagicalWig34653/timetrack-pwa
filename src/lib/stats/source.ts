@@ -100,6 +100,8 @@ export function fromStatistics(stats: TimeStatistics, monthly: TimeStatistics, t
 	const points = build(stats);
 	const t = stats.totals;
 	return {
+		includesToday: stats.includesToday,
+		todayDeltaSeconds: stats.todayDeltaSeconds ?? null,
 		from: stats.from,
 		to: stats.to,
 		granularity: stats.granularity,

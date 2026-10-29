@@ -320,6 +320,9 @@ export interface TimeStatistics {
 	timezone: string;
 	accountStart?: string | null;
 	openingBalanceSeconds?: number | null;
+	includesToday?: boolean;
+	/** Difference of the running day; null when today is outside from..to. */
+	todayDeltaSeconds?: number | null;
 	buckets: StatisticsBucket[];
 	totals: {
 		targetSeconds: number;
@@ -387,6 +390,10 @@ export interface TimeAccount {
 	openingSeconds: number;
 	adjustmentSeconds: number;
 	provisional: boolean;
+	/** Contract 0.36.0: always false, the running day is not in the balance. Absent on older servers (balance then includes today). */
+	includesToday?: boolean;
+	/** Difference of the running day (actual + credit - target); null when asOf is before today or the account has not started. */
+	todayDeltaSeconds?: number | null;
 }
 
 export interface AccountAdjustmentInput {
@@ -747,10 +754,15 @@ export interface TimeWeekDay {
 
 export interface TimeWeekSummary {
 	targetSeconds: number;
+	/** Contract 0.36.0: target of the completed days (through yesterday). */
 	targetToDateSeconds: number;
 	workSeconds: number;
 	creditSeconds: number;
+	/** Contract 0.36.0: sum of the daily balances of the completed days (through yesterday). */
 	balanceSeconds: number;
+	includesToday?: boolean;
+	/** Balance of the running day; null when the week does not contain today. */
+	todayDeltaSeconds?: number | null;
 	plannedSeconds: number | null;
 	accountBalanceBeforeSeconds: number;
 	accountBalanceAfterSeconds: number;

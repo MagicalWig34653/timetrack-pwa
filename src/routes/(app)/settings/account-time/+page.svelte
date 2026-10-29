@@ -14,6 +14,7 @@
 	import { parseDuration } from '#lib/time/format.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
+	import { todayDeltaNote } from '#lib/time/today-delta.js';
 	import { onMount } from 'svelte';
 
 	let load = $state<LoadState>({ status: 'loading' });
@@ -140,7 +141,10 @@
 			</CardHeader>
 			<CardContent>
 				<dl class="grid grid-cols-3 gap-4 text-sm">
-					<div><dt class="text-muted-foreground">{t('account_time.balance')}</dt><dd class="text-2xl font-semibold tabular-nums {account.balanceSeconds < 0 ? 'text-destructive' : ''}" data-testid="account-balance"><Dur seconds={account.balanceSeconds} delta /></dd></div>
+					<div><dt class="text-muted-foreground">{t('account_time.balance')}</dt><dd class="text-2xl font-semibold tabular-nums {account.balanceSeconds < 0 ? 'text-destructive' : ''}" data-testid="account-balance"><Dur seconds={account.balanceSeconds} delta /></dd>
+						{#if account.includesToday === false}<dd class="mt-1 text-xs text-muted-foreground" data-testid="account-without-today">{t('account.without_today')}</dd>{/if}
+						{#if todayDeltaNote(account)}<dd class="text-xs text-muted-foreground" data-testid="account-today">{todayDeltaNote(account)}</dd>{/if}
+					</div>
 					<div><dt class="text-muted-foreground">{t('account_time.opening')}</dt><dd class="text-lg tabular-nums" data-testid="account-opening"><Dur seconds={account.openingSeconds} delta /></dd></div>
 					<div><dt class="text-muted-foreground">{t('account_time.corrections')}</dt><dd class="text-lg tabular-nums" data-testid="account-corrections"><Dur seconds={account.adjustmentSeconds} delta /></dd></div>
 				</dl>

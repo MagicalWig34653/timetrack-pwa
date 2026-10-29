@@ -23,6 +23,7 @@
 	import Plane from '@lucide/svelte/icons/plane';
 	import Scale from '@lucide/svelte/icons/scale';
 	import Target from '@lucide/svelte/icons/target';
+	import { todayDeltaNote } from '#lib/time/today-delta.js';
 	import Wallet from '@lucide/svelte/icons/wallet';
 
 	const PRESETS: Exclude<RangePreset, 'custom'>[] = ['w4', 'w12', 'w26', 'w52', 'year'];
@@ -157,7 +158,7 @@
 				<KpiCard title={t('stats.kpi.actual')} seconds={data.totals.actualSeconds} icon={Gauge} testid="stats-actual" />
 				<KpiCard title={t('stats.kpi.target')} seconds={data.totals.targetSeconds} icon={Target} testid="stats-target" />
 				<KpiCard title={t('stats.kpi.balance')} seconds={data.totals.deltaSeconds} delta icon={Scale} tone={data.totals.deltaSeconds < 0 ? 'negative' : 'default'} testid="stats-delta" />
-				<KpiCard title={t('stats.kpi.account')} value={endBalance === null ? '–' : timeDisplay.delta(endBalance)} icon={Wallet} tone={(endBalance ?? 0) < 0 ? 'negative' : 'default'} testid="stats-account" />
+				<KpiCard title={t('stats.kpi.account')} value={endBalance === null ? '–' : timeDisplay.delta(endBalance)} icon={Wallet} hint={data.includesToday === false ? t('stats.kpi.account_hint') : undefined} note={todayDeltaNote(data)} tone={(endBalance ?? 0) < 0 ? 'negative' : 'default'} testid="stats-account" />
 				<KpiCard title={t('stats.kpi.avg_start')} value={data.totals.avgStartMinutes === null ? '–' : clockText(data.totals.avgStartMinutes)} icon={Clock} testid="stats-avg-start" />
 				<KpiCard title={t('stats.kpi.avg_end')} value={data.totals.avgEndMinutes === null ? '–' : clockText(data.totals.avgEndMinutes)} icon={Clock} testid="stats-avg-end" />
 				<KpiCard title={t('stats.kpi.breaks')} seconds={data.totals.breakSeconds} icon={Coffee} testid="stats-breaks" />

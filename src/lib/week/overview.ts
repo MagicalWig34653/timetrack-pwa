@@ -97,6 +97,8 @@ export function summarySentence(summary: TimeWeekSummary, current: boolean, week
 	if (summary.targetToDateSeconds === 0 && diff === 0) comparison = '';
 	else if (diff === 0) comparison = t('weekview.sentence.on_target');
 	else comparison = t(diff < 0 ? 'weekview.sentence.under' : 'weekview.sentence.over', { time: formatDuration(Math.abs(diff)) });
+	// the balance counts completed days only (contract 0.36.0): say so in the running week
+	if (comparison && current && summary.includesToday === false) comparison += ` ${t('weekview.sentence.until_yesterday')}`;
 	const head = t('weekview.sentence.worked', { prefix, time: worked }) + (comparison ? `, ${comparison}` : '');
 	const extras = noteworthyDays(summary);
 	return extras.length > 0 ? `${head}; ${extras.join(', ')}.` : `${head}.`;

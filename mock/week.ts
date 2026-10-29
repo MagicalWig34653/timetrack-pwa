@@ -155,7 +155,7 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 			};
 		});
 
-		const accountAt = (asOf: string) => get<TimeAccount>(deps.time, accountId, `time/account?asOf=${asOf}`, { asOf, balanceSeconds: 0, openingSeconds: 0, adjustmentSeconds: 0, provisional: false });
+		const accountAt = (asOf: string) => get<TimeAccount>(deps.time, accountId, `time/account?asOf=${asOf}`, { asOf, balanceSeconds: 0, openingSeconds: 0, adjustmentSeconds: 0, provisional: false, includesToday: false, todayDeltaSeconds: null });
 		const before = accountAt(addDays(monday, -1));
 		const after = accountAt(sunday);
 		const worked = days.filter((d) => d.workSeconds > 0);
@@ -173,10 +173,13 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 			days,
 			summary: {
 				targetSeconds: days.reduce((s, d) => s + d.targetSeconds, 0),
-				targetToDateSeconds: days.filter((d) => !d.isFuture).reduce((s, d) => s + d.targetSeconds, 0),
+				targetToDateSeconds: days.filter((d) => !d.isFuture && !d.isToday).reduce((s, d) => s + d.targetSeconds, 0),
 				workSeconds: days.reduce((s, d) => s + d.workSeconds, 0),
 				creditSeconds: days.reduce((s, d) => s + d.creditSeconds, 0),
-				balanceSeconds: days.reduce((s, d) => s + (d.balanceSeconds ?? 0), 0),
+				// contract 0.36.0: completed days only; today's difference is reported separately
+				balanceSeconds: days.filter((d) => !d.isToday).reduce((s, d) => s + (d.balanceSeconds ?? 0), 0),
+				includesToday: false,
+				todayDeltaSeconds: days.find((d) => d.isToday)?.balanceSeconds ?? null,
 				plannedSeconds: hasPlan ? days.reduce((s, d) => s + (d.plannedSeconds ?? 0), 0) : null,
 				accountBalanceBeforeSeconds: before.balanceSeconds,
 				accountBalanceAfterSeconds: after.balanceSeconds,
