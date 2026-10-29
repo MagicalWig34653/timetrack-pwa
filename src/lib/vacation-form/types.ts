@@ -1,5 +1,6 @@
 import type { DateRange } from './days';
 import type { DateFormatId } from './format';
+import type { VacationBlock } from './remaining';
 
 /** What a PDF target can hold. `overlay` is a free text position on a flat PDF. */
 export type TargetKind = 'text' | 'checkbox' | 'dropdown' | 'overlay';
@@ -16,6 +17,8 @@ export type SourceId =
 	| 'carryOver'
 	| 'additional'
 	| 'paidOut'
+	| 'compensated'
+	| 'restYearEnd'
 	| 'restBefore'
 	| 'restAfter'
 	| 'dateFrom'
@@ -43,7 +46,12 @@ export interface Binding {
 	index?: number;
 	/** date sources: overrides the profile's date format */
 	dateFormat?: DateFormatId;
+	/** compensated: which earlier vacation counts as "davon abgegolten" (default `all`) */
+	scope?: CompensatedScope;
 }
+
+/** `all`: everything deducted before the request (taken, approved, requested, planned), so total - compensated = rest before. `decided`: only taken and approved. */
+export type CompensatedScope = 'all' | 'decided';
 
 export interface PersonValues {
 	lastName: string;
@@ -66,6 +74,8 @@ export interface OverlayItem {
 /** The saved profile: stored as opaque JSON on the server (<= 64 KB) or in IndexedDB. */
 export interface FormMapping {
 	version: 1;
+	/** Mapping semantics revision; absent (0) on mappings saved before the "davon abgegolten" fix (2). */
+	revision?: number;
 	person: PersonValues;
 	dateFormat: DateFormatId;
 	/** Flatten the generated PDF (no longer fillable) unless the dialog says otherwise. */
@@ -75,22 +85,24 @@ export interface FormMapping {
 	overlays: OverlayItem[];
 }
 
-/** Vacation account figures around one request, in half days. "Planned" means not submitted yet. */
+/** Vacation account figures around one request, in half days. */
 export interface RequestBreakdown {
 	entitlementTotalHalfDays: number;
-	/** approved or taken */
-	bookedHalfDays: number;
-	/** requested (submitted, undecided) vacation of other absences */
-	requestedOthersHalfDays: number;
-	/** planned but not submitted vacation of other absences */
-	plannedOthersHalfDays: number;
+	/** other vacation before the request's first day (all statuses that consume entitlement) */
+	before: VacationBlock[];
+	/** other vacation after the request's last day; does not reduce the rest at the request date */
+	later: VacationBlock[];
+	/** other vacation overlapping the request period (not counted twice) */
+	overlapping: VacationBlock[];
+	consumedBeforeHalfDays: number;
+	laterHalfDays: number;
 	requestHalfDays: number;
-	/** without the other unsubmitted plans: what the form shows */
 	restBeforeHalfDays: number;
 	restAfterHalfDays: number;
-	/** with every other plan deducted as well */
-	restBeforeInclPlannedHalfDays: number;
-	restAfterInclPlannedHalfDays: number;
+	/** after every plan of the year */
+	restYearEndHalfDays: number;
+	/** false: the absence list was missing, so every other vacation is treated as earlier */
+	blocksKnown: boolean;
 }
 
 /** Everything a request provides at generation time. */
@@ -105,6 +117,12 @@ export interface RequestData {
 	adjustmentHalfDays: number;
 	restBeforeHalfDays: number;
 	restAfterHalfDays: number;
+	/** rest at the end of the year after all plans */
+	restYearEndHalfDays: number;
+	/** earlier vacation, all statuses ("davon abgegolten", default) */
+	compensatedHalfDays: number;
+	/** earlier vacation, only approved or taken */
+	compensatedDecidedHalfDays: number;
 	workingDays: number;
 	freeRanges: DateRange[];
 	breakdown?: RequestBreakdown;

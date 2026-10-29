@@ -16,6 +16,9 @@ const request: RequestData = {
 	adjustmentHalfDays: 2,
 	restBeforeHalfDays: 45,
 	restAfterHalfDays: 25,
+	restYearEndHalfDays: 17,
+	compensatedHalfDays: 23,
+	compensatedDecidedHalfDays: 15,
 	workingDays: 10,
 	freeRanges: [
 		{ from: '2026-07-11', to: '2026-07-12' },
@@ -69,6 +72,12 @@ describe('source catalogue', () => {
 		expect(value({ source: 'paidOut' })).toBe('0');
 		expect(value({ source: 'restBefore' })).toBe('22,5');
 		expect(value({ source: 'restAfter' })).toBe('12,5');
+	});
+	it('resolves "davon abgegolten" as earlier vacation, by scope, and the year-end rest', () => {
+		expect(value({ source: 'compensated' })).toBe('11,5');
+		expect(value({ source: 'compensated', scope: 'all' })).toBe('11,5');
+		expect(value({ source: 'compensated', scope: 'decided' })).toBe('7,5');
+		expect(value({ source: 'restYearEnd' })).toBe('8,5');
 	});
 	it('splits a negative correction into paid-out days', () => {
 		expect(resolveBinding({ source: 'paidOut' }, mapping, { ...request, adjustmentHalfDays: -3 })).toBe('1,5');

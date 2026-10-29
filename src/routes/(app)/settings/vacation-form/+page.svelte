@@ -30,6 +30,7 @@
 	import { ApiError } from '#lib/api/errors.js';
 	import { PdfError } from '#lib/vacation-form/pdf-limits.js';
 	import type { DetectedField, PdfInfo } from '#lib/vacation-form/pdf.js';
+	import { carryMapping, type ReplaceReview } from '#lib/vacation-form/replace.js';
 	import { SAMPLE_REQUEST, previewMapping } from '#lib/vacation-form/sample.js';
 	import { currentFormStore } from '#lib/vacation-form/store-instance.js';
 	import type { Binding, FormMapping, OverlayItem } from '#lib/vacation-form/types.js';
@@ -53,6 +54,8 @@
 	let previewBytes = $state<Uint8Array | null>(null);
 	let previewSkipped = $state<string[]>([]);
 	let previewFailed = $state(false);
+	let review = $state<ReplaceReview | null>(null);
+	const flagged = $derived(new Set(review ? [...review.fresh, ...review.changed] : []));
 
 	const dirty = $derived.by(() => {
 		try {
@@ -124,11 +127,15 @@
 		try {
 			const data = new Uint8Array(await file.arrayBuffer());
 			const details = await (await pdfModule()).inspectPdf(data); // validates size and magic number first
-			// Field names belong to the file, so the assignment starts over; personal values and the format stay.
-			const fresh: FormMapping = { ...emptyMapping(), person: mapping.person, dateFormat: mapping.dateFormat, flatten: mapping.flatten };
-			await store.saveFile(data, file.name, fresh);
+			// Replacing a template keeps the assignment of fields with the same name and type; only new fields need attention.
+			const hadTemplate = !!info;
+			const carried = hadTemplate
+				? carryMapping($state.snapshot(mapping), $state.snapshot(info!.fields), details.fields, details.pageCount)
+				: { mapping: { ...emptyMapping(), person: mapping.person, dateFormat: mapping.dateFormat, flatten: mapping.flatten } as FormMapping, review: null };
+			await store.saveFile(data, file.name, carried.mapping);
 			storage = store.storage;
-			adopt({ fileName: file.name, bytes: data, mapping: fresh }, details);
+			adopt({ fileName: file.name, bytes: data, mapping: carried.mapping }, details);
+			review = carried.review;
 			notice = t('vform.file_saved');
 		} catch (error) {
 			problem = pdfProblem(error);
@@ -161,6 +168,7 @@
 			await store.remove();
 			bytes = null;
 			info = null;
+			review = null;
 			fileName = '';
 			mapping = emptyMapping();
 			savedJson = serializeMapping(mapping);
@@ -279,6 +287,30 @@
 			</CardContent>
 		</Card>
 
+		{#if review}
+			{@const r = review}
+			<Card data-testid="vform-replace-review">
+				<CardHeader>
+					<CardTitle>{t('vform.replace.title')}</CardTitle>
+					<CardDescription data-testid="vform-replace-summary">{t('vform.replace.summary', { kept: r.kept.length, fresh: r.fresh.length, gone: r.removed.length })}</CardDescription>
+				</CardHeader>
+				<CardContent class="flex flex-col gap-3 text-sm">
+					{#each [{ key: 'kept', names: r.kept }, { key: 'fresh', names: r.fresh }, { key: 'changed', names: r.changed }, { key: 'gone', names: r.removed }] as group (group.key)}
+						{#if group.names.length > 0}
+							<div data-testid="vform-replace-{group.key}">
+								<p class="font-medium">{t(`vform.replace.${group.key}` as MessageKey)}</p>
+								<p class="font-mono text-xs break-all text-muted-foreground">{group.names.join(', ')}</p>
+							</div>
+						{/if}
+					{/each}
+					{#if r.overlaysKept + r.overlaysDropped > 0}
+						<p class="text-xs text-muted-foreground" data-testid="vform-replace-overlays">{t('vform.replace.overlays', { kept: r.overlaysKept, dropped: r.overlaysDropped })}</p>
+					{/if}
+					<div><Button type="button" variant="outline" size="sm" onclick={() => (review = null)} data-testid="vform-replace-dismiss">{t('vform.replace.dismiss')}</Button></div>
+				</CardContent>
+			</Card>
+		{/if}
+
 		<Card data-testid="vform-person">
 			<CardHeader>
 				<CardTitle>{t('vform.person_title')}</CardTitle>
@@ -329,6 +361,7 @@
 								<li class="grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:items-start sm:gap-4" data-testid="vform-field" data-field-name={field.name}>
 									<div class="min-w-0">
 										<p class="font-mono text-sm break-all" data-testid="vform-field-name">{field.name}</p>
+										{#if flagged.has(field.name) && !mapping.fields[field.name]}<Badge variant="secondary" class="mt-1" data-testid="vform-field-new">{t('vform.replace.new_badge')}</Badge>{/if}
 										<p class="text-xs text-muted-foreground">
 											{typeLabel(field)} · {t('vform.field_page')} {field.page || '?'}{field.readOnly ? ` · ${t('vform.field_readonly')}` : ''}
 										</p>

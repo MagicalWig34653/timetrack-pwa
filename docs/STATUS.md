@@ -209,3 +209,6 @@ Erkennungskarte mit Vorlage, Vorschau mit einem Hauptknopf, „Anpassen“ einge
 
 ## N4-pwa (Betriebstage 24.12./31.12.)
 Einstellung Keine/Halber/Ganzer Tag plus eigene Regeln, Anzeige mit ½-Variante für halbe Betriebstage in Woche, Tag, Kalender und Planer (Vertrag 0.32.0). Details: docs/handoffs/N4-pwa.md (Branch `n4-company-days`, nicht integriert).
+
+## V6-pwa (Urlaubsantrag: Resttage, „davon abgegolten“, PDF tauschen)
+Resttage zum Antrag ziehen früheren Urlaub ab (alle Status), Aufstellung mit Blockliste und Jahresende-Rest; „davon abgegolten“ = vor dem Antrag verbrauchter Urlaub (einstellbar); beim PDF-Tausch bleiben Zuordnungen gleicher Feldnamen erhalten, neue Felder werden markiert. Details: docs/handoffs/V6-pwa.md (Branch `v6-vacation-form`, nicht integriert).

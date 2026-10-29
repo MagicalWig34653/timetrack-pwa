@@ -64,6 +64,14 @@
 					<Label for="{id}-index" class="text-xs">{t('vform.option_index')}</Label>
 					<Input id="{id}-index" type="number" min="1" max={MAX_FREE_RANGES} step="1" value={binding.index ?? 1} oninput={(e) => patch({ index: Number(e.currentTarget.value) || 1 })} />
 				</div>
+			{:else if def.option === 'scope'}
+				<div class="flex min-w-48 flex-col gap-1">
+					<Label for="{id}-scope" class="text-xs">{t('vform.option_scope')}</Label>
+					<Select id="{id}-scope" value={binding.scope ?? 'all'} onchange={(e) => patch({ scope: e.currentTarget.value === 'decided' ? 'decided' : 'all' })}>
+						<option value="all">{t('vform.option_scope_all')}</option>
+						<option value="decided">{t('vform.option_scope_decided')}</option>
+					</Select>
+				</div>
 			{/if}
 			{#if isDate}
 				<div class="flex min-w-36 flex-col gap-1">
