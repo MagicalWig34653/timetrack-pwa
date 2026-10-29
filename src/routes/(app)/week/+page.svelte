@@ -27,7 +27,7 @@
 	import { absenceRuns, absenceWarning, hasOpenAbsence } from '#lib/week/absences.js';
 	import { prefetchAdjacentWeeks } from '#lib/week/prefetch.js';
 	import { recalledWeek, rememberWeek } from '#lib/week/last-week.js';
-	import { ABSENCE_CLASSES, absenceKindLabel } from '#lib/planning/labels.js';
+	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel } from '#lib/planning/labels.js';
 	import { isEmptyWeek, summarySentence } from '#lib/week/overview.js';
 	import Briefcase from '@lucide/svelte/icons/briefcase';
 	import CalendarRange from '@lucide/svelte/icons/calendar-range';
@@ -236,12 +236,12 @@
 			<Panel title={t('weekview.absences_title')} description={openAbsence ? t('weekview.absences_open_hint') : undefined} data-testid="week-absences">
 				<ul class="flex flex-col gap-2" aria-label={t('weekview.absences_label')}>
 					{#each runs as run, i (i)}
-						{@const warning = absenceWarning(run.status)}
+						{@const warning = absenceWarning(run.status, run.kind)}
 						<li class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[15px]" data-testid="week-absence-run" data-status={run.status}>
 							<span class="inline-flex h-6 items-center rounded-full px-2.5 text-xs font-medium {ABSENCE_CLASSES[run.kind]}">{absenceKindLabel(run.kind)}</span>
 							<span class="tabular-nums">{run.from === run.to ? formatDateNumeric(run.from) : `${formatDateNumeric(run.from)} – ${formatDateNumeric(run.to)}`}</span>
 							<span class="text-muted-foreground">{t(run.counted === 1 ? 'weekview.absence.days_one' : 'weekview.absence.days_other', { count: String(run.counted).replace('.', ',') })}</span>
-							<span class="text-muted-foreground">{t(`absence.status.${run.status}`)}</span>
+							<span class="text-muted-foreground">{absenceStatusLabel(run.status)}</span>
 							{#if warning}<StatusChip tone="warning" dot={false}>{warning}</StatusChip>{/if}
 						</li>
 					{/each}

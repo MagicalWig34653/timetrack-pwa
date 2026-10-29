@@ -1,6 +1,7 @@
 import type { Absence, AbsenceInput, AbsenceKind, AbsenceStatus, PlanDay, PlanDayInput, PlanMode, PlanTimeBlock } from '#lib/api/types.js';
 import type { MessageKey } from '#lib/i18n/index.js';
 import { isValidDate } from '#lib/time/dates.js';
+import { statusToSend } from './absence-status.js';
 import { covers } from './calendar.js';
 import { isWorkday, type ConflictContext, type PlannedAction } from './conflicts.js';
 import { rangeDates, selectionRuns, type DateRange } from './range-select.js';
@@ -138,7 +139,7 @@ export function buildResult(form: DialogForm, ctx: ConflictContext, editing: Abs
 			editing,
 			template: {
 				kind: form.kind,
-				status: form.status,
+				status: statusToSend(form.kind as AbsenceKind, form.status, editing),
 				halfDayStart: form.halfDayStart,
 				halfDayEnd: form.halfDayEnd,
 				note: form.note.trim() || null,

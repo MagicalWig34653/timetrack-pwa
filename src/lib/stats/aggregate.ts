@@ -72,7 +72,7 @@ export interface AggregateInput {
 	timeZone: string;
 }
 
-const ACTIVE = ['planned', 'requested', 'approved', 'taken'];
+const ACTIVE = ['planned', 'requested', 'approved', 'taken', 'recorded'];
 
 export function bucketKey(date: string, granularity: Granularity): string {
 	if (granularity === 'day') return date;

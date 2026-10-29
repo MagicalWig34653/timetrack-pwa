@@ -1,9 +1,10 @@
 import { t } from '#lib/i18n/index.js';
+import { KNOWN_STATUSES } from './absence-status.js';
 import type { DayWorkState } from '#lib/planning/calendar.js';
-import type { AbsenceKind, AbsenceStatus, DocumentStatus, PlanBlockKind, PlanHint, PlanMode, ShareScopes } from '#lib/api/types.js';
+import type { AbsenceKind, AbsenceStatus, KnownAbsenceStatus, DocumentStatus, PlanBlockKind, PlanHint, PlanMode, ShareScopes } from '#lib/api/types.js';
 
 export const ABSENCE_KINDS: AbsenceKind[] = ['vacation', 'sick', 'excused', 'other'];
-export const ABSENCE_STATUSES: AbsenceStatus[] = ['planned', 'requested', 'approved', 'taken', 'rejected', 'cancelled'];
+export const ABSENCE_STATUSES: AbsenceStatus[] = [...KNOWN_STATUSES];
 export const DOCUMENT_STATUSES: DocumentStatus[] = ['not_needed', 'pending', 'submitted'];
 export const PLAN_MODES: PlanMode[] = ['office', 'home', 'customer', 'school', 'off'];
 /** Kinds of a plan block (contract 0.35.0), in the order of the brush. */
@@ -11,7 +12,10 @@ export const BLOCK_KINDS: PlanBlockKind[] = ['work', 'school', 'travel', 'office
 export const SHARE_SCOPE_KEYS: (keyof ShareScopes)[] = ['plan', 'actual', 'vacation'];
 
 export const absenceKindLabel = (kind: AbsenceKind) => t(`absence.kind.${kind}`);
-export const absenceStatusLabel = (status: AbsenceStatus) => t(`absence.status.${status}`);
+/** Label of a status; an unknown value from a newer server is shown as received instead of a missing-key marker. */
+export const absenceStatusLabel = (status: AbsenceStatus) => (KNOWN_STATUSES.includes(status) ? t(`absence.status.${status as KnownAbsenceStatus}`) : String(status || '–'));
+/** Short status text for chips and day details: a plain "recorded" entry of sick/excused/other needs no extra wording. */
+export const absenceStatusHint = (absence: { kind: AbsenceKind; status: AbsenceStatus }) => (absence.kind !== 'vacation' && absence.status === 'recorded' ? '' : absenceStatusLabel(absence.status));
 export const documentStatusLabel = (status: DocumentStatus) => t(`absence.document.${status}`);
 export const planModeLabel = (mode: PlanMode) => t(`plan.mode.${mode}`);
 export const blockKindLabel = (kind: PlanBlockKind) => t(`plan.kind.${kind}`);
@@ -19,7 +23,7 @@ export const planHintLabel = (hint: PlanHint) => t(`plan.hint.${hint}`);
 export const scopeLabel = (scope: keyof ShareScopes) => t(`share.scope.${scope}`);
 
 /** Statuses that count as booked / planned vacation (ADR-0005). */
-export const BOOKED_STATUSES: AbsenceStatus[] = ['approved', 'taken'];
+export const BOOKED_STATUSES: AbsenceStatus[] = ['approved', 'taken', 'recorded'];
 export const PLANNED_STATUSES: AbsenceStatus[] = ['planned', 'requested'];
 
 /** Tailwind classes per absence kind (color is never the only signal: the label text is always shown). */

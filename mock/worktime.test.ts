@@ -114,8 +114,8 @@ describe('worktime import profile', () => {
 		const absences = await api.listAbsences('2026-03-01', '2026-03-31');
 		expect(absences.map((a) => [a.kind, a.startDate, a.endDate, a.status, a.countedHalfDays])).toEqual([
 			['vacation', '2026-03-03', '2026-03-04', 'taken', 4],
-			['excused', '2026-03-05', '2026-03-05', 'taken', 0],
-			['sick', '2026-03-09', '2026-03-10', 'taken', 0],
+			['excused', '2026-03-05', '2026-03-05', 'recorded', 0],
+			['sick', '2026-03-09', '2026-03-10', 'recorded', 0],
 			['vacation', '2026-03-16', '2026-03-23', 'taken', 12]
 		]);
 		expect(absences[1].note).toBe('Urlaub (Freigestellt)');

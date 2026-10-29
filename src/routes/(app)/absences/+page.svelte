@@ -16,6 +16,7 @@
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
+	import { quickStatusesFor, isCancelledLike } from '#lib/planning/absence-status.js';
 	import { ABSENCE_CLASSES, ABSENCE_KINDS, ABSENCE_STATUSES, absenceKindLabel, absenceStatusLabel, documentStatusLabel } from '#lib/planning/labels.js';
 	import {
 		ABSENCE_SORTS,
@@ -187,7 +188,7 @@
 	function menuFor(absence: Absence): MenuEntry[] {
 		return [
 			{ id: 'edit', label: t('absence.edit'), onselect: () => (editing = absence) },
-			...(['planned', 'approved', 'taken', 'cancelled'] as AbsenceStatus[])
+			...quickStatusesFor(absence.kind)
 				.filter((s) => s !== absence.status)
 				.map<MenuEntry>((s) => ({ id: `status-${s}`, label: t('cal.menu_status', { status: absenceStatusLabel(s) }), onselect: () => void setStatus(absence, s) })),
 			{ separator: true },
@@ -199,7 +200,7 @@
 		];
 	}
 
-	const countsNot = (a: Absence) => a.status === 'rejected' || a.status === 'cancelled';
+	const countsNot = (a: Absence) => isCancelledLike(a.status);
 </script>
 
 <PageHeader title={t('absences.title')} description={t('absences.description')} />

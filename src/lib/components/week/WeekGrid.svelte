@@ -5,7 +5,7 @@
 	import { t } from '#lib/i18n/index.js';
 	import { holidayHint } from '#lib/planning/company-days.js';
 	import { exceedsThreshold } from '#lib/planning/drag.js';
-	import { blockKindLabel, planModeLabel } from '#lib/planning/labels.js';
+	import { absenceStatusLabel, blockKindLabel, planModeLabel } from '#lib/planning/labels.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { weekdayLabel } from '#lib/time/labels.js';
@@ -656,9 +656,9 @@
 				{@const draft = drafts[i]}
 				<div class="wg-allday" data-testid="allday-{day.date}">
 					{#if day.blockedBy}
-						<span class="wg-chip {markClass(day.blockedBy)}" title={holidayNames[day.date] ? holidayHint(holidayNames[day.date], holidayTreatments[day.date]) : ''} data-testid="blocked-chip-{day.date}">{day.blockedBy === 'holiday' && holidayNames[day.date] ? holidayNames[day.date] : t(`weekview.mark.${day.blockedBy}`)}{#if day.blockedBy === 'vacation' && vacation[day.date]} ({t(`absence.status.${vacation[day.date]}`)}){/if}</span>
+						<span class="wg-chip {markClass(day.blockedBy)}" title={holidayNames[day.date] ? holidayHint(holidayNames[day.date], holidayTreatments[day.date]) : ''} data-testid="blocked-chip-{day.date}">{day.blockedBy === 'holiday' && holidayNames[day.date] ? holidayNames[day.date] : t(`weekview.mark.${day.blockedBy}`)}{#if day.blockedBy === 'vacation' && vacation[day.date]} ({absenceStatusLabel(vacation[day.date])}){/if}</span>
 					{:else if vacation[day.date]}
-						<span class="wg-chip {markClass('vacation')} wg-chip-open" data-testid="vacation-chip-{day.date}" data-status={vacation[day.date]}>{t('weekview.mark.vacation')} ({t(`absence.status.${vacation[day.date]}`)})</span>
+						<span class="wg-chip {markClass('vacation')} wg-chip-open" data-testid="vacation-chip-{day.date}" data-status={vacation[day.date]}>{t('weekview.mark.vacation')} ({absenceStatusLabel(vacation[day.date])})</span>
 					{:else if holidayNames[day.date]}
 						<span class="wg-chip {markClass('holiday')} {holidayTreatments[day.date] === 'half' ? 'wg-chip-half' : ''}" title={holidayHint(holidayNames[day.date], holidayTreatments[day.date])} data-treatment={holidayTreatments[day.date]} data-testid="holiday-chip-{day.date}">{holidayNames[day.date]}{#if holidayTreatments[day.date] === 'half'}<span aria-hidden="true"> ½</span><span class="sr-only">, {holidayHint(holidayNames[day.date], 'half')}</span>{/if}</span>
 					{:else if draft.mode !== '' && (draft.blocks.length === 0 || multi)}

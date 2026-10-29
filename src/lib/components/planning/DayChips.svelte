@@ -2,7 +2,7 @@
 	import { t } from '#lib/i18n/index.js';
 	import { holidayHint } from '#lib/planning/company-days.js';
 	import type { DayInfo } from '#lib/planning/calendar.js';
-	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS } from '#lib/planning/labels.js';
+	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusHint, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS } from '#lib/planning/labels.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { listsBlocks } from '#lib/week/plan-blocks.js';
 
@@ -32,7 +32,7 @@
 			data-absence-id={draggable ? absence.id : undefined}
 		>
 			{#if draggable && absence.startDate === info.date}<span class="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize rounded-l bg-current/30" data-resize="start" aria-hidden="true"></span>{/if}
-			{absenceKindLabel(absence.kind)}{#if !compact} ({absenceStatusLabel(absence.status)}){/if}
+			{absenceKindLabel(absence.kind)}{#if !compact && absenceStatusHint(absence)} ({absenceStatusHint(absence)}){/if}
 			{#if draggable && absence.endDate === info.date}<span class="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize rounded-r bg-current/30" data-resize="end" aria-hidden="true"></span>{/if}
 		</span>
 	{/each}

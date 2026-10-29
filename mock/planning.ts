@@ -120,10 +120,30 @@ const fail = (status: number, code: string, message = code): PlanningResponse =>
 const ok = (body: unknown, status = 200): PlanningResponse => ({ status, body });
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && addDays(v, 0) === v;
 const KINDS = ['vacation', 'sick', 'excused', 'other'];
-const STATUSES = ['planned', 'requested', 'approved', 'rejected', 'cancelled', 'taken'];
+const STATUSES = ['planned', 'requested', 'approved', 'rejected', 'cancelled', 'taken', 'recorded'];
+/** Statuses a kind accepts as stored value (contract 0.36.0, ADR-0032). */
+const STATUSES_BY_KIND: Record<string, string[]> = {
+	vacation: ['planned', 'requested', 'approved', 'rejected', 'cancelled', 'taken'],
+	sick: ['recorded', 'cancelled'],
+	excused: ['recorded', 'cancelled'],
+	other: ['planned', 'recorded', 'cancelled']
+};
+/**
+ * Server-side normalisation like the backend: an omitted status becomes the kind default; the old vacation workflow values
+ * sent for other kinds are mapped; `recorded` for vacation and `rejected` for other kinds are errors.
+ */
+function statusFor(kind: string, status: unknown): { status: string } | { code: string } {
+	if (status === undefined || status === null) return { status: kind === 'vacation' ? 'planned' : 'recorded' };
+	if (typeof status !== 'string' || !STATUSES.includes(status)) return { code: 'bad_request' };
+	if (kind === 'vacation') return status === 'recorded' ? { code: 'absence_status_invalid_for_kind' } : { status };
+	if (status === 'rejected') return { code: 'absence_status_invalid_for_kind' };
+	if (STATUSES_BY_KIND[kind].includes(status)) return { status };
+	if (kind === 'other') return { status: status === 'requested' ? 'planned' : 'recorded' };
+	return { status: 'recorded' };
+}
 const DOC_STATUSES = ['not_needed', 'pending', 'submitted'];
 const PLAN_MODES: PlanMode[] = ['office', 'home', 'customer', 'school', 'off'];
-const BOOKED = ['approved', 'taken'];
+const BOOKED = ['approved', 'taken', 'recorded'];
 const PLANNED = ['planned', 'requested'];
 const MAX_SPAN_DAYS = 800;
 /** Contract v0.3.1: absences, plan/days and shared views accept at most 366 days (else 400 range_too_large). */
@@ -343,8 +363,17 @@ export function createPlanningMock(deps: PlanningDeps) {
 		return half && !halfCompany ? { mark: 'vacation', halfTarget: true } : { mark: 'vacation' };
 	}
 
-	function normalize(input: any): AbsenceInput | null {
-		if (!input || !KINDS.includes(input.kind) || !STATUSES.includes(input.status)) return null;
+	type Normalized = { input: AbsenceInput & { status: string } } | { code: string };
+
+	function normalize(input: any): Normalized {
+		if (!input || !KINDS.includes(input.kind)) return { code: 'bad_request' };
+		const resolved = statusFor(input.kind, input.status);
+		if ('code' in resolved) return resolved;
+		const parsed = normalizeFields(input);
+		return parsed ? { input: { ...parsed, status: resolved.status } } : { code: 'bad_request' };
+	}
+
+	function normalizeFields(input: any): AbsenceInput | null {
 		if (!isDate(input.startDate) || !isDate(input.endDate) || input.endDate < input.startDate) return null;
 		if (daysBetween(input.startDate, input.endDate).length > MAX_SPAN_DAYS) return null;
 		if (input.note != null && (typeof input.note !== 'string' || input.note.length > 500)) return null;
@@ -369,7 +398,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 	}
 
 	/** Contract v0.3.1: cancelled and rejected absences do not block other ones. */
-	const blocks = (a: Pick<Absence, 'status'>) => a.status !== 'cancelled' && a.status !== 'rejected';
+	const blocks = (a: { status?: string }) => a.status !== 'cancelled' && a.status !== 'rejected';
 
 	function overlaps(state: PlanningState, input: AbsenceInput, ignoreId?: string): boolean {
 		if (!blocks(input)) return false;
@@ -412,10 +441,10 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const monday = startOfWeek(today);
 		if (options.configured ?? true) state.settings = { ...DEFAULT_VACATION_SETTINGS };
 		const add = (input: Partial<AbsenceInput> & Pick<AbsenceInput, 'kind' | 'startDate' | 'endDate' | 'status'>) => {
-			state.absences.push(withCount(accountId, { id: uuid(), version: 1, ...(normalize(input) as AbsenceInput) }));
+			state.absences.push(withCount(accountId, { id: uuid(), version: 1, ...(normalize(input) as { input: AbsenceInput & { status: string } }).input }));
 		};
 		add({ kind: 'vacation', startDate: addDays(monday, -35), endDate: addDays(monday, -33), status: 'taken' });
-		add({ kind: 'sick', startDate: addDays(monday, -14), endDate: addDays(monday, -13), status: 'taken', documentStatus: 'pending', documentReferenceStart: addDays(monday, -14), documentReferenceEnd: addDays(monday, -13), note: 'Erkältung' });
+		add({ kind: 'sick', startDate: addDays(monday, -14), endDate: addDays(monday, -13), status: 'recorded', documentStatus: 'pending', documentReferenceStart: addDays(monday, -14), documentReferenceEnd: addDays(monday, -13), note: 'Erkältung' });
 		add({ kind: 'vacation', startDate: addDays(monday, 14), endDate: addDays(monday, 18), status: 'approved' });
 		add({ kind: 'vacation', startDate: addDays(monday, 42), endDate: addDays(monday, 44), halfDayEnd: true, status: 'planned' });
 		state.customDays.push({ id: uuid(), kind: 'school_holiday', startDate: addDays(monday, 21), endDate: addDays(monday, 25), name: 'Berufsschulferien', source: 'custom' });
@@ -542,8 +571,9 @@ export function createPlanningMock(deps: PlanningDeps) {
 				);
 			}
 			if (method === 'POST') {
-				const input = normalize(body);
-				if (!input) return fail(400, 'bad_request');
+				const parsed = normalize(body);
+				if ('code' in parsed) return fail(400, parsed.code);
+				const input = parsed.input;
 				if (overlaps(state, input)) return fail(409, 'absence_overlap');
 				const absence = withCount(accountId, { id: uuid(), version: 1, ...input });
 				state.absences.push(absence);
@@ -557,8 +587,9 @@ export function createPlanningMock(deps: PlanningDeps) {
 			if (method === 'PUT') {
 				if (req.ifMatch === undefined) return fail(400, 'bad_request');
 				if (String(absence.version) !== req.ifMatch) return fail(412, 'stale_version');
-				const input = normalize(body);
-				if (!input) return fail(400, 'bad_request');
+				const parsed = normalize(body);
+				if ('code' in parsed) return fail(400, parsed.code);
+				const input = parsed.input;
 				if (overlaps(state, input, absence.id)) return fail(409, 'absence_overlap');
 				Object.assign(absence, input, { version: absence.version + 1 });
 				return ok(withCount(accountId, absence));

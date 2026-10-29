@@ -329,3 +329,20 @@ describe('absences, holidays and marks in time/days (C9 behaviour)', () => {
 		expect(after.balanceSeconds - before.balanceSeconds).toBe(27720); // the target of the sick day no longer counts as missing
 	});
 });
+
+describe('mock absence status per kind (contract 0.36.0)', () => {
+	const input = (kind: AbsenceInput['kind'], status?: string): AbsenceInput => ({ kind, startDate: '2026-11-02', endDate: '2026-11-02', ...(status ? { status } : {}) });
+
+	it('defaults the status by kind when it is omitted', async () => {
+		expect((await api.createAbsence(input('sick'))).status).toBe('recorded');
+		expect((await api.createAbsence({ ...input('vacation'), startDate: '2026-11-03', endDate: '2026-11-03' })).status).toBe('planned');
+	});
+
+	it('normalises the old workflow statuses for other kinds and rejects invalid combinations', async () => {
+		expect((await api.createAbsence(input('sick', 'taken'))).status).toBe('recorded');
+		expect((await api.createAbsence({ ...input('other', 'requested'), startDate: '2026-11-04', endDate: '2026-11-04' })).status).toBe('planned');
+		expect(await code(api.createAbsence({ ...input('vacation', 'recorded'), startDate: '2026-11-05', endDate: '2026-11-05' }))).toBe('400:absence_status_invalid_for_kind');
+		expect(await code(api.createAbsence({ ...input('sick', 'rejected'), startDate: '2026-11-06', endDate: '2026-11-06' }))).toBe('400:absence_status_invalid_for_kind');
+		expect(await code(api.createAbsence({ ...input('sick', 'bogus'), startDate: '2026-11-09', endDate: '2026-11-09' }))).toBe('400:bad_request');
+	});
+});

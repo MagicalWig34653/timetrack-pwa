@@ -14,7 +14,7 @@ type Caller = (accountId: string, method: string, path: string, body?: unknown) 
 const fail = (status: number, code: string): WeekResponse => ({ status, body: { error: { code, message: code } } });
 const ok = (body: unknown): WeekResponse => ({ status: 200, body });
 const BLOCKING = ['holiday', 'vacation', 'sick', 'excused'];
-const ACTIVE = ['planned', 'requested', 'approved', 'taken'];
+const ACTIVE = ['planned', 'requested', 'approved', 'taken', 'recorded'];
 
 export function createWeekMock(deps: { clock: () => number; time: Caller; planning: Caller; planningEnabled: (accountId: string) => boolean }) {
 	const get = <T>(caller: Caller, accountId: string, path: string, fallback: T): T => {

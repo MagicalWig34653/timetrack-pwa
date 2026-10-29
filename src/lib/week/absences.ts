@@ -10,9 +10,13 @@ type DayAbsence = TimeWeekDay['absences'][number];
 export const OPEN_STATUSES: AbsenceStatus[] = ['planned', 'requested'];
 
 export const isOpenStatus = (status: AbsenceStatus) => OPEN_STATUSES.includes(status);
+/** Open = vacation that is planned or requested; other kinds never wait for a step. */
+export const isOpenAbsence = (a: { kind: AbsenceKind | string; status: AbsenceStatus }) => a.kind === 'vacation' && isOpenStatus(a.status);
 
 /** Warning text of an absence that is not decided yet; null for approved and taken ones (shown as usual). */
-export function absenceWarning(status: AbsenceStatus): string | null {
+export function absenceWarning(status: AbsenceStatus, kind: AbsenceKind | string = 'vacation'): string | null {
+	// only vacation is requested and approved; the other kinds are merely recorded (contract 0.36.0)
+	if (kind !== 'vacation') return null;
 	if (status === 'planned') return t('weekview.absence.not_requested');
 	if (status === 'requested') return t('weekview.absence.not_approved');
 	return null;
@@ -29,7 +33,7 @@ export function chipAbsences(day: Pick<TimeWeekDay, 'mark' | 'absences'>, vacati
 	// when the vacation entries come from the absence list (N3), they get their own chips and are not repeated here
 	// open absences on free days (weekend, holiday) are not shown: nothing is taken there
 	if (day.mark === 'off' || day.mark === 'holiday') return [];
-	return day.absences.filter((a) => !(vacationListed && a.kind === 'vacation') && (isOpenStatus(a.status) || MARK_OF_KIND[a.kind] !== day.mark));
+	return day.absences.filter((a) => !(vacationListed && a.kind === 'vacation') && (isOpenAbsence(a) || MARK_OF_KIND[a.kind] !== day.mark));
 }
 
 export interface AbsenceRun {
@@ -59,4 +63,4 @@ export function absenceRuns(days: Pick<TimeWeekDay, 'date' | 'absences'>[]): Abs
 }
 
 /** True when the week has at least one absence that is still planned or requested. */
-export const hasOpenAbsence = (days: Pick<TimeWeekDay, 'absences'>[]) => days.some((d) => d.absences.some((a) => isOpenStatus(a.status)));
+export const hasOpenAbsence = (days: Pick<TimeWeekDay, 'absences'>[]) => days.some((d) => d.absences.some(isOpenAbsence));

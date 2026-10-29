@@ -10,7 +10,8 @@
 	import { t } from '#lib/i18n/index.js';
 	import { findConflicts, hasBlocking, type ConflictContext } from '#lib/planning/conflicts.js';
 	import { buildResult, formFromSeed, previewOf, type DialogForm, type DialogKind, type DialogResult, type DialogSeed } from '#lib/planning/dialog.js';
-	import { ABSENCE_KINDS, ABSENCE_STATUSES, absenceKindLabel, absenceStatusLabel, PLAN_MODES, planModeLabel } from '#lib/planning/labels.js';
+	import { STATUSES_BY_KIND } from '#lib/planning/absence-status.js';
+	import { ABSENCE_KINDS, absenceKindLabel, absenceStatusLabel, PLAN_MODES, planModeLabel } from '#lib/planning/labels.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { blocksText } from '#lib/week/plan-blocks.js';
 	import { untrack } from 'svelte';
@@ -47,6 +48,7 @@
 	let form = $state<DialogForm>(untrack(() => formFromSeed(seed)));
 	let errors = $state<Partial<Record<string, string>>>({});
 	const kinds: DialogKind[] = ['plan', ...ABSENCE_KINDS];
+	const vacationStatuses = $derived(STATUSES_BY_KIND.vacation.includes(form.status) ? STATUSES_BY_KIND.vacation : [...STATUSES_BY_KIND.vacation, form.status]);
 	const isPlan = $derived(form.kind === 'plan');
 	const planOff = $derived(isPlan && form.mode === 'off');
 	const multi = $derived(form.days !== null && form.days.length > 0);
@@ -131,12 +133,16 @@
 			{/if}
 			{#if errors.days}<p class="text-xs text-destructive" role="alert">{errors.days}</p>{/if}
 		{:else}
-			<div class="flex flex-col gap-1.5">
-				<Label for="pd-status">{t('absence.status')}</Label>
-				<Select id="pd-status" bind:value={form.status} disabled={busy}>
-					{#each ABSENCE_STATUSES as option (option)}<option value={option}>{absenceStatusLabel(option)}</option>{/each}
-				</Select>
-			</div>
+			{#if form.kind === 'vacation'}
+				<div class="flex flex-col gap-1.5">
+					<Label for="pd-status">{t('absence.status')}</Label>
+					<Select id="pd-status" bind:value={form.status} disabled={busy}>
+						{#each vacationStatuses as option (option)}<option value={option}>{absenceStatusLabel(option)}</option>{/each}
+					</Select>
+				</div>
+			{:else}
+				<p class="text-xs text-muted-foreground" data-testid="pd-recorded-note">{t(`absence.recorded_hint_${form.kind as 'sick' | 'excused' | 'other'}`)}</p>
+			{/if}
 			<fieldset class="flex flex-col gap-2" disabled={busy}>
 				<legend class="mb-1 text-sm font-medium">{t('absence.half_days')}</legend>
 				<label class="flex items-center gap-2 text-sm"><Checkbox id="pd-half-start" bind:checked={form.halfDayStart} />{t('absence.half_start')}</label>

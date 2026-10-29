@@ -8,7 +8,8 @@
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
-	import { ABSENCE_KINDS, ABSENCE_STATUSES, absenceKindLabel, absenceStatusLabel, DOCUMENT_STATUSES, documentStatusLabel } from '#lib/planning/labels.js';
+	import { ABSENCE_KINDS, absenceKindLabel, absenceStatusLabel, DOCUMENT_STATUSES, documentStatusLabel } from '#lib/planning/labels.js';
+	import { hasApprovalWorkflow, STATUSES_BY_KIND, statusToSend } from '#lib/planning/absence-status.js';
 	import { isValidDate } from '#lib/time/dates.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import AbsenceAttachments from '../transfer/AbsenceAttachments.svelte';
@@ -37,7 +38,8 @@
 	let endDate = $state(initial?.endDate ?? untrack(() => date));
 	let halfDayStart = $state(initial?.halfDayStart ?? false);
 	let halfDayEnd = $state(initial?.halfDayEnd ?? false);
-	let status = $state<AbsenceStatus>(initial?.status ?? 'planned');
+	// Only vacation has a status selector; the other kinds are recorded (contract 0.36.0), see statusToSend.
+	let status = $state<AbsenceStatus>(initial?.kind === 'vacation' ? initial.status : 'planned');
 	let note = $state(initial?.note ?? '');
 	let documentStatus = $state<DocumentStatus>(initial?.documentStatus ?? 'not_needed');
 	let documentSubmittedOn = $state(initial?.documentSubmittedOn ?? '');
@@ -50,6 +52,7 @@
 
 	const editing = initial !== null;
 	const withDocuments = $derived(kind === 'sick' || kind === 'other');
+	const vacationStatuses = $derived(STATUSES_BY_KIND.vacation.includes(status) ? STATUSES_BY_KIND.vacation : [...STATUSES_BY_KIND.vacation, status]);
 	const singleDay = $derived(startDate !== '' && startDate === endDate);
 
 	function validate(): AbsenceInput | null {
@@ -72,7 +75,7 @@
 			endDate,
 			halfDayStart,
 			halfDayEnd,
-			status,
+			status: statusToSend(kind, status, initial),
 			note: note.trim() || null,
 			documentStatus: withDocuments ? documentStatus : 'not_needed',
 			documentSubmittedOn: withDocuments ? documentSubmittedOn || null : null,
@@ -125,11 +128,19 @@
 			{#if kind === 'excused'}<p class="text-xs text-muted-foreground" data-testid="absence-excused-hint">{t('absence.kind_excused_hint')}</p>{/if}
 		</div>
 		<div class="flex flex-col gap-1.5">
-			<Label for="abs-status">{t('absence.status')}</Label>
-			<Select id="abs-status" bind:value={status} disabled={pending}>
-				{#each ABSENCE_STATUSES as option (option)}<option value={option}>{absenceStatusLabel(option)}</option>{/each}
-			</Select>
-			<p class="text-xs text-muted-foreground">{t('absence.status_hint')}</p>
+			{#if hasApprovalWorkflow(kind)}
+				<Label for="abs-status">{t('absence.status')}</Label>
+				<Select id="abs-status" bind:value={status} disabled={pending}>
+					{#each vacationStatuses as option (option)}<option value={option}>{absenceStatusLabel(option)}</option>{/each}
+				</Select>
+				<p class="text-xs text-muted-foreground">{t('absence.status_hint')}</p>
+			{:else}
+				<span class="text-sm font-medium leading-none">{t('absence.status')}</span>
+				<p class="text-sm" data-testid="absence-recorded-note">
+					{absenceStatusLabel(statusToSend(kind, status, initial) ?? 'recorded')}
+				</p>
+				<p class="text-xs text-muted-foreground">{t(`absence.recorded_hint_${kind as 'sick' | 'excused' | 'other'}`)}</p>
+			{/if}
 		</div>
 		<Field id="abs-start" type="date" label={t('absence.start')} bind:value={startDate} error={errors.startDate} disabled={pending} required />
 		<Field id="abs-end" type="date" label={t('absence.end')} bind:value={endDate} error={errors.endDate} disabled={pending} required />

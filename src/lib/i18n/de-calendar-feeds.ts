@@ -32,7 +32,7 @@ export const deCalendarFeeds = {
 	'feeds.part.holidays': 'Feiertage und Schulferien',
 	'feeds.part.plan': 'Geplante Arbeitstage',
 	'feeds.part.tracked': 'Erfasste Arbeitszeit',
-	'feeds.part_text.absences': 'Urlaub, Krank, Freigestellt und Sonstiges mit Status im Titel, zum Beispiel „Urlaub (genehmigt)“.',
+	'feeds.part_text.absences': 'Urlaub (mit Status im Titel, zum Beispiel „Urlaub (genehmigt)“), Krank, Freigestellt und Sonstiges sowie ausdrücklich markierte Urlaubs-, Krank-, Freistellungs- und Berufsschultage, ganztägig und ohne Notizen.',
 	'feeds.part_text.holidays': 'Feiertage deiner Region, eigene Feiertage und Schulferien.',
 	'feeds.part_text.plan': 'Geplante Arbeitstage mit Ort und Zeiten.',
 	'feeds.part_text.tracked': 'Bewertete Arbeitszeit je Tag bis heute.',

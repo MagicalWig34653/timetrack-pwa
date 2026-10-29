@@ -7,7 +7,7 @@
 	import HolidayBadge from '#lib/components/week/HolidayBadge.svelte';
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import type { DayInfo } from '#lib/planning/calendar.js';
-	import { absenceKindLabel, absenceStatusLabel, planModeLabel } from '#lib/planning/labels.js';
+	import { absenceKindLabel, absenceStatusHint, planModeLabel } from '#lib/planning/labels.js';
 	import { formatDateLong, formatDateNumeric } from '#lib/time/dates.js';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { listsBlocks } from '#lib/week/plan-blocks.js';
@@ -93,7 +93,7 @@
 				<dt class="text-muted-foreground">{absenceKindLabel(absence.kind)}</dt>
 				<dd class="flex flex-wrap items-center gap-2" data-testid="panel-absence">
 					<span>
-						{formatDateNumeric(absence.startDate)}–{formatDateNumeric(absence.endDate)} · {absenceStatusLabel(absence.status)}
+						{formatDateNumeric(absence.startDate)}–{formatDateNumeric(absence.endDate)}{#if absenceStatusHint(absence)} · {absenceStatusHint(absence)}{/if}
 						{#if absence.kind === 'vacation'} · {t('absence.counted', { days: formatHalfDays(absence.countedHalfDays) })}{/if}
 					</span>
 					{#if absence.kind === 'vacation'}<Button variant="link" size="sm" href="/absences?year={absence.startDate.slice(0, 4)}" data-testid="panel-absence-link">{t('weekview.vacation.open_page')}</Button>{/if}

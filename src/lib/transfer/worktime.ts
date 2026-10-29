@@ -140,7 +140,7 @@ export interface WorktimeAbsenceItem {
 	kind: 'vacation' | 'sick' | 'excused';
 	startDate: string;
 	endDate: string;
-	status: 'taken' | 'approved';
+	status: 'taken' | 'approved' | 'recorded';
 	note: string | null;
 }
 export interface WorktimeCustomDayItem {
@@ -338,7 +338,8 @@ export function evaluateWorktime(inputRows: WorktimeDayRow[], optionsInput: Work
 	let current: { kind: WorktimeAbsenceItem['kind']; startDate: string; endDate: string; row: number; notes: string[] } | null = null;
 	const flush = () => {
 		if (!current) return;
-		const status: WorktimeAbsenceItem['status'] = current.endDate < ctx.today ? 'taken' : 'approved';
+		// sick and excused leave are only recorded (contract 0.36.0); the request workflow exists for vacation
+		const status: WorktimeAbsenceItem['status'] = current.kind !== 'vacation' ? 'recorded' : current.endDate < ctx.today ? 'taken' : 'approved';
 		const note = current.notes.join(' / ').slice(0, 500) || null;
 		const clash = ctx.existingAbsences.filter((a) => !['rejected', 'cancelled'].includes(a.status) && a.startDate <= current!.endDate && a.endDate >= current!.startDate);
 		if (clash.length === 0) absences.push({ row: current.row, kind: current.kind, startDate: current.startDate, endDate: current.endDate, status, note });

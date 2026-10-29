@@ -19,7 +19,8 @@
 	import { findConflicts, hasBlocking, severityByDate, type ConflictContext } from '#lib/planning/conflicts.js';
 	import type { DialogResult, DialogSeed } from '#lib/planning/dialog.js';
 	import { previewRange, type DragOp } from '#lib/planning/drag.js';
-	import { ABSENCE_CLASSES, absenceKindLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS, WORK_STATE_CLASSES, WORK_STATE_ORDER, workStateLabel } from '#lib/planning/labels.js';
+	import { defaultStatusFor, quickStatusesFor } from '#lib/planning/absence-status.js';
+	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS, WORK_STATE_CLASSES, WORK_STATE_ORDER, workStateLabel } from '#lib/planning/labels.js';
 	import { absenceInputOf, createAbsenceOp, deleteAbsenceOp, deletePlanOp, moveAbsenceInput, pasteTargets, putPlanOp, updateAbsenceOp, type Operation } from '#lib/planning/operations.js';
 	import { addRange, emptySelection, rangeDates, selectionRuns, selectOne, selectRangeTo, shiftRange, toggleDate, type DateRange, type Selection } from '#lib/planning/range-select.js';
 	import { combine, UndoStack } from '#lib/planning/undo.js';
@@ -322,8 +323,6 @@
 		}
 	}
 
-	const DEFAULT_STATUS: Record<AbsenceKind, AbsenceStatus> = { vacation: 'planned', sick: 'taken', excused: 'approved', other: 'approved' };
-
 	/** Creates one absence per run; when a later one fails, the earlier ones are removed again. */
 	async function createRuns(runs: DateRange[], template: Omit<AbsenceInput, 'startDate' | 'endDate'>, label: string): Promise<Operation> {
 		const ops: Operation[] = [];
@@ -342,7 +341,7 @@
 			error = t('error.absence_overlap');
 			return;
 		}
-		void run(() => createRuns(selectionRuns(dates), { kind, status: DEFAULT_STATUS[kind], halfDayStart: false, halfDayEnd: false, note: null, documentStatus: 'not_needed' }, label), label);
+		void run(() => createRuns(selectionRuns(dates), { kind, status: defaultStatusFor(kind), halfDayStart: false, halfDayEnd: false, note: null, documentStatus: 'not_needed' }, label), label);
 	}
 
 	function openDialog(dates: string[], kind: DialogSeed['kind'], opener: HTMLElement | null, extra: Partial<DialogSeed> = {}) {
@@ -395,7 +394,7 @@
 	}
 
 	function setStatus(absence: Absence, status: AbsenceStatus) {
-		const label = t('cal.op_status', { status: t(`absence.status.${status}`) });
+		const label = t('cal.op_status', { status: absenceStatusLabel(status) });
 		void run(() => updateAbsenceOp(api, absence, { ...absenceInputOf(absence), status }, label), label);
 	}
 
@@ -454,9 +453,9 @@
 		if (absence) {
 			return [
 				{ id: 'edit', label: t('cal.menu_edit'), icon: Pencil, onselect: () => openDialog([absence.startDate], undefined, opener, { start: absence.startDate, end: absence.endDate, absence }) },
-				...(['planned', 'approved', 'taken', 'cancelled'] as AbsenceStatus[])
+				...quickStatusesFor(absence.kind)
 					.filter((s) => s !== absence.status)
-					.map<MenuEntry>((s) => ({ id: `status-${s}`, label: t('cal.menu_status', { status: t(`absence.status.${s}`) }), onselect: () => setStatus(absence, s) })),
+					.map<MenuEntry>((s) => ({ id: `status-${s}`, label: t('cal.menu_status', { status: absenceStatusLabel(s) }), onselect: () => setStatus(absence, s) })),
 				{ separator: true },
 				{ id: 'attachments', label: t('cal.menu_attachments'), icon: ExternalLink, onselect: () => void goto(`/absences?year=${absence.startDate.slice(0, 4)}`) },
 				{ separator: true },

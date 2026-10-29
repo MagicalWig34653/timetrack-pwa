@@ -50,7 +50,7 @@ export function dayAriaLabel(day: TimeWeekDay, vacation: VacationEntry[] | null 
 	if (day.holidayName) parts.push(holidayHint(day.holidayName, day.companyDayTreatment));
 	for (const entry of vacation ?? []) parts.push(vacationTooltip(entry));
 	for (const absence of chipAbsences(day, vacation !== null)) {
-		const warning = absenceWarning(absence.status);
+		const warning = absenceWarning(absence.status, absence.kind);
 		parts.push(warning ? `${absenceKindLabel(absence.kind)}, ${warning}` : absenceKindLabel(absence.kind));
 	}
 	if (day.isFuture) {

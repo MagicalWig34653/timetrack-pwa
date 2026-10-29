@@ -586,7 +586,9 @@ export interface VacationSuggestionQuery {
 }
 
 export type AbsenceKind = 'vacation' | 'sick' | 'excused' | 'other';
-export type AbsenceStatus = 'planned' | 'requested' | 'approved' | 'rejected' | 'cancelled' | 'taken';
+export type KnownAbsenceStatus = 'planned' | 'requested' | 'approved' | 'rejected' | 'cancelled' | 'taken' | 'recorded';
+/** Contract 0.36.0 adds `recorded`; later servers may add more, so unknown strings must never break a view. */
+export type AbsenceStatus = KnownAbsenceStatus | (string & {});
 export type DocumentStatus = 'not_needed' | 'pending' | 'submitted';
 
 export interface AbsenceInput {
@@ -595,7 +597,8 @@ export interface AbsenceInput {
 	endDate: string;
 	halfDayStart?: boolean;
 	halfDayEnd?: boolean;
-	status: AbsenceStatus;
+	/** Optional since contract 0.36.0: the server defaults to planned (vacation) or recorded (other kinds). */
+	status?: AbsenceStatus;
 	note?: string | null;
 	documentStatus?: DocumentStatus;
 	documentSubmittedOn?: string | null;
@@ -603,8 +606,10 @@ export interface AbsenceInput {
 	documentReferenceEnd?: string | null;
 }
 
-export interface Absence extends AbsenceInput {
+export interface Absence extends Omit<AbsenceInput, 'status'> {
 	id: string;
+	/** Always present on responses; unknown strings are possible (see AbsenceStatus). */
+	status: AbsenceStatus;
 	version: number;
 	countedHalfDays: number;
 	/** Stored attachments of this absence (contract 0.24.0). Absent on older servers, which the UI then counts per absence. */

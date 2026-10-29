@@ -50,7 +50,7 @@ describe('mock GET /time/weeks/{isoWeek}', () => {
 		const sick = await api.getTimeWeek('2026-W40');
 		expect(sick.days.filter((d) => d.mark === 'sick').map((d) => d.date)).toEqual(['2026-09-28', '2026-09-29']);
 		expect(sick.summary.sickDays).toBe(2);
-		expect(sick.days[0].absences).toEqual([{ kind: 'sick', status: 'taken', halfDay: false }]);
+		expect(sick.days[0].absences).toEqual([{ kind: 'sick', status: 'recorded', halfDay: false }]);
 		const worked = await api.getTimeWeek('2026-W41');
 		const thursday = worked.days[3]; // school day with a travel segment
 		expect(thursday.schoolSeconds).toBe(5.5 * 3600);

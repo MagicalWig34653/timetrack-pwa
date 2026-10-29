@@ -249,7 +249,9 @@ describe('calendar page', () => {
 		const panel = await screen.findByTestId('day-panel');
 		await userEvent.click(within(panel).getByRole('button', { name: 'Abwesenheit anlegen' }));
 		await userEvent.selectOptions(screen.getByLabelText('Art'), 'sick');
-		await userEvent.selectOptions(screen.getByLabelText('Status'), 'taken');
+		// sick leave has no approval workflow: no status selector, only the "recorded" note (contract 0.36.0)
+		expect(screen.queryByLabelText('Status')).toBeNull();
+		expect(screen.getByTestId('absence-recorded-note')).toHaveTextContent('Erfasst');
 		await userEvent.click(within(screen.getByTestId('absence-form')).getByRole('button', { name: 'Speichern' }));
 		expect(await screen.findByText('Abwesenheit gespeichert.')).toBeInTheDocument();
 		await waitFor(() => expect(within(screen.getByTestId('month-grid')).getAllByText('Krank').length).toBeGreaterThan(0));

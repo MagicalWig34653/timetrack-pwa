@@ -17,7 +17,8 @@
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
-	import { errorMessage, t, type MessageKey } from '#lib/i18n/index.js';
+	import { errorMessage, t } from '#lib/i18n/index.js';
+	import { absenceStatusLabel } from '#lib/planning/labels.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { todayLocal } from '#lib/time/dates.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
@@ -213,7 +214,7 @@
 								<ul class="mt-1 flex flex-col gap-0.5" data-testid="request-before-list">
 									{#each b.before as block, index (`${block.id}-${index}`)}
 										<li class="grid grid-cols-[1fr_auto] gap-x-4" data-testid="request-before-item">
-											<span>{rangeText({ from: block.from, to: block.to })} <span class="text-muted-foreground">({t(`absence.status.${block.status}` as MessageKey)}{block.partial ? `, ${t('vform.bd.partial')}` : ''})</span></span>
+											<span>{rangeText({ from: block.from, to: block.to })} <span class="text-muted-foreground">({absenceStatusLabel(block.status)}{block.partial ? `, ${t('vform.bd.partial')}` : ''})</span></span>
 											<span class="text-right">- {formatDaysDe(block.halfDays / 2)}</span>
 										</li>
 									{/each}
@@ -231,7 +232,7 @@
 								<ul class="mt-1 flex flex-col gap-0.5" data-testid="request-later-list">
 									{#each b.later as block, index (`${block.id}-${index}`)}
 										<li class="grid grid-cols-[1fr_auto] gap-x-4" data-testid="request-later-item">
-											<span>{rangeText({ from: block.from, to: block.to })} <span class="text-muted-foreground">({t(`absence.status.${block.status}` as MessageKey)}{block.partial ? `, ${t('vform.bd.partial')}` : ''})</span></span>
+											<span>{rangeText({ from: block.from, to: block.to })} <span class="text-muted-foreground">({absenceStatusLabel(block.status)}{block.partial ? `, ${t('vform.bd.partial')}` : ''})</span></span>
 											<span class="text-right text-muted-foreground">{formatDaysDe(block.halfDays / 2)}</span>
 										</li>
 									{/each}

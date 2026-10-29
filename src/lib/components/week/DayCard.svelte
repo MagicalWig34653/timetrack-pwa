@@ -71,7 +71,7 @@
 			</span>
 		{/each}
 		{#each chipAbsences(day, listed) as absence, i (i)}
-			{@const warning = absenceWarning(absence.status)}
+			{@const warning = absenceWarning(absence.status, absence.kind)}
 			<span
 				title={warning ? `${absenceKindLabel(absence.kind)}: ${warning}` : undefined}
 				class="inline-flex h-5 max-w-full items-center gap-1 rounded-full px-2 text-xs font-medium {warning ? 'bg-amber-500/15 text-amber-900 dark:text-amber-200' : ABSENCE_CLASSES[absence.kind]}"
