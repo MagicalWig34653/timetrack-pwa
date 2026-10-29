@@ -161,6 +161,28 @@
 		outline: 2px solid var(--ring);
 		outline-offset: 2px;
 	}
+	/* Tailwind 4 resets buttons to the default arrow: every clickable control gets the hand again, disabled ones the barred cursor.
+	   Utility classes (cursor-grab, cursor-text, ...) sit in a later layer and still win where they are set on purpose. */
+	button:not(:disabled),
+	[role='button']:not([aria-disabled='true']),
+	[role='tab']:not([aria-disabled='true']),
+	[role='menuitem']:not([aria-disabled='true']),
+	[role='switch']:not([aria-disabled='true']),
+	a[href],
+	summary,
+	select:not(:disabled),
+	label[for]:not(:has(:disabled)),
+	input:is([type='checkbox'], [type='radio'], [type='submit'], [type='button'], [type='file']):not(:disabled) {
+		cursor: pointer;
+	}
+	button:disabled,
+	[role='button'][aria-disabled='true'],
+	[role='tab'][aria-disabled='true'],
+	[role='menuitem'][aria-disabled='true'],
+	select:disabled,
+	input:is([type='checkbox'], [type='radio'], [type='submit'], [type='button'], [type='file']):disabled {
+		cursor: not-allowed;
+	}
 	input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='color']),
 	select {
 		min-height: 2.5rem;
