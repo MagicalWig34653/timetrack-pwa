@@ -123,12 +123,13 @@ describe('new poll', () => {
 });
 
 describe('poll detail', () => {
-	async function openDetail(fresh = true) {
+	async function openDetail(fresh = true, extraVotes = 0) {
 		const poll = await api.createPoll({ title: 'Wann?', kind: 'date', choiceMode: 'multi', options: [{ date: '2026-12-01' }, { date: '2026-12-02' }] });
 		if (fresh) freshLinks.set(poll.id!, poll.path!);
 		pageState.params = { id: poll.id! };
 		await publicPost(poll.token!, '/votes', { name: 'Anna', answers: [{ optionId: poll.options[0].id, answer: 'yes' }] });
 		await publicPost(poll.token!, '/votes', { name: 'Ben', answers: [{ optionId: poll.options[0].id, answer: 'yes' }, { optionId: poll.options[1].id, answer: 'maybe' }] });
+		for (let i = 0; i < extraVotes; i++) await publicPost(poll.token!, '/votes', { name: `Gast ${i}`, answers: [{ optionId: poll.options[0].id, answer: 'yes' }] });
 		render(PollDetail);
 		await screen.findByTestId('poll-results');
 		return poll;
@@ -155,6 +156,15 @@ describe('poll detail', () => {
 		const input = await screen.findByTestId('share-link-url');
 		expect((input as HTMLInputElement).value).not.toContain(poll.token!);
 		expect((await fetch(`/api/v1/public/groups/${poll.token}`)).status).toBe(404);
+	});
+
+	it('pages the vote rows at 25 while the tally counts all votes', async () => {
+		const poll = await openDetail(true, 30);
+		await screen.findByTestId('vote-pager');
+		expect(screen.getAllByTestId('vote-row')).toHaveLength(25);
+		expect(screen.getByTestId(`tally-${poll.options[0].id}`)).toHaveTextContent('32');
+		await userEvent.click(screen.getByRole('button', { name: 'Weiter' }));
+		expect(screen.getAllByTestId('vote-row')).toHaveLength(7);
 	});
 
 	it('closes, reopens, chooses and withdraws the final option', async () => {

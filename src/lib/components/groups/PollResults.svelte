@@ -32,7 +32,13 @@
 		onedit?: (vote: PollVote) => void;
 	} = $props();
 
+	const PAGE_SIZE = 25;
 	const votes = $derived(poll.votes ?? []);
+	let page = $state(0);
+	const pageCount = $derived(Math.max(1, Math.ceil(votes.length / PAGE_SIZE)));
+	// removing votes can leave the current page past the end
+	const current = $derived(Math.min(page, pageCount - 1));
+	const visibleVotes = $derived(votes.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE));
 	const best = $derived(bestOptionIds(poll));
 	const maybeUsed = $derived(poll.kind === 'date' && poll.choiceMode === 'multi');
 	const cellWidth = $derived(poll.options.length > 6 ? 'min-w-[5.5rem]' : 'min-w-[6.5rem]');
@@ -75,7 +81,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each votes as vote (vote.id)}
+			{#each visibleVotes as vote (vote.id)}
 				<tr class="border-t" data-testid="vote-row">
 					<th scope="row" class="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium break-words">
 						{vote.name}
@@ -121,4 +127,11 @@
 		</tfoot>
 	</table>
 </div>
+{#if pageCount > 1}
+	<nav class="mt-2 flex items-center justify-between gap-2 text-sm" aria-label={t('groups.pager_label')} data-testid="vote-pager">
+		<Button size="sm" variant="outline" disabled={current === 0} onclick={() => (page = current - 1)}>{t('groups.pager_prev')}</Button>
+		<span class="text-muted-foreground" aria-live="polite">{t('groups.pager_status', { page: current + 1, pages: pageCount, count: votes.length })}</span>
+		<Button size="sm" variant="outline" disabled={current >= pageCount - 1} onclick={() => (page = current + 1)}>{t('groups.pager_next')}</Button>
+	</nav>
+{/if}
 {#if maybeUsed}<p class="mt-1.5 text-xs text-muted-foreground">{t('groups.legend_maybe')}</p>{/if}

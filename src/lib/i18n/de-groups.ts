@@ -128,6 +128,10 @@ export const deGroups = {
 	'groups.rotate_confirm': 'Neuen Link erzeugen',
 
 	'groups.results_title': 'Ergebnis',
+	'groups.pager_label': 'Seiten der Stimmen',
+	'groups.pager_prev': 'Zurück',
+	'groups.pager_next': 'Weiter',
+	'groups.pager_status': 'Seite {page} von {pages} ({count} Stimmen; die Summen gelten für alle)',
 	'groups.results_empty': 'Noch keine Stimmen.',
 	'groups.results_caption': 'Ergebnis der Umfrage {title}: Antworten je Person und Möglichkeit',
 	'groups.results_hidden': 'Die Ergebnisse sind verborgen, bis die Umfrage beendet ist. Bisher haben {count} abgestimmt.',

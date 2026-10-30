@@ -1,4 +1,4 @@
-**U9 (30.10.2026):** Monatskopf und Statistik rechnen den Saldo nur bis gestern (heute separat, `includesToday: false`); An/Aus-Optionen (Rundung, Fahrtzeit, Pausen überspringen, Ruhezeit, Transparenz, Statistik „gerundet“) sind echte Schalter. 1333 Unit-Tests, Mock-E2E 248 grün.
+**U9 (30.10.2026):** Stimmenmatrix im Gruppenmodul mit Seitenumbruch (25 je Seite, Summen über alle); Monatskopf und Statistik rechnen den Saldo nur bis gestern (heute separat, `includesToday: false`); An/Aus-Optionen (Rundung, Fahrtzeit, Pausen überspringen, Ruhezeit, Transparenz, Statistik „gerundet“) sind echte Schalter. 1333 Unit-Tests, Mock-E2E 248 grün.
 
 # Stand der PWA – 26.10.2026 (Paket P15 im Worktree, uncommittet)
 
