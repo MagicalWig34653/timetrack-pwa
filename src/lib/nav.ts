@@ -12,7 +12,7 @@ export const MAIN_LINKS: { href: string; label: MessageKey; prefix: boolean; sec
 	{ href: '/shared', label: 'nav.shared', prefix: true },
 	{ href: '/export', label: 'nav.export', prefix: true },
 	{ href: '/import', label: 'nav.import', prefix: true },
-	{ href: '/settings/work-model', label: 'nav.settings', prefix: false, section: '/settings' }
+	{ href: '/settings', label: 'nav.settings', prefix: false, section: '/settings' }
 ];
 
 export const ADMIN_LINKS: { href: string; label: MessageKey; prefix: boolean }[] = [
@@ -43,25 +43,68 @@ export const SETTINGS_LINKS: { href: string; label: MessageKey }[] = [
 	{ href: '/settings/mcp-help', label: 'nav.mcp_help' },
 	{ href: '/settings/recovery', label: 'nav.recovery' },
 	{ href: '/settings/sessions', label: 'nav.sessions' },
-	{ href: '/settings/privacy', label: 'nav.privacy' }
+	{ href: '/settings/privacy', label: 'nav.privacy' },
+	// shortcuts to pages that live outside /settings but belong to "Daten & Export" (U8)
+	{ href: '/export', label: 'nav.export' },
+	{ href: '/import', label: 'nav.import' },
+	{ href: '/time/cancelled', label: 'trash.title' }
 ];
 
 /** Admin-only settings entries. */
 export const SETTINGS_ADMIN_LINKS: { href: string; label: MessageKey }[] = [
-	{ href: '/settings/storage', label: 'nav.storage' },
-	{ href: '/admin/mail', label: 'nav.mail' }
+	{ href: '/admin/invitations', label: 'nav.invitations' },
+	{ href: '/admin/accounts', label: 'nav.accounts' },
+	{ href: '/admin/modules', label: 'nav.admin_modules' },
+	{ href: '/admin/mail', label: 'nav.mail' },
+	{ href: '/settings/storage', label: 'nav.storage' }
 ];
+
+/** One explanatory line per settings entry (the page's own description), shown on the settings landing page. */
+export const SETTINGS_DESCRIPTIONS: Record<string, MessageKey> = {
+	'/settings/profile': 'profile.description',
+	'/settings/passkeys': 'passkeys.description',
+	'/settings/identities': 'identities.description',
+	'/settings/recovery': 'recovery.description',
+	'/settings/sessions': 'sessions.description',
+	'/settings/work-model': 'work_model.description',
+	'/settings/account-time': 'account_time.description',
+	'/settings/vacation-form': 'vform.description',
+	'/settings/learning-fields': 'learning.description',
+	'/settings/sharing': 'share.description',
+	'/settings/places': 'places.description',
+	'/settings/devices': 'devices.description',
+	'/settings/trigger-links': 'trigger.description',
+	'/settings/notifications': 'notif_settings.description',
+	'/settings/calendar-feeds': 'feeds.description',
+	'/settings/appearance': 'appearance.description',
+	'/settings/modules': 'modules.description',
+	'/settings/connections': 'connections.description',
+	'/settings/api-tokens': 'tokens.description',
+	'/settings/mcp-help': 'mcphelp.description',
+	'/settings/privacy': 'privacy.description',
+	'/export': 'export.description',
+	'/import': 'import.description',
+	'/time/cancelled': 'trash.description',
+	'/admin/invitations': 'invitations.description',
+	'/admin/accounts': 'accounts.description',
+	'/admin/modules': 'admin_modules.description',
+	'/admin/mail': 'mail.description',
+	'/settings/storage': 'storage.description'
+};
 
 /**
  * Grouped settings navigation (P1): the former single row of 18 tabs became a sidebar list on wide screens and a
  * collapsible grouped list on phones. Every settings link belongs to exactly one group (nav.test.ts).
  */
 export const SETTINGS_GROUPS: { id: string; label: MessageKey; hrefs: string[] }[] = [
-	{ id: 'account', label: 'nav.settings_group.account', hrefs: ['/settings/profile', '/settings/passkeys', '/settings/identities', '/settings/recovery', '/settings/sessions', '/settings/privacy'] },
-	{ id: 'work', label: 'nav.settings_group.work', hrefs: ['/settings/work-model', '/settings/places', '/settings/account-time', '/settings/vacation-form', '/settings/learning-fields'] },
-	{ id: 'app', label: 'nav.settings_group.app', hrefs: ['/settings/appearance', '/settings/notifications', '/settings/modules'] },
-	{ id: 'connections', label: 'nav.settings_group.connections', hrefs: ['/settings/devices', '/settings/trigger-links', '/settings/calendar-feeds', '/settings/sharing', '/settings/connections', '/settings/api-tokens', '/settings/mcp-help'] },
-	{ id: 'admin', label: 'nav.settings_group.admin', hrefs: ['/settings/storage', '/admin/mail'] }
+	{ id: 'account', label: 'nav.settings_group.account', hrefs: ['/settings/profile', '/settings/passkeys', '/settings/identities', '/settings/recovery', '/settings/sessions'] },
+	{ id: 'work', label: 'nav.settings_group.work', hrefs: ['/settings/work-model', '/settings/account-time', '/settings/vacation-form', '/settings/learning-fields', '/settings/sharing'] },
+	{ id: 'places', label: 'nav.settings_group.places', hrefs: ['/settings/places', '/settings/devices', '/settings/trigger-links'] },
+	{ id: 'notify', label: 'nav.settings_group.notify', hrefs: ['/settings/notifications', '/settings/calendar-feeds'] },
+	{ id: 'ai', label: 'nav.settings_group.ai', hrefs: ['/settings/connections', '/settings/api-tokens', '/settings/mcp-help'] },
+	{ id: 'data', label: 'nav.settings_group.data', hrefs: ['/export', '/import', '/time/cancelled', '/settings/privacy'] },
+	{ id: 'app', label: 'nav.settings_group.app', hrefs: ['/settings/appearance', '/settings/modules'] },
+	{ id: 'admin', label: 'nav.settings_group.admin', hrefs: ['/admin/invitations', '/admin/accounts', '/admin/modules', '/admin/mail', '/settings/storage'] }
 ];
 
 /** Groups the visible links; empty groups disappear. */
@@ -138,13 +181,13 @@ export const NAV_GROUPS: NavGroup[] = [
 /** Extra search terms per settings page (German); the page title is always searched too. */
 export const SETTINGS_KEYWORDS: Record<string, string> = {
 	'/settings/profile': 'profil name anzeigename e-mail adresse konto einrichtung wiederholen onboarding',
-	'/settings/work-model': 'arbeitszeit soll woche tag pause rundung schule fahrtzeit modell',
+	'/settings/work-model': 'arbeitszeit soll woche tag pause rundung schule fahrtzeit modell firmentage betriebsferien',
 	'/settings/appearance': 'darstellung hell dunkel akzent farbe theme transparenz design',
-	'/settings/places': 'orte standort ort automatik geofence',
+	'/settings/places': 'orte standort ort automatik geofence regeln',
 	'/settings/account-time': 'zeitkonto saldo anfangsstand korrektur',
 	'/settings/learning-fields': 'lernfelder berichtsheft ihk',
-	'/settings/vacation-form': 'urlaubsantrag antrag formular pdf vorlage urlaub ausfüllen',
-	'/settings/notifications': 'hinweise push benachrichtigung erinnerung',
+	'/settings/vacation-form': 'urlaub urlaubsanspruch resturlaub urlaubsantrag antrag formular pdf vorlage urlaub ausfüllen',
+	'/settings/notifications': 'hinweise push benachrichtigung erinnerung apns web-push',
 	'/settings/modules': 'module funktionen ausblenden',
 	'/settings/devices': 'geräte shortcuts automatik',
 	'/settings/trigger-links': 'auslöse links url start stopp timer schaltfläche widget kurzbefehl',
@@ -159,6 +202,12 @@ export const SETTINGS_KEYWORDS: Record<string, string> = {
 	'/settings/sessions': 'sitzungen abmelden geräte sicherheit',
 	'/settings/privacy': 'daten datenschutz export herunterladen löschen konto dsgvo auskunft',
 	'/settings/storage': 'speicher dateien s3 anhänge',
+	'/export': 'export exportieren csv pdf tabelle nachweis herunterladen',
+	'/import': 'import importieren csv excel tabelle übernehmen',
+	'/time/cancelled': 'storniert stornierte einträge papierkorb gelöscht wiederherstellen',
+	'/admin/invitations': 'einladung einladen registrierung token admin',
+	'/admin/accounts': 'konten benutzer admin sperren löschen',
+	'/admin/modules': 'module server admin funktionen',
 	'/admin/mail': 'e-mail mail smtp versand server testmail verbindung prüfen'
 };
 
@@ -182,12 +231,14 @@ export function breadcrumbs(pathname: string): Crumb[] {
 	const parts = pathname.split('/').filter(Boolean);
 	const trail: Crumb[] = [{ label: 'nav.home', href: '/' }];
 	if (parts[0] === 'settings') {
-		trail.push({ label: 'nav.settings', href: '/settings/work-model' });
+		if (parts.length === 1) return [{ label: 'nav.home', href: '/' }, { label: 'nav.settings' }];
+		trail.push({ label: 'nav.settings', href: '/settings' });
 		const label = ALL_LABELS.get(`/settings/${parts[1] ?? ''}`);
 		if (label) trail.push({ label });
 		return trail;
 	}
 	if (parts[0] === 'admin') {
+		trail.push({ label: 'nav.settings', href: '/settings' });
 		const label = ALL_LABELS.get(`/admin/${parts[1] ?? ''}`);
 		if (label) trail.push({ label });
 		return trail;
@@ -220,8 +271,8 @@ export function searchSettings<T extends { href: string; label: MessageKey }>(li
 
 /**
  * Pages that share one section shell (the settings nav + content column, see SettingsShell). The app layout keeps such a
- * shell mounted across navigations between its pages; `/admin/mail` is listed in the settings nav and uses the same shell.
+ * shell mounted across navigations between its pages; the `/admin/*` pages are listed in the settings nav (admin group) and use the same shell.
  */
 export function sectionShell(pathname: string): 'settings' | null {
-	return pathname === '/settings' || pathname.startsWith('/settings/') || pathname === '/admin/mail' ? 'settings' : null;
+	return pathname === '/settings' || pathname.startsWith('/settings/') || pathname.startsWith('/admin/') ? 'settings' : null;
 }

@@ -30,3 +30,21 @@ describe('grouped settings navigation', () => {
 		expect(groups[0].links[0].href).toBe('/settings/profile');
 	});
 });
+
+import { SETTINGS_DESCRIPTIONS, SETTINGS_GROUPS, sectionShell } from './nav';
+
+describe('settings information architecture (U8)', () => {
+	it('groups admin entries separately and keeps every entry described', () => {
+		const all = [...SETTINGS_LINKS, ...SETTINGS_ADMIN_LINKS];
+		for (const link of all) expect(SETTINGS_DESCRIPTIONS[link.href], link.href).toBeTruthy();
+		const admin = SETTINGS_GROUPS.find((g) => g.id === 'admin')!;
+		expect(admin.hrefs).toEqual(SETTINGS_ADMIN_LINKS.map((l) => l.href).sort((a, b) => admin.hrefs.indexOf(a) - admin.hrefs.indexOf(b)));
+	});
+	it('shares one shell for settings, landing and admin pages', () => {
+		for (const path of ['/settings', '/settings/profile', '/admin/accounts', '/admin/mail']) expect(sectionShell(path)).toBe('settings');
+		expect(sectionShell('/week')).toBeNull();
+	});
+	it('finds moved entries by keyword', () => {
+		expect(searchSettings(SETTINGS_LINKS, 'papierkorb', (k) => k).map((l) => l.href)).toEqual(['/time/cancelled']);
+	});
+});

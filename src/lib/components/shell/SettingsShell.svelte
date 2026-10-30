@@ -1,6 +1,6 @@
 <script lang="ts">
-	// Section shell of the settings pages (nav + content column). Used by the settings layout and by /admin/mail,
-	// which is listed in the settings nav; without the shell the nav would vanish and the content would jump (J1).
+	// Section shell of the settings pages (nav + content column). Used by the settings layout and the admin layout,
+	// whose pages are listed in the settings nav; without the shell the nav would vanish and the content would jump (J1).
 	import { page } from '$app/state';
 	import ErrorPage from '#lib/components/app/ErrorPage.svelte';
 	import { newErrorId } from '#lib/errors/describe.js';
@@ -21,6 +21,7 @@
 		})
 	);
 	const groups = $derived(groupSettingsLinks(links));
+	const landing = $derived(page.url.pathname === '/settings');
 	const current = $derived(links.find((link) => link.href === page.url.pathname));
 	// Phones: the grouped list is folded behind one button; wide screens always show it.
 	let open = $state(false);
@@ -34,7 +35,7 @@
 
 <div class="wide:grid wide:grid-cols-[13.5rem_minmax(0,1fr)] wide:items-start wide:gap-8">
 	<!-- sticky below the 60 px top bar; scrolls on its own when taller than the window, so every entry stays reachable -->
-	<div class="mb-5 wide:sticky wide:top-[76px] wide:mb-0 wide:max-h-[calc(100vh-92px)] wide:overflow-y-auto wide:overscroll-contain" data-testid="settings-nav-sticky">
+	<div class="{landing ? 'hidden wide:block' : ''} mb-5 wide:sticky wide:top-[76px] wide:mb-0 wide:max-h-[calc(100vh-92px)] wide:overflow-y-auto wide:overscroll-contain" data-testid="settings-nav-sticky">
 		<button
 			type="button"
 			class="flex h-10 w-full items-center justify-between rounded-lg border bg-card px-3 text-sm font-medium wide:hidden"

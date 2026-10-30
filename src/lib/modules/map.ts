@@ -19,6 +19,7 @@ export const CORE_ROUTES = [
 	'/mock-idp',
 	'/mock-oauth',
 	'/onboarding',
+	'/settings',
 	'/settings/profile',
 	'/settings/work-model',
 	'/settings/appearance',
@@ -47,7 +48,8 @@ export const MODULE_ROUTES: Record<ModuleKey, readonly string[]> = {
 };
 
 function covers(route: string, pathname: string): boolean {
-	if (route === '/') return pathname === '/';
+	// '/' and the settings landing match only themselves; every settings sub page is classified individually
+	if (route === '/' || route === '/settings') return pathname === route;
 	return pathname === route || pathname.startsWith(route + '/');
 }
 

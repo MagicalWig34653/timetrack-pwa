@@ -95,7 +95,7 @@ test('settings nav stays mounted: its scroll position and DOM node survive a pag
 	const start = await page.evaluate(() => document.querySelector('[data-testid="settings-nav-sticky"]')!.scrollTop);
 	expect(start).toBeGreaterThan(50);
 	// /admin/mail has its own layout component (separate route tree), so only hops between settings pages keep the node
-	for (const route of ['/settings/privacy', '/settings/places', '/settings/sessions']) {
+	for (const route of ['/settings/privacy', '/settings/modules', '/settings/storage']) {
 		await page.locator(`#settings-nav-list a[href="${route}"]`).click();
 		await page.waitForURL(`**${route}`);
 		const state = await page.evaluate(() => ({

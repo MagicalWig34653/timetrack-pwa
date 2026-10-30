@@ -2,11 +2,17 @@
 export const deProfile = {
 	'nav.profile': 'Profil',
 	'nav.onboarding': 'Einrichtung',
-	'nav.settings_group.account': 'Konto & Sicherheit',
-	'nav.settings_group.work': 'Arbeit',
-	'nav.settings_group.app': 'App',
-	'nav.settings_group.connections': 'Verbindungen',
-	'nav.settings_group.admin': 'Verwaltung',
+	'nav.settings_group.account': 'Profil & Sicherheit',
+	'nav.settings_group.work': 'Arbeitszeit & Urlaub',
+	'nav.settings_group.places': 'Orte & Automatik',
+	'nav.settings_group.notify': 'Benachrichtigungen & Kalender',
+	'nav.settings_group.ai': 'KI-Zugang',
+	'nav.settings_group.data': 'Daten & Export',
+	'nav.settings_group.app': 'Darstellung & Module',
+	'nav.settings_group.admin': 'Verwaltung (Admin)',
+	'settings.landing.title': 'Einstellungen',
+	'settings.landing.description': 'Alle Einstellungen nach Themen geordnet. Nutze die Suche, um direkt zu einer Seite zu springen.',
+	'settings.landing.search': 'Einstellungen suchen',
 
 	'error.email_taken': 'Diese E-Mail-Adresse wird bereits von einem anderen Konto verwendet. Die Änderung wurde nicht übernommen.',
 
