@@ -1,5 +1,6 @@
 import { createGroupsMock } from './groups.ts';
 import { createMcpMock } from './mcp.ts';
+import { createApnsMock } from './apns.ts';
 import { createMailMock } from './mail.ts';
 import { createModulesMock, type ModuleKey } from './modules.ts';
 import { createNotificationsMock } from './notifications.ts';
@@ -164,6 +165,7 @@ export function createMockApi(options: MockOptions = {}) {
 		attachmentCountOf: (accountId, absenceId) => transfer.attachmentCount(accountId, absenceId)
 	});
 	const mail = createMailMock({ configured: options.mailAvailable ?? true });
+	const apns = createApnsMock({ now: options.now });
 	const modules = createModulesMock({ disabledByOperator: options.modulesDisabled });
 	// With planning switched off, absences and holidays do not act on the day evaluation (ADR-0012).
 	time.setDayContext((accountId, date) => (modules.effective(accountId, 'planning') ? planning.dayContext(accountId, date) : null));
@@ -195,7 +197,7 @@ export function createMockApi(options: MockOptions = {}) {
 		clock: options.now ?? Date.now,
 		ownerState: (ownerId) => (!modules.serverEnabled('groups') && modules.state.locked.has('groups') ? 'locked' : modules.effective(ownerId, 'groups') ? 'ok' : 'off')
 	});
-	const notifications = createNotificationsMock({ clock: options.now ?? Date.now });
+	const notifications = createNotificationsMock({ clock: options.now ?? Date.now, apnsAvailable: () => apns.state.configured });
 	const oidc = {
 		enabled: !!options.oidc,
 		name: typeof options.oidc === 'object' ? (options.oidc.name ?? 'Mock-IdP') : 'Mock-IdP'
@@ -479,6 +481,7 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 200, body: { enabled: oidc.enabled, name: oidc.name } };
 		}
 		if (path === '/api/v1/mock/mail' && method === 'POST') return mail.hook(body);
+		if (path === '/api/v1/mock/apns' && method === 'POST') return apns.hook(admin.id, body);
 		if (path === '/api/v1/mock/trash' && method === 'POST') return time.hookTrash(body);
 		if (path === '/api/v1/mock/review' && method === 'POST') return time.hookReview(admin.id, body.segmentId);
 		if (path === '/api/v1/mock/accounts' && method === 'POST') {
@@ -892,6 +895,9 @@ export function createMockApi(options: MockOptions = {}) {
 			{ method, path, body: req.body }
 		);
 		if (mailResponse) return mailResponse;
+
+		const apnsResponse = apns.handle({ admin: account.role === 'admin', accountId: account.id }, { method, path });
+		if (apnsResponse) return apnsResponse;
 
 		const modulesResponse = modules.handle(account.id, account.role, { method, path, body: req.body });
 		if (modulesResponse) return modulesResponse;

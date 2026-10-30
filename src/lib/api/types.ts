@@ -1204,6 +1204,8 @@ export interface NotificationSettings {
 
 export interface PushConfig {
 	available: boolean;
+	/** APNs push for the Apple apps is configured (contract 0.33.0) */
+	apnsAvailable?: boolean;
 	/** base64url uncompressed P-256 public key */
 	vapidPublicKey?: string;
 }
@@ -1534,4 +1536,51 @@ export interface PublicGroup {
 	type: 'poll' | 'order';
 	poll?: Poll;
 	order?: Order;
+}
+
+/** APNs device of an Apple app (contract 0.33.0). The device token is never delivered. */
+export interface PushDeviceInfo {
+	id: string;
+	platform: 'ios' | 'macos' | 'watchos';
+	environment: 'sandbox' | 'production';
+	appBundleId: string;
+	label?: string | null;
+	createdAt: string;
+	lastSuccessAt?: string | null;
+}
+
+/** APNs diagnosis for administrators (contract 0.38.0, P14e). */
+export interface ApnsHint {
+	severity: 'info' | 'warning';
+	code: 'not_configured' | 'incomplete' | 'no_devices';
+	message: string;
+}
+
+export interface ApnsStatus {
+	configured: boolean;
+	keyId?: string;
+	teamId?: string;
+	bundleIds: string[];
+	/** names of missing or invalid APNS_* variables */
+	problems: string[];
+	deviceCount: number;
+	source: 'environment';
+	hints: ApnsHint[];
+}
+
+export interface ApnsProbe {
+	bundleId: string;
+	environment: 'production' | 'sandbox';
+	status: 'ok' | 'failed';
+	httpStatus?: number;
+	reason?: string;
+	advice?: string;
+}
+
+export interface ApnsCheckResult {
+	ok: boolean;
+	summary: string;
+	checkedAt: string;
+	totalMs: number;
+	probes: ApnsProbe[];
 }

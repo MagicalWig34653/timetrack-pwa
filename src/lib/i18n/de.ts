@@ -4,6 +4,7 @@ import { deCalendarFeeds } from './de-calendar-feeds';
 import { deCompanyDays } from './de-company-days';
 import { deDesign } from './de-design';
 import { deErrors } from './de-errors';
+import { deApns } from './de-apns';
 import { deMail } from './de-mail';
 import { deMcp } from './de-mcp';
 import { deN2 } from './de-n2';
@@ -35,6 +36,7 @@ export const de = {
 	...deDesign,
 	...deErrors,
 	...deMail,
+	...deApns,
 	...deMcp,
 	...deN2,
 	...deV6,

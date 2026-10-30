@@ -2,7 +2,10 @@ import { splitRange } from '../time/dates';
 import { pwa } from '../pwa/pwa.svelte';
 import { ApiError } from './errors';
 import type {
+	ApnsCheckResult,
+	ApnsStatus,
 	MailCheckResult,
+	PushDeviceInfo,
 	MailStatus,
 	MailTestResult,
 	AdminAccount,
@@ -662,6 +665,8 @@ export const api = {
 	getMailStatus: () => request<MailStatus>('GET', '/admin/mail'),
 	checkMail: () => request<MailCheckResult>('POST', '/admin/mail/check'),
 	sendMailTest: (to?: string) => request<MailTestResult>('POST', '/admin/mail/test', to ? { to } : {}),
+	getApnsStatus: () => request<ApnsStatus>('GET', '/admin/apns'),
+	checkApns: () => request<ApnsCheckResult>('POST', '/admin/apns/check'),
 
 	// file storage (admin) and files
 	getStorageSettings: () => request<StorageSettings>('GET', '/admin/storage'),
@@ -708,6 +713,9 @@ export const api = {
 	createPushSubscription: (input: PushSubscriptionInput) => request<PushSubscriptionInfo>('POST', '/me/push-subscriptions', input),
 	deletePushSubscription: (id: string) => request<void>('DELETE', `/me/push-subscriptions/${id}`),
 	sendTestPush: (id: string) => request<void>('POST', `/me/push-subscriptions/${id}/test`),
+	listPushDevices: () => request<PushDeviceInfo[]>('GET', '/me/push-devices'),
+	deletePushDevice: (id: string) => request<void>('DELETE', `/me/push-devices/${id}`),
+	sendTestPushDevice: (id: string) => request<void>('POST', `/me/push-devices/${id}/test`),
 
 	// version information, contract v0.19.0 (ADR-0023); older servers answer 404
 	getSystemInfo: () => request<SystemInfo>('GET', '/system/info'),

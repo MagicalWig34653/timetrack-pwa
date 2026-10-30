@@ -19,7 +19,8 @@ export const ADMIN_LINKS: { href: string; label: MessageKey; prefix: boolean }[]
 	{ href: '/admin/invitations', label: 'nav.invitations', prefix: true },
 	{ href: '/admin/accounts', label: 'nav.accounts', prefix: true },
 	{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true },
-	{ href: '/admin/mail', label: 'nav.mail', prefix: true }
+	{ href: '/admin/mail', label: 'nav.mail', prefix: true },
+	{ href: '/admin/apns', label: 'nav.apns', prefix: true }
 ];
 
 export const SETTINGS_LINKS: { href: string; label: MessageKey }[] = [
@@ -56,6 +57,7 @@ export const SETTINGS_ADMIN_LINKS: { href: string; label: MessageKey }[] = [
 	{ href: '/admin/accounts', label: 'nav.accounts' },
 	{ href: '/admin/modules', label: 'nav.admin_modules' },
 	{ href: '/admin/mail', label: 'nav.mail' },
+	{ href: '/admin/apns', label: 'nav.apns' },
 	{ href: '/settings/storage', label: 'nav.storage' }
 ];
 
@@ -89,6 +91,7 @@ export const SETTINGS_DESCRIPTIONS: Record<string, MessageKey> = {
 	'/admin/accounts': 'accounts.description',
 	'/admin/modules': 'admin_modules.description',
 	'/admin/mail': 'mail.description',
+	'/admin/apns': 'apns.description',
 	'/settings/storage': 'storage.description'
 };
 
@@ -104,7 +107,7 @@ export const SETTINGS_GROUPS: { id: string; label: MessageKey; hrefs: string[] }
 	{ id: 'ai', label: 'nav.settings_group.ai', hrefs: ['/settings/connections', '/settings/api-tokens', '/settings/mcp-help'] },
 	{ id: 'data', label: 'nav.settings_group.data', hrefs: ['/export', '/import', '/time/cancelled', '/settings/privacy'] },
 	{ id: 'app', label: 'nav.settings_group.app', hrefs: ['/settings/appearance', '/settings/modules'] },
-	{ id: 'admin', label: 'nav.settings_group.admin', hrefs: ['/admin/invitations', '/admin/accounts', '/admin/modules', '/admin/mail', '/settings/storage'] }
+	{ id: 'admin', label: 'nav.settings_group.admin', hrefs: ['/admin/invitations', '/admin/accounts', '/admin/modules', '/admin/mail', '/admin/apns', '/settings/storage'] }
 ];
 
 /** Groups the visible links; empty groups disappear. */
@@ -174,7 +177,8 @@ export const NAV_GROUPS: NavGroup[] = [
 			{ href: '/admin/invitations', label: 'nav.invitations', prefix: true, icon: 'invite' },
 			{ href: '/admin/accounts', label: 'nav.accounts', prefix: true, icon: 'users' },
 			{ href: '/admin/modules', label: 'nav.admin_modules', prefix: true, icon: 'modules' },
-			{ href: '/admin/mail', label: 'nav.mail', prefix: true, icon: 'mail' }
+			{ href: '/admin/mail', label: 'nav.mail', prefix: true, icon: 'mail' },
+			{ href: '/admin/apns', label: 'nav.apns', prefix: true, icon: 'mail' }
 		]
 	}
 ];
@@ -209,7 +213,8 @@ export const SETTINGS_KEYWORDS: Record<string, string> = {
 	'/admin/invitations': 'einladung einladen registrierung token admin',
 	'/admin/accounts': 'konten benutzer admin sperren löschen',
 	'/admin/modules': 'module server admin funktionen',
-	'/admin/mail': 'e-mail mail smtp versand server testmail verbindung prüfen'
+	'/admin/mail': 'e-mail mail smtp versand server testmail verbindung prüfen',
+	'/admin/apns': 'apns push apple iphone mitteilungen schlüssel server prüfen verbindung'
 };
 
 export interface Crumb {

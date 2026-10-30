@@ -5,6 +5,7 @@
 		NOTIFICATION_CATEGORIES,
 		type NotificationCategory,
 		type PushConfig,
+		type PushDeviceInfo,
 		type PushSubscriptionInfo
 	} from '#lib/api/types.js';
 	import { formatDateTime } from '#lib/browser.js';
@@ -48,6 +49,10 @@
 	let supported = $state(true);
 	let permission = $state<PermissionState>('default');
 	let subscriptions = $state<PushSubscriptionInfo[]>([]);
+	let appleDevices = $state<PushDeviceInfo[]>([]);
+	let appleBusy = $state(false);
+	let appleNotice = $state('');
+	let appleError = $state('');
 	/** server id of this browser's subscription; null when this device has none */
 	let thisDeviceId = $state<string | null>(null);
 	let pushBusy = $state(false);
@@ -89,6 +94,11 @@
 				await refreshSubscriptions();
 			} catch {
 				subscriptions = [];
+			}
+			try {
+				appleDevices = await api.listPushDevices();
+			} catch {
+				appleDevices = [];
 			}
 			load = { status: 'ready' };
 		} catch (e) {
@@ -179,6 +189,33 @@
 			pushBusy = false;
 		}
 	}
+
+	async function appleAction(run: () => Promise<void>) {
+		if (appleBusy) return;
+		appleBusy = true;
+		appleNotice = appleError = '';
+		try {
+			await run();
+			appleDevices = await api.listPushDevices();
+		} catch (e) {
+			if (e instanceof ApiError && e.status === 429) appleError = t('apnsdev.test_rate');
+			else if (e instanceof ApiError && e.status === 502) appleError = t('apnsdev.test_failed');
+			else if (e instanceof ApiError && e.status === 501) appleError = t('push.unavailable_server');
+			else appleError = errorMessage(e);
+		} finally {
+			appleBusy = false;
+		}
+	}
+	const testAppleDevice = (info: PushDeviceInfo) =>
+		appleAction(async () => {
+			await api.sendTestPushDevice(info.id);
+			appleNotice = t('apnsdev.test_sent');
+		});
+	const removeAppleDevice = (info: PushDeviceInfo) =>
+		appleAction(async () => {
+			await api.deletePushDevice(info.id);
+			appleNotice = t('apnsdev.removed');
+		});
 
 	async function sendTest(info: PushSubscriptionInfo) {
 		if (pushBusy) return;
@@ -351,6 +388,40 @@
 				</div>
 			</CardContent>
 		</Card>
+
+		{#if config.apnsAvailable || appleDevices.length > 0}
+			<Card data-testid="apns-card">
+				<CardHeader>
+					<CardTitle>{t('apnsdev.title')}</CardTitle>
+					<CardDescription>{t('apnsdev.description')}</CardDescription>
+				</CardHeader>
+				<CardContent class="flex flex-col gap-4">
+					{#if appleNotice}<Alert variant="success" data-testid="apns-notice">{appleNotice}</Alert>{/if}
+					{#if appleError}<Alert variant="destructive" data-testid="apns-error">{appleError}</Alert>{/if}
+					{#if appleDevices.length === 0}
+						<EmptyState title={t('apnsdev.empty')} />
+					{:else}
+						<ul class="divide-y" data-testid="apns-device-list">
+							{#each appleDevices as info (info.id)}
+								<li class="flex flex-wrap items-center justify-between gap-3 py-3" data-testid="apns-device">
+									<div class="min-w-0">
+										<p class="font-medium break-words">{info.label || t(`apnsdev.platform.${info.platform}`)}</p>
+										<p class="text-xs break-words text-muted-foreground">{t(`apnsdev.platform.${info.platform}`)} · {t(`apnsdev.env.${info.environment}`)} · {info.appBundleId}</p>
+										<p class="text-xs text-muted-foreground">
+											{t('push.created', { date: formatDateTime(info.createdAt) })} · {info.lastSuccessAt ? t('push.last_success', { date: formatDateTime(info.lastSuccessAt) }) : t('push.never_delivered')}
+										</p>
+									</div>
+									<div class="flex gap-2">
+										<Button size="sm" variant="outline" onclick={() => testAppleDevice(info)} disabled={appleBusy || !config.apnsAvailable}>{t('apnsdev.test')}</Button>
+										<Button size="sm" variant="destructive" onclick={() => removeAppleDevice(info)} disabled={appleBusy}>{t('apnsdev.remove')}</Button>
+									</div>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</CardContent>
+			</Card>
+		{/if}
 
 		<Card data-testid="install-card">
 			<CardHeader>

@@ -111,10 +111,13 @@ export function normalizeSettings(body: any): Settings | null {
 
 export interface NotificationsMockOptions {
 	clock: () => number;
+	/** APNs is configured on the (mock) server; reported as `apnsAvailable` by /push/config */
+	apnsAvailable?: () => boolean;
 }
 
 export function createNotificationsMock(options: NotificationsMockOptions) {
 	const now = options.clock;
+	const apnsAvailable = options.apnsAvailable ?? (() => false);
 	const items = new Map<string, Item[]>();
 	const settings = new Map<string, Settings>();
 	const subscriptions = new Map<string, Subscription[]>();
@@ -206,7 +209,7 @@ export function createNotificationsMock(options: NotificationsMockOptions) {
 		}
 
 		if (path === '/api/v1/push/config' && method === 'GET') {
-			return { status: 200, body: push.available ? { available: true, vapidPublicKey: MOCK_VAPID_PUBLIC_KEY } : { available: false } };
+			return { status: 200, body: { ...(push.available ? { available: true, vapidPublicKey: MOCK_VAPID_PUBLIC_KEY } : { available: false }), ...(apnsAvailable() ? { apnsAvailable: true } : {}) } };
 		}
 		if (path === '/api/v1/me/push-subscriptions') {
 			if (method === 'GET') return { status: 200, body: subsOf(accountId).map(publicSub) };

@@ -1,3 +1,5 @@
+**P14e-pwa (30.10.2026):** Admin-Seite `/admin/apns` (Zustand ohne Schlüssel, Live-Prüfung bei Apple je Bundle-ID/Umgebung, Vertrag 0.38.0) und Karte „Apple-Geräte“ in den Benachrichtigungen (Liste, Testmitteilung, Entfernen). 1340 Unit-Tests, Mock-E2E 248 grün; gegen das echte Backend ungeprüft.
+
 **U9 (30.10.2026):** Stimmenmatrix im Gruppenmodul mit Seitenumbruch (25 je Seite, Summen über alle); Monatskopf und Statistik rechnen den Saldo nur bis gestern (heute separat, `includesToday: false`); An/Aus-Optionen (Rundung, Fahrtzeit, Pausen überspringen, Ruhezeit, Transparenz, Statistik „gerundet“) sind echte Schalter. 1333 Unit-Tests, Mock-E2E 248 grün.
 
 # Stand der PWA – 26.10.2026 (Paket P15 im Worktree, uncommittet)
