@@ -128,6 +128,8 @@ function build(input: AggregateInput): Omit<StatsData, 'monthly'> {
 	const to = days.at(-1)?.date ?? today;
 	const buckets = new Map<string, { point: StatsPoint; starts: number[]; ends: number[] }>();
 	let running = input.openingBalanceSeconds;
+	// the account counts completed days only (ADR-0032): today's difference stands apart and flows in tomorrow
+	let todayDelta: number | null = null;
 	const allStarts: number[] = [];
 	const allEnds: number[] = [];
 	const totals = { targetSeconds: 0, actualSeconds: 0, deltaSeconds: 0, breakSeconds: 0, workSeconds: 0, travelSeconds: 0, schoolSeconds: 0, absenceDays: 0, days: 0 };
@@ -154,7 +156,8 @@ function build(input: AggregateInput): Omit<StatsData, 'monthly'> {
 		p.targetSeconds += day.targetSeconds;
 		p.actualSeconds += actual;
 		p.deltaSeconds += delta;
-		running += delta;
+		if (day.date < today) running += delta;
+		else todayDelta = delta;
 		p.balanceSeconds = running;
 		p.workSeconds += figures.work;
 		p.travelSeconds += figures.travel;
@@ -193,6 +196,8 @@ function build(input: AggregateInput): Omit<StatsData, 'monthly'> {
 		rounded,
 		points: elapsed,
 		totals: { ...totals, avgStartMinutes: mean(allStarts), avgEndMinutes: mean(allEnds) },
+		includesToday: false,
+		todayDeltaSeconds: todayDelta,
 		openingBalanceSeconds: input.openingBalanceSeconds,
 		balanceAvailable: true,
 		empty: totals.targetSeconds === 0 && totals.actualSeconds === 0

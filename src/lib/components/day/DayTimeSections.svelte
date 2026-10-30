@@ -11,7 +11,7 @@
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
-	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -322,7 +322,7 @@
 						<Field id="day-school-lessons" type="number" min="0" max="20" label={t('day_prefs.school_lessons')} hint={t('day_prefs.school_lessons_hint')} bind:value={schoolLessonCount} disabled={prefsPending} />
 					{/if}
 					<div class="flex items-center gap-2">
-						<Checkbox id="day-skip-breaks" bind:checked={skipFixedBreaks} disabled={prefsPending} />
+						<Switch id="day-skip-breaks" bind:checked={skipFixedBreaks} disabled={prefsPending} />
 						<Label for="day-skip-breaks">{t('day_prefs.skip_breaks')}</Label>
 					</div>
 					<div class="flex flex-col gap-1.5">

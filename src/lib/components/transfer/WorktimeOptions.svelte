@@ -3,7 +3,7 @@
 	import StatusChip from '#lib/components/app/StatusChip.svelte';
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
@@ -117,7 +117,7 @@
 		</div>
 
 		<label class="flex items-start gap-3 text-sm">
-			<Checkbox id="wt-round" class="mt-0.5" bind:checked={form.roundToMinutes} />
+			<Switch id="wt-round" class="mt-0.5" bind:checked={form.roundToMinutes} />
 			<span>
 				<span class="block font-medium">{t('worktime.round')}</span>
 				<span class="mt-0.5 block text-[13px] text-muted-foreground">{t('worktime.round_hint')}</span>

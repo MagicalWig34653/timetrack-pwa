@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import Chart from '#lib/components/stats/Chart.svelte';
 	import EmptyState from '#lib/components/app/EmptyState.svelte';
 	import KpiCard from '#lib/components/app/KpiCard.svelte';
@@ -136,7 +137,7 @@
 		{/each}
 	</div>
 	<label class="flex items-center gap-2 text-sm" title={t('stats.rounded_hint')}>
-		<input type="checkbox" bind:checked={rounded} class="size-4 accent-primary" data-testid="stats-rounded" />
+		<Switch bind:checked={rounded} data-testid="stats-rounded" />
 		{t('stats.rounded')}
 	</label>
 </div>

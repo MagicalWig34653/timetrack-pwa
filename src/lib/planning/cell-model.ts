@@ -70,6 +70,9 @@ export function monthSummary(dates: string[], data: CalendarData, models: Parame
 	let actual = 0;
 	let target = 0;
 	let targetToDate = 0;
+	// the balance counts completed days only (before today, ADR-0032); today's difference flows in tomorrow
+	let completedActual = 0;
+	let completedTarget = 0;
 	let vacationBooked = 0;
 	let vacationOpen = 0;
 	let sickDays = 0;
@@ -81,6 +84,10 @@ export function monthSummary(dates: string[], data: CalendarData, models: Parame
 			actual += evaluation.evaluatedWorkSeconds + evaluation.creditSeconds;
 			target += evaluation.targetSeconds;
 			if (date <= today) targetToDate += evaluation.targetSeconds;
+			if (date < today) {
+				completedActual += evaluation.evaluatedWorkSeconds + evaluation.creditSeconds;
+				completedTarget += evaluation.targetSeconds;
+			}
 		}
 		const info = dayInfo(date, data);
 		if (info.absences.some((a) => a.kind === 'sick')) sickDays++;
@@ -91,7 +98,7 @@ export function monthSummary(dates: string[], data: CalendarData, models: Parame
 			else vacationOpen += half;
 		}
 	}
-	return { actualSeconds: actual, targetSeconds: target, targetToDateSeconds: targetToDate, balanceSeconds: actual - targetToDate, vacationBooked, vacationOpen, sickDays, complete: covered === dates.length };
+	return { actualSeconds: actual, targetSeconds: target, targetToDateSeconds: targetToDate, balanceSeconds: completedActual - completedTarget, vacationBooked, vacationOpen, sickDays, complete: covered === dates.length };
 }
 
 /** Heat level 0..4 of a day for the year overview, from worked time against the Soll. */

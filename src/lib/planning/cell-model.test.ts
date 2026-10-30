@@ -37,6 +37,12 @@ describe('monthSummary', () => {
 		expect(s.balanceSeconds).toBe(0);
 		expect(s.complete).toBe(true);
 	});
+	it('leaves today out of the balance (completed days only)', () => {
+		const s = monthSummary(dates, { holidays: [], absences: [], plan: [], days }, [], '2026-10-14');
+		expect(s.balanceSeconds).toBe(0);
+		const todayWorked = dates.map((date) => evaluation({ date, evaluatedWorkSeconds: date === '2026-10-14' ? 3600 : 0 }));
+		expect(monthSummary(dates, { holidays: [], absences: [], plan: [], days: todayWorked }, [], '2026-10-14').balanceSeconds).toBe(-2 * 28800);
+	});
 	it('counts vacation days by status, half days as 0.5, and skips non-working days', () => {
 		const absences = [
 			absence({ id: '1', startDate: '2026-10-12', endDate: '2026-10-13', status: 'approved' }),

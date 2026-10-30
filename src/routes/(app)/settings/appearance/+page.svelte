@@ -7,7 +7,7 @@
 	import GlowSwitch from '#lib/components/shell/GlowSwitch.svelte';
 	import ModeSwitch from '#lib/components/shell/ModeSwitch.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { accentTokens, contrastRatio } from '#lib/theme/accent.js';
 	import { theme } from '#lib/theme/theme.svelte.js';
@@ -48,7 +48,7 @@
 
 	<Panel title={t('appearance.transparency')} description={t('appearance.transparency_hint')}>
 		<label class="flex items-center gap-3 text-sm">
-			<Checkbox
+			<Switch
 				checked={theme.transparency === 'reduced'}
 				onchange={(event) => theme.setTransparency(event.currentTarget.checked ? 'reduced' : 'system')}
 				data-testid="transparency-toggle"

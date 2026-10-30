@@ -14,6 +14,7 @@
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
@@ -278,7 +279,7 @@
 				</CardHeader>
 				<CardContent class="flex flex-col gap-4">
 					<div class="flex items-center gap-2">
-						<Checkbox id="quiet-enabled" bind:checked={form.quietEnabled} />
+						<Switch id="quiet-enabled" bind:checked={form.quietEnabled} />
 						<Label for="quiet-enabled">{t('notif_settings.quiet_enabled')}</Label>
 					</div>
 					{#if form.quietEnabled}

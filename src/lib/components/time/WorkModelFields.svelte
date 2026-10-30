@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Field from '#lib/components/app/Field.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
@@ -68,7 +69,7 @@
 		<fieldset class="flex flex-col gap-3">
 			<legend class="mb-1 text-sm font-medium">{t('work_model.rounding')}</legend>
 			<div class="flex items-center gap-2">
-				<Checkbox id="wm-rounding" bind:checked={form.roundingEnabled} disabled={pending} />
+				<Switch id="wm-rounding" bind:checked={form.roundingEnabled} disabled={pending} />
 				<Label for="wm-rounding">{t('work_model.rounding_enabled')}</Label>
 			</div>
 			{#if form.roundingEnabled}
@@ -79,7 +80,7 @@
 		</fieldset>
 
 		<div class="flex items-center gap-2">
-			<Checkbox id="wm-travel" bind:checked={form.travelCountsAsWork} disabled={pending} />
+			<Switch id="wm-travel" bind:checked={form.travelCountsAsWork} disabled={pending} />
 			<Label for="wm-travel">{t('work_model.travel_counts')}</Label>
 		</div>
 
