@@ -10,6 +10,7 @@
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { errorMessage, t, type MessageKey } from '#lib/i18n/index.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { buildModelPlan, buildVacationPlan, dailyTargetSeconds, initialDraft, visibleSteps, type SetupDraft, type StepId } from '#lib/onboarding/plan.js';
@@ -283,10 +284,8 @@
 								<p class="text-sm font-medium">{t(`module.${key}.name` as MessageKey)}</p>
 								<p class="text-xs text-muted-foreground">{t(`module.${key}.desc` as MessageKey)}</p>
 							</div>
-							<input
-								type="checkbox"
-								role="switch"
-								class="mt-1 size-5 shrink-0 accent-primary"
+							<Switch
+								class="mt-0.5"
 								checked={!draft.modulesOff.includes(key)}
 								aria-label={t('onboarding.modules.switch', { name: t(`module.${key}.name` as MessageKey) })}
 								data-testid="ob-module-{key}"

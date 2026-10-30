@@ -7,6 +7,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { errorMessage, t, type MessageKey } from '#lib/i18n/index.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { onMount } from 'svelte';
@@ -101,10 +102,7 @@
 										<Badge variant={valueOf(m) ? 'default' : 'secondary'}>
 											{m.lockedByOperator ? t('admin_modules.locked') : valueOf(m) ? t('admin_modules.on') : t('admin_modules.off')}
 										</Badge>
-										<input
-											type="checkbox"
-											role="switch"
-											class="size-5 accent-primary"
+										<Switch
 											checked={valueOf(m)}
 											disabled={m.lockedByOperator || saving}
 											aria-label={t('modules.switch_label', { name: nameOf(key) })}

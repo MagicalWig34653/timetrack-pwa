@@ -5,6 +5,7 @@
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { errorMessage, t, type MessageKey } from '#lib/i18n/index.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { onMount } from 'svelte';
@@ -76,10 +77,7 @@
 									<CardTitle>{t(`module.${key}.name` as MessageKey)}</CardTitle>
 									<div class="flex items-center gap-3">
 										<Badge variant={status.effective ? 'default' : 'secondary'} data-testid="module-state">{state.label}</Badge>
-										<input
-											type="checkbox"
-											role="switch"
-											class="size-5 accent-primary"
+										<Switch
 											checked={status.effective}
 											disabled={locked || busy !== null}
 											aria-label={t('modules.switch_label', { name: t(`module.${key}.name` as MessageKey) })}
