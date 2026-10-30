@@ -272,7 +272,7 @@
 						<button
 							type="button"
 							class="{base} {TINT[stateOf(info)]} {isOtherMonth(date) ? 'bg-muted/40' : ''} {cellClass(cell)} {selected.has(date) ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''} {ghostClass(date)}"
-							aria-label="{visibleText(date, shown.pills)}, {describe(info)}"
+							aria-label="{visibleText(date, shown.pills, shown.more)}, {describe(info)}"
 							data-work-state={stateOf(info)}
 							aria-pressed={selected.has(date)}
 							data-date={date}
@@ -311,8 +311,9 @@
 										<span class="pill mx-1.5 gap-1 rounded-md {PLAN_CLASSES[pill.planMode]}" data-chip="plan"><span class="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true"></span>{pill.label}</span>
 									{/if}
 								{/each}
-								{#if shown.more > 0}<span class="mx-1.5 px-1 text-[11px] leading-[18px] text-muted-foreground" aria-hidden="true" data-testid="pill-more">+{shown.more}</span>{/if}
+								{#if shown.more > 0 && !shown.moreInCorner}<span class="mx-1.5 px-1 text-[11px] leading-[18px] text-muted-foreground" aria-hidden="true" data-testid="pill-more">+{shown.more}</span>{/if}
 							</span>
+							{#if shown.moreInCorner}<span class="absolute top-1.5 right-1.5 text-[11px] leading-[18px] text-muted-foreground" aria-hidden="true" data-testid="pill-more">+{shown.more}</span>{/if}
 						</button>
 					</div>
 				{/each}

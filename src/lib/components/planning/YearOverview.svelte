@@ -43,7 +43,7 @@
 		const ev = byDate.get(date);
 		const level = heatLevel(ev ? ev.evaluatedWorkSeconds + ev.creditSeconds : 0, ev?.targetSeconds ?? 0);
 		const state = dayWorkState(info, models);
-		return { level, open: info.absences.some((a) => a.kind === 'vacation' && (a.status === 'planned' || a.status === 'requested')), booked: info.absences.some((a) => a.kind === 'vacation' && (a.status === 'approved' || a.status === 'taken')), sick: info.absences.some((a) => a.kind === 'sick'), holiday: info.holidays.length > 0, free: state === 'free' };
+		return { level, open: info.absences.some((a) => a.kind === 'vacation' && (a.status === 'planned' || a.status === 'requested')), booked: info.absences.some((a) => a.kind === 'vacation' && (a.status === 'approved' || a.status === 'taken')), sick: info.absences.some((a) => a.kind === 'sick'), other: info.absences.some((a) => a.kind === 'excused' || a.kind === 'other'), holiday: info.holidays.length > 0, free: state === 'free' };
 	}
 </script>
 
@@ -62,7 +62,7 @@
 						{#if date.slice(0, 7) === first.slice(0, 7)}
 							{@const c = cellOf(date)}
 							<span
-								class="flex aspect-square items-center justify-center rounded-[3px] text-[9px] tabular-nums {LEVEL[c.level]} {c.free && c.level === 0 ? 'bg-muted/60' : ''} {c.booked ? 'bg-sky-500/50' : ''} {c.sick ? 'bg-rose-500/45' : ''} {c.open ? 'ring-1 ring-dashed ring-sky-500 ring-inset' : ''} {c.holiday ? 'outline outline-1 outline-amber-500' : ''} {date === today ? 'font-bold underline' : ''}"
+								class="flex aspect-square items-center justify-center rounded-[3px] text-[9px] tabular-nums {LEVEL[c.level]} {c.free && c.level === 0 ? 'bg-muted/60' : ''} {c.booked ? 'bg-sky-500/50' : ''} {c.sick ? 'bg-rose-500/45' : ''} {c.other && !c.booked && !c.sick ? 'bg-violet-500/40' : ''} {c.open && !c.booked ? 'bg-sky-500/15 ring-1 ring-sky-500 ring-inset' : ''} {c.holiday ? 'outline outline-1 outline-amber-500' : ''} {date === today ? 'font-bold underline' : ''}"
 								data-date={date}
 								data-level={c.level}>{Number(date.slice(8))}</span>
 						{:else}

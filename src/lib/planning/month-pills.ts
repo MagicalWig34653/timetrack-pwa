@@ -28,6 +28,8 @@ export interface MonthPills {
 	pills: MonthPill[];
 	/** pills that did not fit; shown as "+n" */
 	more: number;
+	/** only one slot is free: the first pill stays visible and "+n" moves into the cell corner next to the day number */
+	moreInCorner: boolean;
 }
 
 export interface PillLabels {
@@ -65,12 +67,14 @@ export function monthPills(info: DayInfo, hidden: Set<string>, labels: PillLabel
 		all.push({ key: 'plan', kind: 'plan', label, continuesLeft: false, continuesRight: false, open: false, half: false, planMode: info.plan.mode, nameText: label });
 	}
 	const slots = Math.max(1, max);
-	if (all.length <= slots) return { pills: all, more: 0 };
-	// the "+n" pill takes the last slot
-	return { pills: all.slice(0, slots - 1), more: all.length - (slots - 1) };
+	if (all.length <= slots) return { pills: all, more: 0, moreInCorner: false };
+	// One slot: the most important pill (absences come first) must stay visible; "+n" goes into the cell corner.
+	if (slots === 1) return { pills: all.slice(0, 1), more: all.length - 1, moreInCorner: true };
+	// otherwise the "+n" pill takes the last slot
+	return { pills: all.slice(0, slots - 1), more: all.length - (slots - 1), moreInCorner: false };
 }
 
-/** Text of the cell that is visible: day number then the pill labels (accessible name must start with it, WCAG 2.5.3). */
-export function visibleText(date: string, shown: MonthPill[]): string {
-	return [String(Number(date.slice(8))), ...shown.map((p) => p.nameText).filter(Boolean)].join(' ');
+/** Text of the cell that is visible: day number then the pill labels and the "+n" counter (accessible name must start with it, WCAG 2.5.3). */
+export function visibleText(date: string, shown: MonthPill[], more = 0): string {
+	return [String(Number(date.slice(8))), ...shown.map((p) => p.nameText).filter(Boolean), ...(more > 0 ? [`+${more}`] : [])].join(' ');
 }

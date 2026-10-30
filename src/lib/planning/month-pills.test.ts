@@ -42,9 +42,18 @@ describe('monthPills', () => {
 		expect(result.more).toBe(2);
 		expect(monthPills(many, new Set(), labels, 3).more).toBe(0);
 	});
+	it('keeps the first pill (the absence) visible when only one slot fits, with "+n" in the corner', () => {
+		const day = info('2026-10-13', { plan: { mode: 'home' } as DayInfo['plan'] });
+		const one = monthPills(day, new Set(), labels, 1);
+		expect(one.pills.map((p) => p.kind)).toEqual(['absence']);
+		expect([one.more, one.moreInCorner]).toEqual([1, true]);
+		expect(monthPills(info('2026-10-13'), new Set(), labels, 1).moreInCorner).toBe(false);
+		expect(monthPills(day, new Set(), labels, 0).pills).toHaveLength(1);
+	});
 	it('builds the visible text with day number and labels', () => {
 		const shown = monthPills(info('2026-10-13'), new Set(), labels, 3).pills;
 		expect(visibleText('2026-10-13', shown)).toBe('13 Urlaub');
+		expect(visibleText('2026-10-13', shown, 2)).toBe('13 Urlaub +2');
 		expect(visibleText('2026-10-14', monthPills(info('2026-10-14'), new Set(), labels, 3).pills)).toBe('14');
 	});
 });
