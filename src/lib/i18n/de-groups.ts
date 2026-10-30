@@ -117,8 +117,9 @@ export const deGroups = {
 	'groups.open_public': 'Teilnehmerseite öffnen',
 
 	'groups.link_title': 'Link zum Teilen',
-	'groups.link_fresh_note': 'Das ist der Link für die Teilnehmer. Er wird nur jetzt angezeigt: Wer ihn kennt, kann mitmachen. Kopiere ihn und schicke ihn weiter.',
-	'groups.link_hidden_note': 'Aus Sicherheitsgründen speichert der Server den Link nicht lesbar und zeigt ihn nicht noch einmal an. Ist er dir verloren gegangen, erzeuge einen neuen Link.',
+	'groups.link_fresh_note': 'Das ist der neue Link für die Teilnehmer. Wer ihn kennt, kann mitmachen. Kopiere ihn und schicke ihn weiter.',
+	'groups.link_known_note': 'Das ist der Link für die Teilnehmer. Du kannst ihn jederzeit wieder ansehen und kopieren; wer ihn kennt, kann mitmachen.',
+	'groups.link_hidden_note': 'Für diesen älteren Eintrag ist der Link nicht gespeichert. Erzeuge einmal einen neuen Link, danach kannst du ihn jederzeit wieder ansehen.',
 	'groups.link_copy': 'Link kopieren',
 	'groups.link_share': 'Teilen',
 	'groups.link_saved': 'Ich habe den Link gespeichert',

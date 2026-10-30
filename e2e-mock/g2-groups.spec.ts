@@ -65,11 +65,10 @@ test('owner creates a text poll and sees the link once', async ({ browser }) => 
 	textPollPath = new URL(url).pathname;
 	await shot(page, 'g2-owner-poll-detail-fresh');
 
-	// reload: the link is not shown again, only the hint
+	// reload: the owner can look at the link again (without the "just created" note)
 	await page.reload();
-	await expect(page.getByTestId('share-link-hidden')).toBeVisible();
-	await expect(page.getByTestId('share-link-url')).toHaveCount(0);
-	await expect(page.locator('body')).not.toContainText(textPollPath.slice(3));
+	await expect(page.getByTestId('share-link-known')).toBeVisible();
+	expect(new URL(await page.getByTestId('share-link-url').inputValue()).pathname).toBe(textPollPath);
 	await context.close();
 });
 
@@ -144,7 +143,7 @@ test('owner detail: matrix, remove a vote, choose the final option, close and re
 	await page.goto('/groups');
 	await page.getByTestId('poll-list').getByRole('link', { name: /Teamessen/ }).click();
 	await expect(page.getByTestId('vote-row')).toHaveCount(2);
-	await expect(page.getByTestId('share-link-hidden')).toBeVisible();
+	await expect(page.getByTestId('share-link-known')).toBeVisible();
 	await shot(page, 'g2-owner-poll-detail');
 
 	await page.getByRole('button', { name: 'Stimme von Ben entfernen' }).click();
@@ -175,6 +174,7 @@ test('renewing the link invalidates the old one', async ({ browser }) => {
 	await page.getByTestId('poll-list').getByRole('link', { name: /Teamessen/ }).click();
 	await page.getByRole('button', { name: 'Link erneuern' }).click();
 	await page.getByRole('button', { name: 'Neuen Link erzeugen' }).click();
+	await expect(page.getByTestId('share-link-fresh')).toBeVisible();
 	const fresh = new URL(await page.getByTestId('share-link-url').inputValue()).pathname;
 	expect(fresh).not.toBe(textPollPath);
 	const old = await visitor(browser);

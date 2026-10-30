@@ -43,6 +43,7 @@
 	let confirmError = $state('');
 
 	const freshPath = $derived(freshLinks.get(id));
+	const linkPath = $derived(freshPath ?? order?.path);
 
 	onMount(async () => {
 		zone = await zoneStore.ensure();
@@ -70,7 +71,7 @@
 		notice = '';
 		try {
 			const result = await action();
-			if (result) order = { ...result, token: undefined, path: undefined };
+			if (result) order = result;
 			if (success) notice = success;
 		} catch (error) {
 			actionError = errorMessage(error);
@@ -89,7 +90,7 @@
 		try {
 			const result = await api.rotateOrderToken(id);
 			if (result.path) freshLinks.set(id, result.path);
-			order = { ...result, token: undefined, path: undefined };
+			order = result;
 			notice = t('groups.notice_rotated');
 		} catch (error) {
 			actionError = errorMessage(error);
@@ -182,9 +183,9 @@
 			{#if order.deadline}<span>· {order.closed ? t('groups.deadline_ended', { time: formatDateTime(order.deadline) }) : t('groups.deadline_until', { time: formatDateTime(order.deadline) })}</span>{/if}
 		</div>
 
-		<ShareLinkCard url={freshPath ? groupUrl(freshPath) : undefined} title={order.title} {busy} onrotate={rotate} ondismiss={() => freshLinks.clear(id)} />
-		{#if freshPath}
-			<div class="-mt-3"><a href={freshPath} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-ui-accent-ink hover:underline" data-testid="open-public"><ExternalLink class="size-4" />{t('groups.open_public')}</a></div>
+		<ShareLinkCard url={linkPath ? groupUrl(linkPath) : undefined} fresh={!!freshPath} title={order.title} {busy} onrotate={rotate} ondismiss={() => freshLinks.clear(id)} />
+		{#if linkPath}
+			<div class="-mt-3"><a href={linkPath} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-ui-accent-ink hover:underline" data-testid="open-public"><ExternalLink class="size-4" />{t('groups.open_public')}</a></div>
 		{/if}
 
 		<OrderLines {order}>

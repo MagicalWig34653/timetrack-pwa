@@ -1,21 +1,22 @@
 <script lang="ts">
 	import Share2 from '@lucide/svelte/icons/share-2';
 	import CopyButton from '#lib/components/app/CopyButton.svelte';
-	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
 
 	/**
-	 * Share link of a poll or order. The address exists only right after create / rotate-token (the server stores a hash):
-	 * with `url` the card shows it with copy and share buttons, without it a note explains how to get a new link.
+	 * Share link of a poll or order. The owner view always carries it (contract 0.37.1); rows from before that have none until
+	 * the link is renewed. With `url` the card shows it with copy and share buttons, `fresh` adds the "just created" note.
+	 * Without `url` a note explains how to get a new link.
 	 */
 	let {
 		url,
+		fresh = false,
 		title,
 		busy = false,
 		onrotate,
 		ondismiss
-	}: { url?: string; title: string; busy?: boolean; onrotate: () => void; ondismiss?: () => void } = $props();
+	}: { url?: string; fresh?: boolean; title: string; busy?: boolean; onrotate: () => void; ondismiss?: () => void } = $props();
 
 	const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 	let confirming = $state(false);
@@ -32,17 +33,17 @@
 <section class="flex flex-col gap-3 rounded-[10px] border bg-card p-4" aria-labelledby="share-link-title" data-testid="share-link-card">
 	<h2 id="share-link-title" class="text-base font-semibold">{t('groups.link_title')}</h2>
 	{#if url}
-		<Alert variant="warning" data-testid="share-link-fresh">
-			<p>{t('groups.link_fresh_note')}</p>
-			<div class="mt-3 flex flex-col gap-2">
+		<div class="flex flex-col gap-2" data-testid={fresh ? 'share-link-fresh' : 'share-link-known'}>
+			<p class="text-sm text-muted-foreground">{t(fresh ? 'groups.link_fresh_note' : 'groups.link_known_note')}</p>
+			<div class="flex flex-col gap-2">
 				<input readonly value={url} aria-label={t('groups.link_title')} class="h-10 w-full rounded-lg border bg-background px-3 font-mono text-sm" onfocus={(e) => e.currentTarget.select()} data-testid="share-link-url" />
 				<div class="flex flex-wrap items-center gap-2">
 					<CopyButton text={url} label={t('groups.link_copy')} />
 					{#if canShare}<Button size="sm" variant="outline" onclick={share}><Share2 />{t('groups.link_share')}</Button>{/if}
-					{#if ondismiss}<Button size="sm" variant="ghost" onclick={ondismiss} class="sm:ml-auto">{t('groups.link_saved')}</Button>{/if}
+					{#if fresh && ondismiss}<Button size="sm" variant="ghost" onclick={ondismiss} class="sm:ml-auto">{t('groups.link_saved')}</Button>{/if}
 				</div>
 			</div>
-		</Alert>
+		</div>
 	{:else}
 		<p class="text-sm text-muted-foreground" data-testid="share-link-hidden">{t('groups.link_hidden_note')}</p>
 	{/if}

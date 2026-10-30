@@ -1,6 +1,6 @@
 import type { MockResponse } from './api.ts';
 
-// Mock of the groups module (contract v0.37.0, ADR-0033): public polls and group orders with catalogs.
+// Mock of the groups module (contract v0.37.1, ADR-0033): public polls and group orders with catalogs.
 // Owner API /api/v1/groups/** (session, module `groups`) and the public participant API /api/v1/public/groups/{token}/** that
 // needs no login: the 43-character link token is the only credential, own votes/entries are changed with the edit secret
 // (header X-Edit-Secret). The rules follow the backend (limits, name_taken, group_closed, answers_invalid, hidden results,
@@ -165,7 +165,7 @@ export function createGroupsMock(deps: Deps) {
 			voteCount: poll.votes.length,
 			...(visible ? { votes: poll.votes.map(voteView), tally } : {}),
 			...(owner ? { createdAt: poll.createdAt, updatedAt: poll.updatedAt } : {}),
-			...(withToken ? { token: poll.token, path: `/g/${poll.token}` } : {})
+			...(withToken || owner ? { token: poll.token, path: `/g/${poll.token}` } : {})
 		};
 	}
 	function entryView(entry: Entry) {
@@ -199,7 +199,7 @@ export function createGroupsMock(deps: Deps) {
 			totalCents: priced.reduce((sum, e) => sum + e.quantity * (e.priceCents ?? 0), 0),
 			unpricedQuantity: order.entries.filter((e) => e.priceCents === null).reduce((sum, e) => sum + e.quantity, 0),
 			suggestions: catalog ? catalog.items.map((i) => ({ name: i.name, priceCents: i.priceCents })) : [],
-			...(withToken ? { token: order.token, path: `/g/${order.token}` } : {})
+			...(withToken || owner ? { token: order.token, path: `/g/${order.token}` } : {})
 		};
 	}
 	const catalogView = (catalog: Catalog) => ({ id: catalog.id, name: catalog.name, items: catalog.items, itemCount: catalog.items.length, createdAt: catalog.createdAt, updatedAt: catalog.updatedAt });

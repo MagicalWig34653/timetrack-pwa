@@ -1,7 +1,7 @@
 # Stand der PWA – 26.10.2026 (Paket P15 im Worktree, uncommittet)
 
 ## Paket G2-pwa (30.10.2026, Branch g2-groups, nicht gemergt)
-Gruppenmodul (Vertrag 0.37.0, ADR-0033): öffentliche Seite `/g/<token>` ohne Anmeldung und ohne App-Hülle (Umfragen mit Ja/Vielleicht/Nein, Bestellrunden mit Übernehmen und Export, Bearbeitungsschlüssel im localStorage), Besitzerbereich `/groups` (Umfragen, Bestellrunden, Kataloge, Link nur einmalig, erneuern), sechster Modulschalter `groups`, Service Worker ohne Gruppen-Daten im Cache, Mock und Tests. Details: `docs/handoffs/G2-pwa.md`.
+Gruppenmodul (Vertrag 0.37.0/0.37.1, ADR-0033): **seit 0.37.1 zeigt der Besitzerbereich den Teilnehmerlink jederzeit wieder (Kopieren/Teilen/Öffnen); nur ältere Zeilen ohne gespeicherten Link brauchen einmal „Link erneuern“.** öffentliche Seite `/g/<token>` ohne Anmeldung und ohne App-Hülle (Umfragen mit Ja/Vielleicht/Nein, Bestellrunden mit Übernehmen und Export, Bearbeitungsschlüssel im localStorage), Besitzerbereich `/groups` (Umfragen, Bestellrunden, Kataloge, Link nur einmalig, erneuern), sechster Modulschalter `groups`, Service Worker ohne Gruppen-Daten im Cache, Mock und Tests. Details: `docs/handoffs/G2-pwa.md`.
 
 ## Paket U4-pwa (29.10.2026, Branch u4-pwa-bugs, nicht gemergt)
 Vertrag 0.36.0: Abwesenheitsstatus je Art (`recorded`/„erfasst“, Statusauswahl nur bei Urlaub, unbekannte Status tolerant), Zeitkonto ohne laufenden Tag mit getrenntem „Heute: …, fließt morgen ein“, Konto-Mail als einzige Recovery-Adresse, Zeigercursor für klickbare Elemente, stabile /absences-Filter (Fokus bleibt beim Tippen). Details: `docs/handoffs/U4-pwa.md`.

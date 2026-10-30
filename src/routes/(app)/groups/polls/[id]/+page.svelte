@@ -39,6 +39,7 @@
 	let confirmError = $state('');
 
 	const freshPath = $derived(freshLinks.get(id));
+	const linkPath = $derived(freshPath ?? poll?.path);
 	const finalOption = $derived(poll?.options.find((o) => o.id === poll?.finalOptionId));
 
 	onMount(async () => {
@@ -62,7 +63,7 @@
 		notice = '';
 		try {
 			const result = await action();
-			if (result) poll = { ...result, token: undefined, path: undefined };
+			if (result) poll = result;
 			if (success) notice = success;
 		} catch (error) {
 			actionError = errorMessage(error);
@@ -82,7 +83,7 @@
 		try {
 			const result = await api.rotatePollToken(id);
 			if (result.path) freshLinks.set(id, result.path);
-			poll = { ...result, token: undefined, path: undefined };
+			poll = result;
 			notice = t('groups.notice_rotated');
 		} catch (error) {
 			actionError = errorMessage(error);
@@ -178,9 +179,9 @@
 			</Alert>
 		{/if}
 
-		<ShareLinkCard url={freshPath ? groupUrl(freshPath) : undefined} title={poll.title} {busy} onrotate={rotate} ondismiss={() => freshLinks.clear(id)} />
-		{#if freshPath}
-			<div class="-mt-3"><a href={freshPath} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-ui-accent-ink hover:underline" data-testid="open-public"><ExternalLink class="size-4" />{t('groups.open_public')}</a></div>
+		<ShareLinkCard url={linkPath ? groupUrl(linkPath) : undefined} fresh={!!freshPath} title={poll.title} {busy} onrotate={rotate} ondismiss={() => freshLinks.clear(id)} />
+		{#if linkPath}
+			<div class="-mt-3"><a href={linkPath} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-ui-accent-ink hover:underline" data-testid="open-public"><ExternalLink class="size-4" />{t('groups.open_public')}</a></div>
 		{/if}
 
 		<section class="flex flex-col gap-3" aria-labelledby="results-title">

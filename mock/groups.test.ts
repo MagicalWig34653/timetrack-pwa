@@ -34,14 +34,15 @@ async function setup(options?: Parameters<typeof createMockFetch>[0]) {
 const future = () => new Date(Date.now() + 7 * 86_400_000).toISOString();
 
 describe('groups mock: owner polls', () => {
-	it('creates a poll, returns the link once and never lists it', async () => {
+	it('creates a poll, returns the link, shows it again in the owner detail and never lists it', async () => {
 		const s = await setup();
 		const created = await s.post('/api/v1/groups/polls', { title: 'Teamabend', kind: 'text', choiceMode: 'single', options: [{ label: 'Pizza' }, { label: 'Sushi' }] });
 		expect(created.status).toBe(201);
 		expect(created.body.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
 		expect(created.body.path).toBe(`/g/${created.body.token}`);
 		const detail = await s.get(`/api/v1/groups/polls/${created.body.id}`);
-		expect(detail.body.token).toBeUndefined();
+		expect(detail.body.token).toBe(created.body.token);
+	expect(detail.body.path).toBe(created.body.path);
 		expect(JSON.stringify((await s.get('/api/v1/groups/polls')).body)).not.toContain(created.body.token);
 	});
 

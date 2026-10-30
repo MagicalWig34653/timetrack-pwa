@@ -144,10 +144,11 @@ describe('poll detail', () => {
 		expect(screen.getByTestId(`tally-${poll.options[1].id}`)).toHaveTextContent('0 (+1)');
 	});
 
-	it('without a fresh link only the hint is shown; renewing shows a new link once and the old one stops working', async () => {
+	it('shows the known link again without a fresh note; renewing shows a new link and the old one stops working', async () => {
 		const poll = await openDetail(false);
-		expect(screen.queryByTestId('share-link-url')).toBeNull();
-		expect(screen.getByTestId('share-link-hidden')).toHaveTextContent('erzeuge einen neuen Link');
+		expect(screen.getByTestId('share-link-url')).toHaveValue(`${location.origin}${poll.path}`);
+		expect(screen.getByTestId('share-link-known')).toHaveTextContent('jederzeit wieder ansehen');
+		expect(screen.queryByTestId('share-link-fresh')).toBeNull();
 		await userEvent.click(screen.getByRole('button', { name: 'Link erneuern' }));
 		expect(screen.getByTestId('rotate-confirm')).toHaveTextContent('Der bisherige Link funktioniert sofort nicht mehr');
 		await userEvent.click(screen.getByRole('button', { name: 'Neuen Link erzeugen' }));
