@@ -43,6 +43,7 @@
 
 	// Pages of one section keep the section shell (settings nav) mounted: only the page body below is re-created per route.
 	// A key on the full pathname would rebuild the shell nav too (its scroll position and focus got lost on every click, J2).
+	const planRoute = $derived(page.url.pathname === '/plan');
 	const shellKey = $derived(sectionShell(page.url.pathname) ?? page.url.pathname);
 
 	let menuOpen = $state(false);
@@ -105,7 +106,8 @@
 
 	<div class="menu:pl-64">
 		<TopBar {polling} {menuOpen} onmenu={() => (menuOpen = true)} onsignout={signOut} />
-		<main class="app-sheet mx-auto w-full max-w-[1240px] px-4 py-[22px] menu:px-6 menu:py-6 wide:px-10 wide:py-9">
+		<!-- U6: the planner uses the full width and less padding on landscape desktops, the grid needs every pixel. -->
+		<main class="app-sheet mx-auto w-full max-w-[1240px] px-4 py-[22px] menu:px-6 menu:py-6 wide:px-10 wide:py-9 {planRoute ? 'fit:max-w-none! fit:px-5! fit:py-4!' : ''}">
 			{#if blockedBy}
 				<ModuleDisabled module={blockedBy} />
 			{:else}

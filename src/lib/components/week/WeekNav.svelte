@@ -28,7 +28,7 @@
 		<Button variant="outline" size="sm" href={href(currentMonday)} data-testid="week-today">{t('weekview.this_week')}</Button>
 	{/if}
 	<label class="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
-		<span class="sr-only sm:not-sr-only">{t('weekview.jump')}</span>
+		<span class="sr-only sm:not-sr-only {compact ? 'fit:max-[1599px]:sr-only' : ''}">{t('weekview.jump')}</span>
 		<input
 			type="date"
 			value={monday}

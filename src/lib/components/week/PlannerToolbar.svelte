@@ -58,7 +58,7 @@
 	const seg = 'inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 </script>
 
-<div class="flex flex-wrap items-center gap-x-3 gap-y-2" role="toolbar" aria-label={t('wg.toolbar')} data-testid="planner-toolbar">
+<div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 fit:gap-y-1.5" role="toolbar" aria-label={t('wg.toolbar')} data-testid="planner-toolbar">
 	<div class="inline-flex rounded-lg bg-muted p-0.5" role="group" aria-label={t('wg.tools')}>
 		{#each tools as item (item.id)}
 			<button type="button" class={seg} aria-pressed={tool === item.id} onclick={() => (tool = item.id)} title="{item.label} ({item.key})" data-testid="tool-{item.id}">
@@ -77,7 +77,7 @@
 
 	<div class="flex items-center gap-2">
 		<label class="sr-only" for="brush-place">{t('wg.brush_place')}</label>
-		<Select id="brush-place" bind:value={placeId} class="h-8 w-32 text-[13px]" data-testid="brush-place" disabled={kind === 'off'}>
+		<Select id="brush-place" bind:value={placeId} class="h-8 w-28 text-[13px]" data-testid="brush-place" disabled={kind === 'off'}>
 			<option value="">{t('wg.brush_no_place')}</option>
 			{#each places.filter((p) => !p.archived) as place (place.id)}<option value={place.id}>{place.name}</option>{/each}
 		</Select>
@@ -87,8 +87,8 @@
 		<Button variant="outline" size="icon" class="size-8" onclick={onundo} disabled={!canUndo} aria-label={undoLabel ? t('wg.undo_named', { label: undoLabel }) : t('wg.undo')} title="{t('wg.undo')} (Strg+Z)" data-testid="plan-undo"><Undo2 /></Button>
 		<Button variant="outline" size="icon" class="size-8" onclick={onredo} disabled={!canRedo} aria-label={redoLabel ? t('wg.redo_named', { label: redoLabel }) : t('wg.redo')} title="{t('wg.redo')} (Strg+Umschalt+Z)" data-testid="plan-redo"><Redo2 /></Button>
 		<button type="button" class="{seg} border border-border bg-background" aria-pressed={showActuals} onclick={() => (showActuals = !showActuals)} data-testid="toggle-actuals" title={t('wg.actuals_hint')}>
-			<Ghost class="size-4" /><span class="fit:max-[1599px]:sr-only">{t('wg.actuals')}</span>
+			<Ghost class="size-4" /><span class="fit:max-[1999px]:sr-only">{t('wg.actuals')}</span>
 		</button>
-		<Button size="sm" onclick={onadd} title={t('wg.add_block')} data-testid="plan-add-block"><Plus /><span class="fit:max-[1599px]:sr-only">{t('wg.add_block')}</span></Button>
+		<Button size="sm" onclick={onadd} title={t('wg.add_block')} data-testid="plan-add-block"><Plus /><span class="fit:max-[1999px]:sr-only">{t('wg.add_block')}</span></Button>
 	</div>
 </div>

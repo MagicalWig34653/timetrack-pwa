@@ -313,13 +313,26 @@
 		}
 	}
 
+	// Save bar variants: side panel foot, grid view (sticky on phones/tablets, plain inside the bottom row on landscape desktops), list view (always sticky).
+	const SAVE_BASE = 'flex flex-wrap items-center justify-end gap-3';
+	const SAVE_SIDE = 'flex shrink-0 flex-wrap items-center justify-end gap-2 rounded-lg border bg-background/95 p-2.5';
+	const SAVE_STICKY = `${SAVE_BASE} sticky bottom-0 z-30 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:mx-0 sm:rounded-lg sm:border`;
+	const SAVE_GRID = `${SAVE_STICKY} fit:static! fit:z-auto! fit:m-0! fit:ml-auto! fit:shrink-0 fit:flex-nowrap fit:rounded-none! fit:border-0! fit:bg-transparent! fit:p-0! fit:backdrop-blur-none!`;
+	const SAVE_LIST = `${SAVE_STICKY} fit:shrink-0 fit:py-2`;
+	const actionItems = $derived([
+		{ testid: 'plan-standard', label: t('weekplan.action_standard'), icon: WandSparkles, run: applyStandard },
+		{ testid: 'plan-copy', label: t('weekplan.action_copy'), icon: Copy, run: applyCopy },
+		{ testid: 'plan-follow', label: t('wg.follow_action'), icon: Layers, run: openFollow },
+		{ testid: 'plan-same', label: t('weekplan.action_same'), icon: Equal, run: applySame },
+		{ testid: 'plan-clear', label: t('weekplan.action_clear'), icon: Eraser, run: applyClear }
+	]);
 	const differenceText = $derived(
 		totals.differenceSeconds === 0 ? t('weekplan.diff_equal') : t(totals.differenceSeconds < 0 ? 'weekplan.diff_under' : 'weekplan.diff_over', { time: timeDisplay.duration(Math.abs(totals.differenceSeconds)) })
 	);
 </script>
 
 <!-- U1: on landscape desktops the planner fills the viewport height (header row, grid with the remaining height, sticky save bar). -->
-<div class="fit:flex fit:h-[calc(100dvh-60px-4.5rem)] fit:flex-col fit:gap-2.5" data-testid="plan-page">
+<div class="fit:flex fit:h-[calc(100dvh-60px-2rem)] fit:flex-col fit:gap-2" data-testid="plan-page">
 <div class="fit:flex fit:shrink-0 fit:flex-wrap fit:items-center fit:gap-x-5 fit:gap-y-1">
 	<PageHeader compact title={t('weekplan.title')} description={view === 'grid' ? undefined : t('weekplan.description')} />
 	<WeekTabs compact current="plan" week={isoWeek} />
@@ -338,72 +351,111 @@
 		</div>
 	</Alert>
 {:else if week}
-	<div class="flex flex-col gap-4 fit:min-h-0 fit:flex-1 fit:gap-2.5" data-testid="week-planner" data-week={isoWeek}>
-		{#if isPast}<Alert variant="warning">{t('weekplan.past_hint')}</Alert>{/if}
-		{#if saveError}<Alert variant="destructive" data-testid="plan-error">{saveError}</Alert>{/if}
+	{#snippet alerts(side: boolean)}
+		{#if isPast}<Alert variant="warning" class={side ? 'text-[13px]' : ''}>{t('weekplan.past_hint')}</Alert>{/if}
+		{#if saveError}<Alert variant="destructive" class={side ? 'text-[13px]' : ''} data-testid="plan-error">{saveError}</Alert>{/if}
+	{/snippet}
 
-		<!-- Grid view on landscape desktops: week sum, actions and the view switch share one row, so the grid keeps the height. -->
-		<div class="flex flex-col gap-4 {view === 'grid' ? 'fit:flex-row fit:items-center fit:gap-4 fit:shrink-0' : ''}">
-		{#if view === 'grid'}
-			<!-- Compact week sum above the grid: the grid itself needs the height. -->
-			<div class="flex flex-wrap items-center gap-x-4 gap-y-2 fit:shrink-0" data-testid="plan-total">
-				<p class="text-[15px] font-semibold tabular-nums" data-testid="plan-total-text">
-					{t('weekplan.total_text', { planned: timeDisplay.duration(totals.plannedSeconds), target: timeDisplay.duration(totals.targetSeconds) })}
-				</p>
-				<StatusChip tone={totals.differenceSeconds === 0 ? 'success' : totals.differenceSeconds < 0 ? 'warning' : 'accent'} dot={false}>
-					<span data-testid="plan-diff">{differenceText}</span>
-				</StatusChip>
-				<div class="h-1.5 w-32 overflow-hidden rounded-full bg-muted max-sm:hidden fit:w-20" aria-hidden="true"><div class="h-full rounded-full bg-ui-accent" style="width: {progress}%"></div></div>
-				<p class="text-[13px] text-muted-foreground max-[1700px]:hidden" data-testid="plan-suggestion">
-					{suggestion.source === 'history'
-						? t('weekplan.suggestion_history', { start: suggestion.start, end: suggestion.end, break: suggestion.breakMinutes })
-						: t('weekplan.suggestion_fallback', { start: suggestion.start, break: suggestion.breakMinutes })}
-				</p>
-			</div>
-		{:else}
-		<Panel data-testid="plan-total">
-			<div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-				<div class="min-w-0">
-					<p class="text-[13px] font-medium text-muted-foreground">{t('weekplan.total_label')}</p>
-					<p class="text-[22px] sm:text-[22px] sm:text-[28px] leading-tight font-semibold tracking-[-0.6px] tabular-nums" data-testid="plan-total-text">
+	{#snippet actionButtons(side: boolean)}
+		<div class="flex gap-2 {side ? 'flex-col items-stretch' : 'max-sm:flex-nowrap sm:flex-wrap'}" role="group" aria-label={t('weekplan.actions_label')}>
+			{#each actionItems as item (item.testid)}
+				<Button variant="outline" size="sm" class={side ? 'justify-start' : ''} onclick={item.run} title={item.label} data-testid={item.testid}><item.icon /><span class={side ? '' : 'fit:max-[1599px]:sr-only'}>{item.label}</span></Button>
+			{/each}
+		</div>
+	{/snippet}
+
+	{#snippet viewSwitch(side: boolean)}
+		<Segmented
+			class={side ? '' : 'ml-auto'}
+			label={t('wg.view_label')}
+			value={view}
+			items={[
+				{ id: 'grid', label: t('wg.view_grid'), icon: CalendarRange, testid: 'view-grid' },
+				{ id: 'list', label: t('wg.view_list'), icon: LayoutList, testid: 'view-list' }
+			]}
+			onchange={(id) => pickView(id as 'grid' | 'list')}
+		/>
+	{/snippet}
+
+	{#snippet suggestionText()}
+		{suggestion.source === 'history'
+			? t('weekplan.suggestion_history', { start: suggestion.start, end: suggestion.end, break: suggestion.breakMinutes })
+			: t('weekplan.suggestion_fallback', { start: suggestion.start, break: suggestion.breakMinutes })}
+	{/snippet}
+
+	{#snippet overview(side: boolean)}
+		{#if side}
+			<!-- Side panel: week sum with progress and suggestion, the stacked actions and the view switch. -->
+			<div class="flex flex-col gap-3" data-testid="plan-total">
+				<div class="flex flex-col gap-2">
+					<p class="text-[15px] leading-tight font-semibold tabular-nums" data-testid="plan-total-text">
 						{t('weekplan.total_text', { planned: timeDisplay.duration(totals.plannedSeconds), target: timeDisplay.duration(totals.targetSeconds) })}
 					</p>
+					<div class="flex items-center gap-2">
+						<StatusChip tone={totals.differenceSeconds === 0 ? 'success' : totals.differenceSeconds < 0 ? 'warning' : 'accent'} dot={false}>
+							<span data-testid="plan-diff">{differenceText}</span>
+						</StatusChip>
+						<div class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden="true"><div class="h-full rounded-full bg-ui-accent" style="width: {progress}%"></div></div>
+					</div>
+					<p class="text-[13px] text-muted-foreground" data-testid="plan-suggestion">{@render suggestionText()}</p>
 				</div>
-				<StatusChip tone={totals.differenceSeconds === 0 ? 'success' : totals.differenceSeconds < 0 ? 'warning' : 'accent'} dot={false}>
-					<span data-testid="plan-diff">{differenceText}</span>
-				</StatusChip>
+				{@render actionButtons(true)}
+				{@render viewSwitch(true)}
 			</div>
-			<div class="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true"><div class="h-full rounded-full bg-ui-accent" style="width: {progress}%"></div></div>
-			<p class="mt-3 text-[13px] text-muted-foreground" data-testid="plan-suggestion">
-				{suggestion.source === 'history'
-					? t('weekplan.suggestion_history', { start: suggestion.start, end: suggestion.end, break: suggestion.breakMinutes })
-					: t('weekplan.suggestion_fallback', { start: suggestion.start, break: suggestion.breakMinutes })}
-			</p>
-		</Panel>
+		{:else}
+			<!-- Grid view on landscape desktops: week sum, actions and the view switch share one row, so the grid keeps the height. -->
+			<div class="flex flex-col gap-4 {view === 'grid' ? 'fit:flex-row fit:items-center fit:gap-4 fit:shrink-0' : ''}">
+				{#if view === 'grid'}
+					<div class="flex flex-wrap items-center gap-x-4 gap-y-2 fit:shrink-0" data-testid="plan-total">
+						<p class="text-[15px] font-semibold tabular-nums" data-testid="plan-total-text">
+							{t('weekplan.total_text', { planned: timeDisplay.duration(totals.plannedSeconds), target: timeDisplay.duration(totals.targetSeconds) })}
+						</p>
+						<StatusChip tone={totals.differenceSeconds === 0 ? 'success' : totals.differenceSeconds < 0 ? 'warning' : 'accent'} dot={false}>
+							<span data-testid="plan-diff">{differenceText}</span>
+						</StatusChip>
+						<div class="h-1.5 w-32 overflow-hidden rounded-full bg-muted max-sm:hidden fit:w-20 fit:max-[1599px]:hidden" aria-hidden="true"><div class="h-full rounded-full bg-ui-accent" style="width: {progress}%"></div></div>
+						<p class="text-[13px] text-muted-foreground max-[1700px]:hidden" data-testid="plan-suggestion">{@render suggestionText()}</p>
+					</div>
+				{:else}
+					<Panel data-testid="plan-total">
+						<div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+							<div class="min-w-0">
+								<p class="text-[13px] font-medium text-muted-foreground">{t('weekplan.total_label')}</p>
+								<p class="text-[22px] sm:text-[22px] sm:text-[28px] leading-tight font-semibold tracking-[-0.6px] tabular-nums" data-testid="plan-total-text">
+									{t('weekplan.total_text', { planned: timeDisplay.duration(totals.plannedSeconds), target: timeDisplay.duration(totals.targetSeconds) })}
+								</p>
+							</div>
+							<StatusChip tone={totals.differenceSeconds === 0 ? 'success' : totals.differenceSeconds < 0 ? 'warning' : 'accent'} dot={false}>
+								<span data-testid="plan-diff">{differenceText}</span>
+							</StatusChip>
+						</div>
+						<div class="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true"><div class="h-full rounded-full bg-ui-accent" style="width: {progress}%"></div></div>
+						<p class="mt-3 text-[13px] text-muted-foreground" data-testid="plan-suggestion">{@render suggestionText()}</p>
+					</Panel>
+				{/if}
+
+				<div class="flex items-center gap-2 max-sm:flex-nowrap max-sm:overflow-x-auto sm:flex-wrap fit:min-w-0 fit:flex-1 fit:flex-nowrap">
+					{@render actionButtons(false)}
+					{@render viewSwitch(false)}
+				</div>
+			</div>
 		{/if}
+	{/snippet}
 
-		<div class="flex items-center gap-2 max-sm:flex-nowrap max-sm:overflow-x-auto sm:flex-wrap fit:min-w-0 fit:flex-1 fit:flex-nowrap">
-			<div class="flex gap-2 max-sm:flex-nowrap sm:flex-wrap" role="group" aria-label={t('weekplan.actions_label')}>
-				<Button variant="outline" size="sm" onclick={applyStandard} title={t('weekplan.action_standard')} data-testid="plan-standard"><WandSparkles /><span class="fit:max-[1599px]:sr-only">{t('weekplan.action_standard')}</span></Button>
-				<Button variant="outline" size="sm" onclick={applyCopy} title={t('weekplan.action_copy')} data-testid="plan-copy"><Copy /><span class="fit:max-[1599px]:sr-only">{t('weekplan.action_copy')}</span></Button>
-				<Button variant="outline" size="sm" onclick={openFollow} title={t('wg.follow_action')} data-testid="plan-follow"><Layers /><span class="fit:max-[1599px]:sr-only">{t('wg.follow_action')}</span></Button>
-				<Button variant="outline" size="sm" onclick={applySame} title={t('weekplan.action_same')} data-testid="plan-same"><Equal /><span class="fit:max-[1599px]:sr-only">{t('weekplan.action_same')}</span></Button>
-				<Button variant="outline" size="sm" onclick={applyClear} title={t('weekplan.action_clear')} data-testid="plan-clear"><Eraser /><span class="fit:max-[1599px]:sr-only">{t('weekplan.action_clear')}</span></Button>
-			</div>
-			<Segmented
-				class="ml-auto"
-				label={t('wg.view_label')}
-				value={view}
-				items={[
-					{ id: 'grid', label: t('wg.view_grid'), icon: CalendarRange, testid: 'view-grid' },
-					{ id: 'list', label: t('wg.view_list'), icon: LayoutList, testid: 'view-list' }
-				]}
-				onchange={(id) => pickView(id as 'grid' | 'list')}
-			/>
+	{#snippet saveBar(side: boolean)}
+		<!-- Save bar: always reachable. Phones and the list view keep it at the bottom of the viewport while the week scrolls; landscape grid views place it in the bottom row or at the foot of the side panel. -->
+		<div
+			class={side ? SAVE_SIDE : view === 'grid' ? SAVE_GRID : SAVE_LIST}
+			data-testid="plan-savebar"
+		>
+			<span class="mr-auto text-sm {dirty ? 'font-medium text-foreground' : 'text-muted-foreground'}" role="status" data-testid="plan-dirty" data-dirty={dirty}>{dirty ? t('weekplan.dirty') : t('weekplan.clean')}</span>
+			{#if dirty}<Button variant="ghost" size={side ? 'sm' : 'default'} onclick={discard} data-testid="plan-discard">{t('weekplan.discard')}</Button>{/if}
+			<Button size={side ? 'sm' : 'default'} onclick={save} disabled={saving || !dirty} aria-busy={saving} data-testid="plan-save"><Save />{saving ? t('weekplan.saving') : t('weekplan.save')}</Button>
 		</div>
-		</div>
+	{/snippet}
 
-		{#if view === 'grid'}
+	{#if view === 'grid'}
+		<div class="flex flex-col gap-4 fit:flex fit:min-h-0 fit:flex-1 fit:flex-col" data-testid="week-planner" data-week={isoWeek}>
 			<PlannerBoard
 				{week}
 				{drafts}
@@ -422,22 +474,23 @@
 				{monday}
 				onstandard={applyStandard}
 				oncopylast={applyCopy}
+				{alerts}
+				{overview}
+				{saveBar}
 			/>
-		{:else}
+		</div>
+	{:else}
+		<div class="flex flex-col gap-4 fit:min-h-0 fit:flex-1 fit:gap-2.5" data-testid="week-planner" data-week={isoWeek}>
+			{@render alerts(false)}
+			{@render overview(false)}
 			<ul class="relative flex flex-col gap-2.5 fit:min-h-0 fit:flex-1 fit:overflow-y-auto" data-testid="plan-rows">
 				{#each days as day, index (day.date)}
 					<PlanRow {day} {multi} {places} holiday={holidays[day.date] ?? null} draft={drafts[index]} {showProblems} onmode={(mode) => setMode(index, mode)} onchange={(next) => setDraft(index, next)} />
 				{/each}
 			</ul>
-		{/if}
-
-		<!-- Save bar: stays at the bottom of the viewport while the week scrolls, so saving never needs a scroll back to the top. -->
-		<div class="sticky bottom-0 z-30 -mx-4 flex flex-wrap items-center justify-end gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:mx-0 sm:rounded-lg sm:border fit:shrink-0 fit:py-2" data-testid="plan-savebar">
-			<span class="mr-auto text-sm {dirty ? 'font-medium text-foreground' : 'text-muted-foreground'}" role="status" data-testid="plan-dirty" data-dirty={dirty}>{dirty ? t('weekplan.dirty') : t('weekplan.clean')}</span>
-			{#if dirty}<Button variant="ghost" onclick={discard} data-testid="plan-discard">{t('weekplan.discard')}</Button>{/if}
-			<Button onclick={save} disabled={saving || !dirty} aria-busy={saving} data-testid="plan-save"><Save />{saving ? t('weekplan.saving') : t('weekplan.save')}</Button>
+			{@render saveBar(false)}
 		</div>
-	</div>
+	{/if}
 {/if}
 
 {#if followOpen}

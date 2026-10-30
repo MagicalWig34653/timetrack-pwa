@@ -104,6 +104,7 @@ export const deWeekGrid = {
 	'wg.issue.non_working': '{day}: Kein Arbeitstag nach deinem Arbeitsmodell.',
 
 	'wg.help_title': 'Bedienung des Rasters',
+	'wg.side_panel': 'Wochensumme, Aktionen und Speichern',
 	'wg.help.paint': 'Malen: Mit dem Werkzeug Malen im leeren Bereich ziehen (15 Minuten, Umschalt 5 Minuten, Strg/Cmd frei). Über mehrere Spalten ziehen, um mehrere Tage zu füllen.',
 	'wg.help.move': 'Verschieben: Block ziehen, auch auf andere Tage. Alt/Option beim Loslassen kopiert.',
 	'wg.help.resize': 'Länge ändern: obere oder untere Kante ziehen.',

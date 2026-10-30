@@ -55,7 +55,7 @@
 	import Coffee from '@lucide/svelte/icons/coffee';
 	import Merge from '@lucide/svelte/icons/merge';
 	import Split from '@lucide/svelte/icons/split';
-	import { onMount } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import BlockDialog from './BlockDialog.svelte';
 	import CopyDaysDialog from './CopyDaysDialog.svelte';
 	import PlannerToolbar from './PlannerToolbar.svelte';
@@ -83,7 +83,10 @@
 		timeZone,
 		monday,
 		onstandard,
-		oncopylast
+		oncopylast,
+		alerts,
+		overview,
+		saveBar
 	}: {
 		week: PlanWeek;
 		drafts: DayDraft[];
@@ -103,6 +106,12 @@
 		monday: string;
 		onstandard: () => void;
 		oncopylast: () => void;
+		/** page-level notices (past week, save error); `side` is true while they sit in the side panel */
+		alerts: Snippet<[boolean]>;
+		/** week sum, suggestion, actions and the view switch; `side` selects the stacked panel layout */
+		overview: Snippet<[boolean]>;
+		/** unsaved state, discard and save; always reachable (bottom row or the bottom of the side panel) */
+		saveBar: Snippet<[boolean]>;
 	} = $props();
 
 	const days = $derived(week.days);
@@ -150,13 +159,24 @@
 
 	// ---- phone: one day at a time ----------------------------------------------------------------------------
 	let phone = $state(false);
+	// U6: landscape desktops (fit) get one bottom row; wide ones (side) get a right-hand panel with everything but the grid.
+	let fit = $state(false);
+	let side = $state(false);
 	let dayIndex = $state(0);
 	onMount(() => {
 		const query = window.matchMedia('(max-width: 639px)');
-		phone = query.matches;
-		const listener = () => (phone = query.matches);
-		query.addEventListener('change', listener);
-		return () => query.removeEventListener('change', listener);
+		const fitQuery = window.matchMedia('(min-width: 1280px) and (min-height: 640px)');
+		const sideQuery = window.matchMedia('(min-width: 1600px) and (min-height: 640px)');
+		const update = () => {
+			phone = query.matches;
+			fit = fitQuery.matches;
+			side = sideQuery.matches;
+		};
+		update();
+		for (const q of [query, fitQuery, sideQuery]) q.addEventListener('change', update);
+		return () => {
+			for (const q of [query, fitQuery, sideQuery]) q.removeEventListener('change', update);
+		};
 	});
 	let indexedWeek = '';
 	$effect(() => {
@@ -581,51 +601,67 @@
 	const swipe = (direction: -1 | 1) => (dayIndex = Math.min(6, Math.max(0, dayIndex + direction)));
 </script>
 
-<div class="flex flex-col gap-3 fit:h-full fit:min-h-0 fit:gap-2" data-testid="planner-board">
-	<PlannerToolbar bind:tool bind:kind={brushKind} bind:placeId={brushPlace} bind:showActuals {multi} {places} {canUndo} {canRedo} {undoLabel} {redoLabel} onundo={undo} onredo={redo} onadd={() => openAdd()} />
+{#snippet notice_()}
+	<p class="min-w-0 flex-1 truncate text-[13px] text-muted-foreground" role="status" aria-live="polite" data-testid="plan-notice">{notice}</p>
+{/snippet}
 
-	{#if phone}
-		<div class="flex gap-1 overflow-x-auto" role="tablist" aria-label={t('wg.day_tabs')} data-testid="day-tabs">
-			{#each days as day, i (day.date)}
-				<button
-					type="button"
-					role="tab"
-					aria-selected={dayIndex === i}
-					class="flex min-w-[3.1rem] flex-1 flex-col items-center rounded-lg px-1.5 py-1.5 text-xs aria-selected:bg-ui-accent aria-selected:text-ui-accent-foreground {day.date === today ? 'font-semibold' : ''} bg-muted"
-					onclick={() => (dayIndex = i)}
-					data-testid="day-tab-{day.date}"
-				>
-					<span>{weekdayLabel(day.weekday)}</span>
-					<span class="tabular-nums text-[13px] font-semibold">{Number(day.date.slice(8))}</span>
-				</button>
-			{/each}
+{#snippet selectionBar()}
+	{#if selected.length > 0}
+		<div class="flex shrink-0 items-center gap-1.5" role="group" aria-label={t('wg.selection_bar')} data-testid="selection-bar">
+			<span class="mr-1 text-[13px] font-medium" data-testid="selection-count">{t('wg.selected', { count: selected.length })}</span>
+			{#if selected.length === 1}<Button variant="outline" size="sm" onclick={() => openEdit(selected[0])} data-testid="sel-edit" aria-label={t('wg.menu_edit')} title={t('wg.menu_edit')}><Pencil /><span class="max-sm:sr-only {side ? '' : 'fit:max-[1599px]:sr-only'}">{t('wg.menu_edit')}</span></Button>{/if}
+			<Button variant="outline" size="sm" onclick={duplicate} data-testid="sel-duplicate" aria-label={t('wg.menu_duplicate')} title={t('wg.menu_duplicate')}><CopyPlus /><span class="max-sm:sr-only {side ? '' : 'fit:max-[1599px]:sr-only'}">{t('wg.menu_duplicate')}</span></Button>
+			<Button variant="outline" size="sm" onclick={() => copy()} data-testid="sel-copy" aria-label={t('wg.menu_copy')} title={t('wg.menu_copy')}><Copy /><span class="max-sm:sr-only {side ? '' : 'fit:max-[1599px]:sr-only'}">{t('wg.menu_copy')}</span></Button>
+			<Button variant="outline" size="sm" onclick={() => erase(selected)} data-testid="sel-delete" aria-label={t('wg.menu_delete')} title={t('wg.menu_delete')}><Trash /><span class="max-sm:sr-only {side ? '' : 'fit:max-[1599px]:sr-only'}">{t('wg.menu_delete')}</span></Button>
+			<Button variant="ghost" size="sm" class="px-2" onclick={() => (selected = [])} aria-label={t('wg.selection_clear')}><X /></Button>
 		</div>
-		<p class="text-sm font-medium" data-testid="day-title">{dayLabel(dayIndex)}</p>
 	{/if}
+{/snippet}
 
-	<!-- Fixed height: neither the notice nor the selection actions may push the grid around while painting. -->
-	<div class="flex h-8 items-center gap-3 fit:h-7 fit:shrink-0">
-		<p class="min-w-0 flex-1 truncate text-[13px] text-muted-foreground" role="status" aria-live="polite" data-testid="plan-notice">{notice}</p>
-		{#if selected.length > 0}
-			<div class="flex shrink-0 items-center gap-1.5" role="group" aria-label={t('wg.selection_bar')} data-testid="selection-bar">
-				<span class="mr-1 text-[13px] font-medium" data-testid="selection-count">{t('wg.selected', { count: selected.length })}</span>
-				{#if selected.length === 1}<Button variant="outline" size="sm" onclick={() => openEdit(selected[0])} data-testid="sel-edit" aria-label={t('wg.menu_edit')}><Pencil /><span class="max-sm:sr-only">{t('wg.menu_edit')}</span></Button>{/if}
-				<Button variant="outline" size="sm" onclick={duplicate} data-testid="sel-duplicate" aria-label={t('wg.menu_duplicate')}><CopyPlus /><span class="max-sm:sr-only">{t('wg.menu_duplicate')}</span></Button>
-				<Button variant="outline" size="sm" onclick={() => copy()} data-testid="sel-copy" aria-label={t('wg.menu_copy')}><Copy /><span class="max-sm:sr-only">{t('wg.menu_copy')}</span></Button>
-				<Button variant="outline" size="sm" onclick={() => erase(selected)} data-testid="sel-delete" aria-label={t('wg.menu_delete')}><Trash /><span class="max-sm:sr-only">{t('wg.menu_delete')}</span></Button>
-				<Button variant="ghost" size="sm" class="px-2" onclick={() => (selected = [])} aria-label={t('wg.selection_clear')}><X /></Button>
-			</div>
-		{/if}
-		<details class="relative shrink-0 text-[13px]" data-testid="grid-help">
-			<summary class="flex h-7 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 font-medium text-muted-foreground select-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"><Keyboard class="size-4" /><span class="max-sm:sr-only">{t('wg.help_title')}</span></summary>
-			<ul class="absolute top-full right-0 z-40 mt-1 grid w-[min(34rem,calc(100vw-2rem))] max-sm:fixed max-sm:inset-x-4 max-sm:top-auto max-sm:bottom-24 max-sm:w-auto gap-x-6 gap-y-1 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg sm:grid-cols-2">
-				{#each multi ? ['paint', 'move', 'resize', 'split', 'copy', 'select', 'snap', 'menu', 'keys', 'undo', 'touch'] : ['paint', 'move', 'resize', 'copy', 'select', 'snap_single', 'menu', 'keys', 'undo', 'touch'] as key (key)}
-					<li>{t(`wg.help.${key}` as 'wg.help.paint')}</li>
+{#snippet help(up: boolean)}
+	<details class="relative shrink-0 text-[13px]" data-testid="grid-help">
+		<summary class="flex h-7 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 font-medium text-muted-foreground select-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"><Keyboard class="size-4" /><span class="max-sm:sr-only {up ? 'fit:max-[1599px]:sr-only' : ''}">{t('wg.help_title')}</span></summary>
+		<ul class="absolute right-0 z-40 grid w-[min(34rem,calc(100vw-2rem))] max-sm:fixed max-sm:inset-x-4 max-sm:top-auto max-sm:bottom-24 max-sm:w-auto gap-x-6 gap-y-1 rounded-xl border bg-popover p-3 text-popover-foreground shadow-lg sm:grid-cols-2 {up ? 'bottom-full mb-1' : 'top-full mt-1'}">
+			{#each multi ? ['paint', 'move', 'resize', 'split', 'copy', 'select', 'snap', 'menu', 'keys', 'undo', 'touch'] : ['paint', 'move', 'resize', 'copy', 'select', 'snap_single', 'menu', 'keys', 'undo', 'touch'] as key (key)}
+				<li>{t(`wg.help.${key}` as 'wg.help.paint')}</li>
+			{/each}
+		</ul>
+	</details>
+{/snippet}
+
+{#snippet issueSections()}
+	{#if issues.length > 0}
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex (scrollable region must be keyboard reachable) -->
+		<section tabindex="0" class="rounded-lg border bg-card p-3 fit:max-h-24 fit:shrink-0 fit:overflow-y-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {side ? 'fit:max-h-none' : ''}" aria-label={t('wg.issues')} data-testid="plan-issues">
+			<h3 class="mb-1.5 text-[13px] font-semibold">{t('wg.issues')}</h3>
+			<ul class="flex flex-col gap-1">
+				{#each issues as issue, n (n)}
+					<li class="flex items-start gap-2 text-[13px] {issue.severity === 'warn' ? '' : 'text-muted-foreground'}" data-kind={issue.kind}>
+						<TriangleAlert class="mt-0.5 size-3.5 shrink-0 {issue.severity === 'warn' ? 'text-amber-600' : 'text-muted-foreground'}" />{issueText(issue)}
+					</li>
 				{/each}
 			</ul>
-		</details>
-	</div>
+			<p class="mt-2 text-xs text-muted-foreground">{t('work_model.legal_disclaimer')}</p>
+		</section>
+	{/if}
 
+	{#if planHints.length > 0}
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex (scrollable region must be keyboard reachable) -->
+		<section tabindex="0" class="rounded-lg border bg-card p-3 fit:max-h-24 fit:shrink-0 fit:overflow-y-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none {side ? 'fit:max-h-none' : ''}" aria-label={t('wg.plan_hints')} data-testid="plan-hints">
+			<h3 class="mb-1.5 text-[13px] font-semibold">{t('wg.plan_hints')}</h3>
+			<ul class="flex flex-col gap-1">
+				{#each planHints as item, n (n)}
+					<li class="flex items-start gap-2 text-[13px]" data-hint={item.hint} data-date={item.date}>
+						<Lightbulb class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />{hintText(item)}
+					</li>
+				{/each}
+			</ul>
+			<p class="mt-2 text-xs text-muted-foreground">{t('wg.plan_hints_note')}</p>
+		</section>
+	{/if}
+{/snippet}
+
+{#snippet gridView()}
 	<WeekGrid
 		{days}
 		{drafts}
@@ -657,38 +693,86 @@
 		{menu}
 		onswipe={swipe}
 	/>
+{/snippet}
 
-	{#if issues.length > 0}
-		<!-- svelte-ignore a11y_no_noninteractive_tabindex (scrollable region must be keyboard reachable) -->
-		<section tabindex="0" class="rounded-lg border bg-card p-3 fit:max-h-24 fit:shrink-0 fit:overflow-y-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" aria-label={t('wg.issues')} data-testid="plan-issues">
-			<h3 class="mb-1.5 text-[13px] font-semibold">{t('wg.issues')}</h3>
-			<ul class="flex flex-col gap-1">
-				{#each issues as issue, n (n)}
-					<li class="flex items-start gap-2 text-[13px] {issue.severity === 'warn' ? '' : 'text-muted-foreground'}" data-kind={issue.kind}>
-						<TriangleAlert class="mt-0.5 size-3.5 shrink-0 {issue.severity === 'warn' ? 'text-amber-600' : 'text-muted-foreground'}" />{issueText(issue)}
-					</li>
-				{/each}
-			</ul>
-			<p class="mt-2 text-xs text-muted-foreground">{t('work_model.legal_disclaimer')}</p>
-		</section>
-	{/if}
+{#snippet toolbar()}
+	<PlannerToolbar bind:tool bind:kind={brushKind} bind:placeId={brushPlace} bind:showActuals {multi} {places} {canUndo} {canRedo} {undoLabel} {redoLabel} onundo={undo} onredo={redo} onadd={() => openAdd()} />
+{/snippet}
 
-	{#if planHints.length > 0}
-		<!-- svelte-ignore a11y_no_noninteractive_tabindex (scrollable region must be keyboard reachable) -->
-		<section tabindex="0" class="rounded-lg border bg-card p-3 fit:max-h-24 fit:shrink-0 fit:overflow-y-auto focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" aria-label={t('wg.plan_hints')} data-testid="plan-hints">
-			<h3 class="mb-1.5 text-[13px] font-semibold">{t('wg.plan_hints')}</h3>
-			<ul class="flex flex-col gap-1">
-				{#each planHints as item, n (n)}
-					<li class="flex items-start gap-2 text-[13px]" data-hint={item.hint} data-date={item.date}>
-						<Lightbulb class="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />{hintText(item)}
-					</li>
-				{/each}
-			</ul>
-			<p class="mt-2 text-xs text-muted-foreground">{t('wg.plan_hints_note')}</p>
-		</section>
-	{/if}
+{#snippet dayTabs()}
+	<div class="flex gap-1 overflow-x-auto" role="tablist" aria-label={t('wg.day_tabs')} data-testid="day-tabs">
+		{#each days as day, i (day.date)}
+			<button
+				type="button"
+				role="tab"
+				aria-selected={dayIndex === i}
+				class="flex min-w-[3.1rem] flex-1 flex-col items-center rounded-lg px-1.5 py-1.5 text-xs aria-selected:bg-ui-accent aria-selected:text-ui-accent-foreground {day.date === today ? 'font-semibold' : ''} bg-muted"
+				onclick={() => (dayIndex = i)}
+				data-testid="day-tab-{day.date}"
+			>
+				<span>{weekdayLabel(day.weekday)}</span>
+				<span class="tabular-nums text-[13px] font-semibold">{Number(day.date.slice(8))}</span>
+			</button>
+		{/each}
+	</div>
+	<p class="text-sm font-medium" data-testid="day-title">{dayLabel(dayIndex)}</p>
+{/snippet}
 
-</div>
+{#if side}
+	<!-- Wide landscape: the grid gets the full height on the left, a side panel carries summary, actions, notices and the save bar. -->
+	<div class="flex min-h-0 flex-1 gap-4" data-testid="planner-board" data-layout="side">
+		<div class="flex min-w-0 flex-1 flex-col gap-2">
+			{@render toolbar()}
+			{@render gridView()}
+		</div>
+		<aside class="flex w-72 shrink-0 flex-col gap-3 min-h-0" aria-label={t('wg.side_panel')} data-testid="plan-side">
+			<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
+				{@render alerts(true)}
+				{@render overview(true)}
+				<div class="flex items-center gap-2 border-t pt-2">
+					{@render notice_()}
+					{@render help(false)}
+				</div>
+				{@render selectionBar()}
+				{@render issueSections()}
+			</div>
+			{@render saveBar(true)}
+		</aside>
+	</div>
+{:else}
+	<div class="flex flex-col gap-4 fit:min-h-0 fit:flex-1 fit:gap-2" data-testid="planner-board" data-layout="stack">
+		{@render alerts(false)}
+		{@render overview(false)}
+		<div class="flex flex-col gap-3 fit:min-h-0 fit:flex-1 fit:gap-2">
+			{@render toolbar()}
+			{#if phone}{@render dayTabs()}{/if}
+
+			{#if !fit}
+				<!-- Fixed height: neither the notice nor the selection actions may push the grid around while painting. -->
+				<div class="flex h-8 items-center gap-3">
+					{@render notice_()}
+					{@render selectionBar()}
+					{@render help(false)}
+				</div>
+			{/if}
+
+			{@render gridView()}
+
+			{#if fit}
+				<!-- Landscape desktop: notice, selection, help and the save bar share one row below the grid. -->
+				<div class="flex h-9 shrink-0 items-center gap-3">
+					{@render notice_()}
+					{@render selectionBar()}
+					{@render help(true)}
+					{@render saveBar(false)}
+				</div>
+			{/if}
+
+			{@render issueSections()}
+		</div>
+		{#if !fit}{@render saveBar(false)}{/if}
+	</div>
+{/if}
 
 {#if dialog}
 	<BlockDialog {days} {drafts} {multi} seed={dialog.seed} editId={dialog.id} dayOnly={dialog.dayOnly} {places} anchor={dialog.anchor} returnFocus={dialog.returnFocus} onsubmit={submitDialog} ondelete={deleteFromDialog} onclose={() => (dialog = null)} />
