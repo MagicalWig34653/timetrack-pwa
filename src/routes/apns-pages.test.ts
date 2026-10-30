@@ -44,6 +44,8 @@ describe('/admin/apns', () => {
 		expect(await screen.findByTestId('apns-configured')).toHaveTextContent('Nicht eingerichtet');
 		expect(screen.getByTestId('apns-hint-not_configured')).toBeInTheDocument();
 		expect(screen.getByTestId('apns-example')).toHaveTextContent('APNS_KEY_ID');
+		expect(screen.getByTestId('apns-docs')).toHaveAttribute('href', 'https://magicalwig34653.github.io/timetrack-backend/docs/deployment');
+		expect(screen.getByTestId('apns-checklist')).toHaveTextContent('docker stack deploy');
 		expect(screen.queryByTestId('apns-check-run')).toBeNull();
 	});
 

@@ -114,7 +114,11 @@
 		{#if !status.configured}
 			<Panel title={t('apns.setup.title')} description={t('apns.setup.text')} data-testid="apns-setup">
 				<pre class="overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-[13px] leading-relaxed" data-testid="apns-example">{SETUP.join('\n')}</pre>
-				<p class="mt-3 text-[13px] text-muted-foreground">{t('apns.setup.docs')}: <a class="underline underline-offset-2" href="https://magicalwig34653.github.io/timetrack-backend/docs/DEPLOYMENT" target="_blank" rel="noopener">docs/DEPLOYMENT</a></p>
+				<p class="mt-3 text-[13px] text-muted-foreground">{t('apns.setup.docs')}: <a class="underline underline-offset-2" href="https://magicalwig34653.github.io/timetrack-backend/docs/deployment" target="_blank" rel="noopener" data-testid="apns-docs">docs/deployment</a></p>
+				<ul class="mt-3 list-disc pl-5 text-[13px] text-muted-foreground" data-testid="apns-checklist">
+					<li>{t('apns.setup.check_block')}</li>
+					<li>{t('apns.setup.check_deploy')}</li>
+				</ul>
 			</Panel>
 		{:else}
 			<Panel title={t('apns.check.title')} description={t('apns.check.text')} data-testid="apns-check">

@@ -22,6 +22,8 @@ export const deApns = {
 	'apns.setup.title': 'APNs einrichten',
 	'apns.setup.text': 'Setze diese Werte in der Server-Umgebung und starte den Server neu. Den Schlüssel (.p8-Datei von Apple) legst du im Swarm als Secret ab.',
 	'apns.setup.docs': 'Anleitung',
+	'apns.setup.check_block': 'Sind die APNs-Zeilen in stack.yaml einkommentiert (Variablen, APNS_PRIVATE_KEY_FILE, beide Secret-Listen) und stehen Key-ID, Team-ID und Bundle-IDs in .env?',
+	'apns.setup.check_deploy': 'Wurde der Stack danach mit „docker stack deploy“ neu ausgerollt? Das Update-Skript tauscht nur das Image aus und übernimmt keine Änderungen an stack.yaml oder .env.',
 	'apns.check.title': 'Zugang zu Apple prüfen',
 	'apns.check.text': 'Fragt bei Apple an, ob Schlüssel, Team und Bundle-IDs akzeptiert werden. Dafür wird ein erfundenes Gerät benutzt: Es wird nichts zugestellt.',
 	'apns.check.run': 'Verbindung prüfen',
