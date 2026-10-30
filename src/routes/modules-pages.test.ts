@@ -41,11 +41,11 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('/settings/modules', () => {
-	it('lists the five modules, switches one off optimistically and persists it', async () => {
+	it('lists the six modules, switches one off optimistically and persists it', async () => {
 		await signIn();
 		render(ModulesPage);
 		const list = await screen.findByTestId('module-list');
-		expect(within(list).getAllByRole('switch')).toHaveLength(5);
+		expect(within(list).getAllByRole('switch')).toHaveLength(6);
 		expect(screen.getByTestId('modules-note-data')).toHaveTextContent('Daten bleiben erhalten. Beim Wiedereinschalten ist alles wieder da.');
 		expect(screen.getByTestId('modules-note-planning')).toHaveTextContent('Abwesenheiten und Feiertage nicht auf die Tagesbewertung');
 

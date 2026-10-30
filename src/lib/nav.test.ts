@@ -48,3 +48,14 @@ describe('settings information architecture (U8)', () => {
 		expect(searchSettings(SETTINGS_LINKS, 'papierkorb', (k) => k).map((l) => l.href)).toEqual(['/time/cancelled']);
 	});
 });
+
+describe('groups navigation (G2)', () => {
+	it('lists the groups entry in the sidebar and builds readable breadcrumbs for its sub pages', async () => {
+		const { NAV_GROUPS, breadcrumbs } = await import('./nav.js');
+		const hrefs = NAV_GROUPS.flatMap((group) => group.items.map((item) => item.href));
+		expect(hrefs).toContain('/groups');
+		expect(breadcrumbs('/groups/polls/new').map((c) => c.label)).toEqual(['nav.home', 'nav.groups', 'groups.crumb_poll_new']);
+		expect(breadcrumbs('/groups/orders/3f2a').map((c) => c.label)).toEqual(['nav.home', 'nav.groups', 'groups.crumb_order']);
+		expect(breadcrumbs('/groups/catalogs').map((c) => c.label)).toEqual(['nav.home', 'nav.groups', 'groups.crumb_catalogs']);
+	});
+});

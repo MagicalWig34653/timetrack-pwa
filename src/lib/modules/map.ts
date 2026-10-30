@@ -44,7 +44,9 @@ export const MODULE_ROUTES: Record<ModuleKey, readonly string[]> = {
 	planning: ['/vacation', '/calendar', '/plan', '/absences', '/shared', '/settings/sharing', '/settings/vacation-form'],
 	transfer: ['/export', '/import', '/settings/storage'],
 	automation: ['/settings/devices', '/settings/trigger-links', '/suggestions'],
-	mcp: ['/settings/api-tokens', '/settings/connections', '/settings/mcp-help', '/oauth/consent']
+	mcp: ['/settings/api-tokens', '/settings/connections', '/settings/mcp-help', '/oauth/consent'],
+	// '/g' is the public participant page of a poll or order link (no login, outside the app shell); the owner screens live under /groups
+	groups: ['/groups', '/g']
 };
 
 function covers(route: string, pathname: string): boolean {

@@ -4,6 +4,8 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<!-- The whole app is private; /g/<token> pages (public group links) must never be indexed. The backend also sends X-Robots-Tag. -->
+		<meta name="robots" content="noindex, nofollow" />
 		<link rel="manifest" href="/manifest.webmanifest?v=2" />
 		<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
 		<meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)" />

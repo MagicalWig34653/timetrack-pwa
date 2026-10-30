@@ -5,6 +5,14 @@ import { dePwa } from '../i18n/de-pwa';
 /** Paths the service worker must never cache or intercept (API, OAuth, MCP, discovery, probes). */
 export const BYPASS_PREFIXES = ['/api', '/oauth', '/mcp', '/.well-known', '/health', '/ready', '/t', '/ics'] as const;
 
+/**
+ * Public group pages (/g/<token>, ADR-0033): the SPA shell is served like any other route (also from the cache), but the
+ * token must never leak into the offline redirect URL, so an offline navigation answers with the cached shell itself.
+ */
+export function isGroupPagePath(pathname: string): boolean {
+	return pathname.startsWith('/g/') && pathname.length > 3;
+}
+
 export function isBypassPath(pathname: string): boolean {
 	return BYPASS_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix + '/'));
 }

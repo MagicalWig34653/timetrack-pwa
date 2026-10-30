@@ -120,7 +120,7 @@ export interface NavItem {
 	href: string;
 	label: MessageKey;
 	prefix: boolean;
-	icon: 'house' | 'clock' | 'week' | 'calendar' | 'book' | 'chart' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'users' | 'modules' | 'storage' | 'mail';
+	icon: 'house' | 'clock' | 'week' | 'calendar' | 'book' | 'chart' | 'plane' | 'absence' | 'share' | 'bulb' | 'download' | 'upload' | 'invite' | 'users' | 'modules' | 'storage' | 'mail' | 'groups';
 	/** further path prefixes that keep the entry highlighted (the planner tab of "Woche" lives at /plan) */
 	alsoActive?: string[];
 	/** badge source rendered by the sidebar */
@@ -154,6 +154,7 @@ export const NAV_GROUPS: NavGroup[] = [
 			{ href: '/vacation', label: 'nav.vacation', prefix: true, icon: 'plane' },
 			{ href: '/absences', label: 'nav.absences', prefix: true, icon: 'absence' },
 			{ href: '/shared', label: 'nav.shared', prefix: true, icon: 'share' },
+			{ href: '/groups', label: 'nav.groups', prefix: true, icon: 'groups' },
 			{ href: '/suggestions', label: 'nav.suggestions', prefix: true, icon: 'bulb', badge: 'suggestions' }
 		]
 	},
@@ -247,6 +248,10 @@ export function breadcrumbs(pathname: string): Crumb[] {
 	if (label && pathname === '/time/cancelled') {
 		trail.push({ label, href: '/week' }, { label: 'trash.title' });
 		return trail;
+	}
+	if (parts[0] === 'groups' && parts.length > 1) {
+		const leaf = parts[1] === 'polls' ? (parts[2] === 'new' ? 'groups.crumb_poll_new' : 'groups.crumb_poll') : parts[1] === 'orders' ? (parts[2] === 'new' ? 'groups.crumb_order_new' : 'groups.crumb_order') : 'groups.crumb_catalogs';
+		return [...trail, { label: 'nav.groups', href: '/groups' }, { label: leaf }];
 	}
 	if (label && pathname === '/vacation/planner') {
 		trail.push({ label, href: '/vacation' }, { label: 'planner.title' });

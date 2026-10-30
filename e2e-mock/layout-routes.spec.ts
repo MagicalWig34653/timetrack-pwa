@@ -6,7 +6,7 @@ import { loginAsAdmin } from './helpers';
 // backwards, so each page is both source and target) and compares geometry with the first page, at classic scrollbars.
 test.use({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'], args: ['--disable-features=OverlayScrollbar'] } });
 
-const MAIN = ['/', '/week', '/suggestions', '/reports', '/calendar', '/vacation', '/vacation/planner', '/absences', '/shared', '/export', '/import', '/plan', '/stats', '/notifications'];
+const MAIN = ['/', '/week', '/suggestions', '/reports', '/calendar', '/vacation', '/vacation/planner', '/absences', '/shared', '/export', '/import', '/plan', '/stats', '/notifications', '/groups', '/groups/polls/new', '/groups/orders/new', '/groups/catalogs'];
 const ADMIN = ['/admin/invitations', '/admin/accounts', '/admin/modules'];
 const SETTINGS = [
 	'profile', 'work-model', 'appearance', 'places', 'account-time', 'learning-fields', 'notifications', 'modules', 'devices', 'trigger-links',

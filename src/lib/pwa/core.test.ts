@@ -4,6 +4,7 @@ import {
 	bytesToBase64url,
 	cacheNameFor,
 	isBypassPath,
+	isGroupPagePath,
 	isInterceptable,
 	isIosDevice,
 	isOldCache,
@@ -91,6 +92,18 @@ describe('request interception rules', () => {
 			expect(isBypassPath(p), p).toBe(true);
 			expect(isInterceptable(new URL(p, origin), 'GET', origin), p).toBe(false);
 		}
+	});
+
+	it('keeps the public group API out of the worker and recognises the /g/<token> pages (G2)', () => {
+		expect(isBypassPath('/api/v1/public/groups/abc')).toBe(true);
+		expect(isInterceptable(new URL('/api/v1/public/groups/abc/export?format=csv', origin), 'GET', origin)).toBe(false);
+		expect(isGroupPagePath('/g/' + 'A'.repeat(43))).toBe(true);
+		expect(isGroupPagePath('/g/')).toBe(false);
+		expect(isGroupPagePath('/g')).toBe(false);
+		expect(isGroupPagePath('/groups')).toBe(false);
+		expect(isGroupPagePath('/groups/polls/x')).toBe(false);
+		// the pages themselves stay interceptable (shell from cache), only their data is network-only
+		expect(isInterceptable(new URL('/g/' + 'A'.repeat(43), origin), 'GET', origin)).toBe(true);
 	});
 
 	it('intercepts same-origin GET navigations and assets only', () => {

@@ -1,3 +1,4 @@
+import { createGroupsMock } from './groups.ts';
 import { createMcpMock } from './mcp.ts';
 import { createMailMock } from './mail.ts';
 import { createModulesMock, type ModuleKey } from './modules.ts';
@@ -26,6 +27,8 @@ export interface MockRequest {
 	ifMatch?: string;
 	/** value of the Authorization header (device tokens for /automation/events) */
 	authorization?: string;
+	/** value of the X-Edit-Secret header (public group votes and entries, ADR-0033) */
+	editSecret?: string;
 	/** multipart upload (field `file`) */
 	file?: UploadedFile;
 	/** raw binary body (PUT of the vacation form template) and its percent-encoded X-File-Name header */
@@ -188,6 +191,10 @@ export function createMockApi(options: MockOptions = {}) {
 		}
 	});
 	const mcp = createMcpMock({ clock: options.now ?? Date.now });
+	const groups = createGroupsMock({
+		clock: options.now ?? Date.now,
+		ownerState: (ownerId) => (!modules.serverEnabled('groups') && modules.state.locked.has('groups') ? 'locked' : modules.effective(ownerId, 'groups') ? 'ok' : 'off')
+	});
 	const notifications = createNotificationsMock({ clock: options.now ?? Date.now });
 	const oidc = {
 		enabled: !!options.oidc,
@@ -597,6 +604,11 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 201, body: sessionBody(opened), sessionCookie: id };
 		}
 
+		// Public group links (ADR-0033): no login, the link token in the path is the only credential.
+		if (path.startsWith('/api/v1/public/groups/')) {
+			return groups.handlePublic({ method, path, body: req.body, editSecret: req.editSecret, query: req.path.split('?')[1] }) ?? error(404, 'not_found');
+		}
+
 		// Shortcuts: device token instead of cookie/CSRF.
 		if (path === '/api/v1/automation/events' && method === 'POST') {
 			// the token's account is not known here; the server-wide switch is enough for the mock
@@ -885,6 +897,9 @@ export function createMockApi(options: MockOptions = {}) {
 		if (modulesResponse) return modulesResponse;
 		const disabled = modules.guard(account.id, path);
 		if (disabled) return disabled;
+
+		const groupsResponse = groups.handleOwner(account.id, { method, path, query: req.path.split('?')[1], body: req.body });
+		if (groupsResponse) return groupsResponse;
 
 		const notificationsResponse = notifications.handle(account.id, { method, path: req.path, body: req.body });
 		if (notificationsResponse) return notificationsResponse;

@@ -1224,7 +1224,7 @@ export interface PushSubscriptionInput {
 
 // --- Module switches (contract v0.9.0, ADR-0012) ---
 
-export const MODULE_KEYS = ['reports', 'planning', 'transfer', 'automation', 'mcp'] as const;
+export const MODULE_KEYS = ['reports', 'planning', 'transfer', 'automation', 'mcp', 'groups'] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 export interface ModuleStatus {
@@ -1315,4 +1315,223 @@ export interface SystemInfo {
 		replicaId?: string;
 	};
 	pwa: { version: string | null; revision: string | null; buildDate: string | null } | null;
+}
+
+// --- Groups module: public polls, group orders, catalogs (contract v0.37.0, ADR-0033) ---
+
+export type PollKind = 'text' | 'date';
+export type PollChoiceMode = 'single' | 'multi';
+export type PollAnswerValue = 'yes' | 'maybe' | 'no';
+
+export interface PollOptionInput {
+	label?: string;
+	/** date poll: required, YYYY-MM-DD */
+	date?: string;
+	startTime?: string;
+	endTime?: string;
+}
+
+export interface PollInput {
+	title: string;
+	description?: string;
+	kind: PollKind;
+	choiceMode: PollChoiceMode;
+	timeZone?: string;
+	options: PollOptionInput[];
+	deadline?: string;
+	hideResults?: boolean;
+}
+
+export interface PollPatch {
+	title?: string;
+	description?: string | null;
+	deadline?: string | null;
+	hideResults?: boolean;
+}
+
+export interface PollOption {
+	id: string;
+	label?: string | null;
+	date?: string | null;
+	startTime?: string | null;
+	endTime?: string | null;
+}
+
+export interface PollAnswer {
+	optionId: string;
+	answer: PollAnswerValue;
+}
+
+export interface PollVote {
+	id: string;
+	name: string;
+	answers: PollAnswer[];
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface PollTally {
+	optionId: string;
+	yes: number;
+	maybe: number;
+	no: number;
+}
+
+/** Owner and public view of a poll; `id`/timestamps only for the owner, `token`/`path` only right after create and rotate-token. */
+export interface Poll {
+	id?: string;
+	title: string;
+	description?: string | null;
+	kind: PollKind;
+	choiceMode: PollChoiceMode;
+	timeZone?: string | null;
+	options: PollOption[];
+	deadline?: string | null;
+	hideResults: boolean;
+	closed: boolean;
+	closedAt?: string | null;
+	finalOptionId?: string | null;
+	resultsVisible: boolean;
+	voteCount: number;
+	votes?: PollVote[];
+	tally?: PollTally[];
+	createdAt?: string;
+	updatedAt?: string;
+	token?: string;
+	path?: string;
+}
+
+export interface PollSummary {
+	id: string;
+	title: string;
+	kind: PollKind;
+	choiceMode: PollChoiceMode;
+	deadline?: string | null;
+	closed: boolean;
+	closedAt?: string | null;
+	voteCount: number;
+	createdAt: string;
+}
+
+export interface VoteInput {
+	name: string;
+	answers: PollAnswer[];
+}
+
+export interface VoteCreated {
+	vote: PollVote;
+	editSecret: string;
+}
+
+export interface OrderInput {
+	title: string;
+	note?: string;
+	deadline?: string;
+	catalogId?: string;
+}
+
+export interface OrderPatch {
+	title?: string;
+	note?: string | null;
+	deadline?: string | null;
+	catalogId?: string | null;
+}
+
+export interface EntryInput {
+	name: string;
+	item: string;
+	note?: string;
+	quantity?: number;
+	priceCents?: number;
+}
+
+export interface EntryTake {
+	name: string;
+	quantity?: number;
+	note?: string;
+}
+
+export interface OrderEntry {
+	id: string;
+	name: string;
+	item: string;
+	note?: string | null;
+	quantity: number;
+	priceCents?: number | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface EntryCreated {
+	entry: OrderEntry;
+	editSecret: string;
+}
+
+export interface AggregatedItem {
+	item: string;
+	note?: string | null;
+	priceCents?: number | null;
+	quantity: number;
+	names: string[];
+}
+
+export interface CatalogItem {
+	name: string;
+	priceCents?: number | null;
+}
+
+export interface CatalogInput {
+	name: string;
+	items: CatalogItem[];
+}
+
+export interface Catalog {
+	id: string;
+	name: string;
+	items: CatalogItem[];
+	itemCount: number;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/** Owner and public view of an order round; `id`, `catalogId`, `createdAt` only for the owner. */
+export interface Order {
+	id?: string;
+	title: string;
+	note?: string | null;
+	deadline?: string | null;
+	closed: boolean;
+	closedAt?: string | null;
+	catalogId?: string | null;
+	entryCount: number;
+	entries: OrderEntry[];
+	aggregated: AggregatedItem[];
+	totalCents: number;
+	unpricedQuantity: number;
+	suggestions: CatalogItem[];
+	createdAt?: string;
+	token?: string;
+	path?: string;
+}
+
+export interface OrderSummary {
+	id: string;
+	title: string;
+	deadline?: string | null;
+	closed: boolean;
+	closedAt?: string | null;
+	entryCount: number;
+	createdAt: string;
+}
+
+export interface ItemSuggestion {
+	item: string;
+	priceCents?: number | null;
+	count: number;
+}
+
+export interface PublicGroup {
+	type: 'poll' | 'order';
+	poll?: Poll;
+	order?: Order;
 }
