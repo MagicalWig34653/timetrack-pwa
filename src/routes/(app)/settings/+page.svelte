@@ -6,6 +6,7 @@
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { SETTINGS_ADMIN_LINKS, SETTINGS_DESCRIPTIONS, SETTINGS_LINKS, groupSettingsLinks, searchSettings } from '#lib/nav.js';
 	import { sessionStore } from '#lib/session.svelte.js';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import Search from '@lucide/svelte/icons/search';
 
 	const links = $derived(
@@ -37,13 +38,16 @@
 <div class="min-h-[60vh]" data-testid="settings-landing" role="region" aria-label={t('nav.search_results')}>
 	{#each groups as group (group.id)}
 		<section class="mb-7" data-settings-group={group.id}>
-			<h2 class="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t(group.label)}</h2>
+			<h2 class="mb-3 border-b pb-2 text-sm font-bold tracking-wide text-foreground" data-testid="settings-group-heading">{t(group.label)}</h2>
 			<ul class="grid gap-2 sm:grid-cols-2">
 				{#each group.links as link (link.href)}
 					<li>
-						<a href={link.href} class="block h-full rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
-							<span class="block text-sm font-medium">{t(link.label)}</span>
-							{#if SETTINGS_DESCRIPTIONS[link.href]}<span class="mt-0.5 line-clamp-2 block text-[13px] text-muted-foreground">{t(SETTINGS_DESCRIPTIONS[link.href])}</span>{/if}
+						<a href={link.href} class="group flex h-full items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+							<span class="min-w-0">
+								<span class="block text-sm font-medium">{t(link.label)}</span>
+								{#if SETTINGS_DESCRIPTIONS[link.href]}<span class="mt-0.5 line-clamp-2 block text-[13px] text-muted-foreground">{t(SETTINGS_DESCRIPTIONS[link.href])}</span>{/if}
+							</span>
+							<ChevronRight class="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
 						</a>
 					</li>
 				{/each}

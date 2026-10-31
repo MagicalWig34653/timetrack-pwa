@@ -48,17 +48,18 @@
 			<ChevronDown class="size-4 transition-transform {open ? 'rotate-180' : ''}" aria-hidden="true" />
 		</button>
 		<nav aria-label={t('nav.settings')} id="settings-nav-list" class="{open ? 'mt-2 block' : 'hidden'} wide:mt-0 wide:block" data-testid="settings-tabs">
-			<div class="flex flex-col gap-4 rounded-lg border bg-card p-2 wide:rounded-none wide:border-0 wide:bg-transparent wide:p-0">
+			<div class="flex flex-col gap-5 rounded-lg border bg-card p-2 wide:rounded-none wide:border-0 wide:bg-transparent wide:p-0">
 				{#each groups as group (group.id)}
 					<div data-settings-group={group.id}>
-						<h2 class="px-3 pb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{t(group.label)}</h2>
-						<ul class="flex flex-col gap-0.5">
+						<!-- group heading: a header with a rule underneath; the entries below are indented and in full text colour -->
+						<h2 class="mb-1.5 border-b px-1 pb-1.5 text-[11px] font-bold tracking-[0.08em] text-foreground/70 uppercase" data-testid="settings-group-heading">{t(group.label)}</h2>
+						<ul class="flex flex-col gap-0.5 pl-2">
 							{#each group.links as link (link.href)}
 								<li>
 									<a
 										href={link.href}
 										aria-current={page.url.pathname === link.href ? 'page' : undefined}
-										class="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground aria-[current=page]:bg-ui-accent/10 aria-[current=page]:text-ui-accent-ink aria-[current=page]:shadow-[var(--glow-nav)]"
+										class="flex h-9 items-center rounded-lg border-l-2 border-transparent px-3 text-sm font-normal text-foreground transition-colors duration-150 hover:bg-muted aria-[current=page]:border-ui-accent aria-[current=page]:bg-ui-accent/10 aria-[current=page]:font-semibold aria-[current=page]:text-ui-accent-ink aria-[current=page]:shadow-[var(--glow-nav)]"
 									>
 										{t(link.label)}
 									</a>
