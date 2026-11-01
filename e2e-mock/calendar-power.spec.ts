@@ -199,8 +199,19 @@ test('context menu: keyboard operable, closes on Escape, keeps the system menu i
 	await page.setViewportSize({ width: 1280, height: 600 });
 	await tile(page, '2032-07-09').scrollIntoViewIfNeeded();
 	await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+	// wait until scrolling has settled, otherwise the click can land beside the tile on a slow runner
+	let previousY = Number.NaN;
+	await expect.poll(async () => {
+		const y = (await tile(page, '2032-07-09').boundingBox())?.y ?? Number.NaN;
+		const settled = y === previousY;
+		previousY = y;
+		return settled;
+	}, { intervals: [150, 150, 150, 300], timeout: 10_000 }).toBe(true);
 	const t2 = (await tile(page, '2032-07-09').boundingBox())!;
-	await page.mouse.click(Math.min(t2.x + t2.width - 4, 1275), Math.min(Math.round(t2.y + t2.height - 4), 595), { button: 'right' });
+	await expect(async () => {
+		await page.mouse.click(Math.min(t2.x + t2.width - 4, 1275), Math.min(Math.round(t2.y + t2.height - 4), 595), { button: 'right' });
+		await expect(page.getByRole('menu')).toBeVisible({ timeout: 1500 });
+	}).toPass({ timeout: 10_000 });
 	const box = (await page.getByRole('menu').boundingBox())!;
 	expect(box.y + box.height).toBeLessThanOrEqual(600);
 	expect(box.x + box.width).toBeLessThanOrEqual(1280);
