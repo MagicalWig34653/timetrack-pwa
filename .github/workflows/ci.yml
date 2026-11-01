@@ -29,8 +29,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
@@ -42,7 +42,7 @@ jobs:
       - name: Production build
         run: npm run build
       - name: Upload build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pwa-build
           path: build
@@ -53,8 +53,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
@@ -64,7 +64,7 @@ jobs:
         run: npm run test:e2e:mock
       - name: Upload Playwright output
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-mock
           path: |
@@ -78,8 +78,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
@@ -89,7 +89,7 @@ jobs:
         run: npm run test:e2e:pwa
       - name: Upload Playwright output
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-pwa
           path: |
@@ -114,20 +114,20 @@ jobs:
     timeout-minutes: 120
     container: swift:6.3-noble
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: timetrack-pwa
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/timetrack-backend
           path: timetrack-backend
           token: ${{ secrets.BACKEND_REPO_TOKEN || github.token }}
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: timetrack-backend/.build
           key: backend-build-swift-6.3-${{ hashFiles('timetrack-backend/Package.resolved') }}
           restore-keys: backend-build-swift-6.3-
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: timetrack-pwa/.node-version
           cache: npm
@@ -142,7 +142,7 @@ jobs:
         run: npm run test:e2e
       - name: Upload Playwright output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-real-backend
           path: |
