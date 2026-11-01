@@ -146,7 +146,7 @@ describe('mock calendar and plan', () => {
 
 	it('stores plan days per date', async () => {
 		await api.putPlanDay('2026-11-02', { mode: 'customer', note: 'Kunde A' });
-		expect((await api.listPlanDays('2026-11-01', '2026-11-07'))).toEqual([{ date: '2026-11-02', mode: 'customer', placeId: null, note: 'Kunde A', plannedStart: null, plannedEnd: null, plannedBreakMinutes: null, plannedSeconds: null }]);
+		expect((await api.listPlanDays('2026-11-01', '2026-11-07'))).toEqual([{ date: '2026-11-02', mode: 'customer', placeId: null, note: 'Kunde A', plannedStart: null, plannedEnd: null, plannedBreakMinutes: null, plannedSeconds: null, blocks: [], planHints: [] }]);
 		await api.deletePlanDay('2026-11-02');
 		expect(await api.listPlanDays('2026-11-01', '2026-11-07')).toEqual([]);
 		expect(await code(api.putPlanDay('2026-11-02', { mode: 'sick' as never }))).toBe('400:bad_request');
@@ -327,5 +327,22 @@ describe('absences, holidays and marks in time/days (C9 behaviour)', () => {
 		await api.createAbsence({ kind: 'sick', startDate: '2026-10-13', endDate: '2026-10-13', status: 'taken' });
 		const after = await api.getTimeAccount('2026-12-31');
 		expect(after.balanceSeconds - before.balanceSeconds).toBe(27720); // the target of the sick day no longer counts as missing
+	});
+});
+
+describe('mock absence status per kind (contract 0.36.0)', () => {
+	const input = (kind: AbsenceInput['kind'], status?: string): AbsenceInput => ({ kind, startDate: '2026-11-02', endDate: '2026-11-02', ...(status ? { status } : {}) });
+
+	it('defaults the status by kind when it is omitted', async () => {
+		expect((await api.createAbsence(input('sick'))).status).toBe('recorded');
+		expect((await api.createAbsence({ ...input('vacation'), startDate: '2026-11-03', endDate: '2026-11-03' })).status).toBe('planned');
+	});
+
+	it('normalises the old workflow statuses for other kinds and rejects invalid combinations', async () => {
+		expect((await api.createAbsence(input('sick', 'taken'))).status).toBe('recorded');
+		expect((await api.createAbsence({ ...input('other', 'requested'), startDate: '2026-11-04', endDate: '2026-11-04' })).status).toBe('planned');
+		expect(await code(api.createAbsence({ ...input('vacation', 'recorded'), startDate: '2026-11-05', endDate: '2026-11-05' }))).toBe('400:absence_status_invalid_for_kind');
+		expect(await code(api.createAbsence({ ...input('sick', 'rejected'), startDate: '2026-11-06', endDate: '2026-11-06' }))).toBe('400:absence_status_invalid_for_kind');
+		expect(await code(api.createAbsence({ ...input('sick', 'bogus'), startDate: '2026-11-09', endDate: '2026-11-09' }))).toBe('400:bad_request');
 	});
 });

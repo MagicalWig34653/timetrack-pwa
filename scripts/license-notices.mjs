@@ -4,12 +4,49 @@ import path from 'node:path';
 const LICENSE_FILE = /^(LICENSE|LICENCE|COPYING)(\.|$)/i;
 const NOTICE_FILE = /^NOTICE(\.|$)/i;
 
-/** Collect packages that ship in the browser: runtime dependencies and the bundled Inter font.
+const SOURCE_FILE = /\.(ts|js|mjs|svelte|css)$/;
+const TEST_FILE = /\.(test|spec)\.[a-z]+$/;
+// Specifiers in `from '…'`, side-effect `import '…'`, dynamic `import('…')` and CSS `@import '…'`.
+const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|@import\s+(?:url\()?\s*)['"]([^'"]+)['"]/g;
+// Packages whose runtime is compiled into every bundle without a bare import in src/ (Svelte and SvelteKit client runtime).
+const IMPLICIT_RUNTIME = ['svelte', '@sveltejs/kit', 'clsx', 'esm-env', 'devalue'];
+// Packages whose own dependencies are build-/server-side only (the static SPA bundles just the client runtime; the CSS packages contribute stylesheets only).
+const NO_TRANSITIVE = new Set(['svelte', '@sveltejs/kit', 'shadcn-svelte', 'tailwindcss', 'tw-animate-css']);
+
+/** @param {string} dir @param {string[]} out */
+function sourceFiles(dir, out = []) {
+	for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+		const file = path.join(dir, entry.name);
+		if (entry.isDirectory()) sourceFiles(file, out);
+		else if (SOURCE_FILE.test(entry.name) && !TEST_FILE.test(entry.name)) out.push(file);
+	}
+	return out;
+}
+
+/** Package names imported by the application sources (conservative: includes type-only imports, excludes tests).
+ * @param {string} root
+ */
+export function importedPackages(root) {
+	const names = new Set(IMPLICIT_RUNTIME);
+	for (const file of sourceFiles(path.join(root, 'src'))) {
+		for (const match of fs.readFileSync(file, 'utf8').matchAll(SPECIFIER)) {
+			const specifier = match[1];
+			if (/^(\.|#|\$|\/|node:|https?:|data:)/.test(specifier)) continue;
+			const parts = specifier.split('/');
+			const name = specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+			if (fs.existsSync(path.join(root, 'node_modules', name, 'package.json'))) names.add(name);
+		}
+	}
+	return [...names].sort();
+}
+
+/** Collect packages that ship in the browser: runtime dependencies, the bundled Inter font and every package the
+ * application sources import (including devDependencies such as icons and class helpers that Vite bundles).
  * @param {string} root
  */
 export function generateLicenseNotices(root) {
 	const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-	const queue = [...Object.keys(manifest.dependencies ?? {}), '@fontsource-variable/inter'];
+	const queue = [...Object.keys(manifest.dependencies ?? {}), '@fontsource-variable/inter', ...importedPackages(root)];
 	const packages = new Map();
 	while (queue.length) {
 		const name = queue.shift();
@@ -18,12 +55,12 @@ export function generateLicenseNotices(root) {
 		const directory = path.join(root, 'node_modules', name);
 		const metadata = JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8'));
 		packages.set(name, { directory, metadata });
-		queue.push(...Object.keys(metadata.dependencies ?? {}));
+		if (!NO_TRANSITIVE.has(name)) queue.push(...Object.keys(metadata.dependencies ?? {}));
 	}
 	const sections = [
 		'Timetrack – Hinweise zu Drittanbieter-Lizenzen',
 		'Diese Datei wird beim Build aus den installierten Paketmetadaten und Lizenzdateien erstellt.',
-		'Enthalten sind die Laufzeitabhängigkeiten und die ausgelieferte Schrift Inter.'
+		'Enthalten sind die Laufzeitabhängigkeiten, die im Browser gebündelten Pakete und die ausgelieferte Schrift Inter.'
 	];
 	for (const [name, { directory, metadata }] of [...packages].sort(([a], [b]) => a.localeCompare(b))) {
 		const files = fs.readdirSync(directory);

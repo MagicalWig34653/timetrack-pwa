@@ -18,7 +18,8 @@
 		['Strg/Cmd + Z', 'cal.sc.undo'],
 		['Strg/Cmd + Shift + Z', 'cal.sc.redo'],
 		['T', 'cal.sc.today'],
-		['M / W', 'cal.sc.view'],
+		['M / J', 'cal.sc.view'],
+		['W', 'cal.sc.open_week'],
 		['Kontexttaste / Shift + F10', 'cal.sc.menu'],
 		['?', 'cal.sc.help']
 	];

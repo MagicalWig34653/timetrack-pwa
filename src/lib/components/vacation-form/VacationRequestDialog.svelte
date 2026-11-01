@@ -2,6 +2,7 @@
 	import type { AbsenceStatus } from '#lib/api/types.js';
 
 	export interface RequestTarget {
+		id?: string;
 		startDate: string;
 		endDate: string;
 		halfDayStart?: boolean;
@@ -17,6 +18,7 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
+	import { absenceStatusLabel } from '#lib/planning/labels.js';
 	import { formatDateNumeric } from '#lib/time/dates.js';
 	import { todayLocal } from '#lib/time/dates.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
@@ -99,7 +101,8 @@
 					halfDayEnd: current.halfDayEnd,
 					today: todayLocal(zone),
 					...sources,
-					inBalance: current.status !== 'cancelled' && current.status !== 'rejected'
+					inBalance: current.status !== 'cancelled' && current.status !== 'rejected',
+					targetId: current.id
 				});
 				phase = 'form';
 				closeButton?.focus();
@@ -196,6 +199,56 @@
 						<dd class="text-xl font-semibold tabular-nums" data-testid="request-rest">{formatDaysDe(data.restBeforeHalfDays / 2)} / {formatDaysDe(data.restAfterHalfDays / 2)}</dd>
 					</div>
 				</dl>
+				{#if data.breakdown}
+					{@const b = data.breakdown}
+					<div class="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-sm tabular-nums" data-testid="request-breakdown">
+						<p class="font-medium">{t('vform.bd.title')}</p>
+						<dl class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+							<dt>{t('vform.bd.entitlement')}</dt><dd class="text-right">{formatDaysDe(b.entitlementTotalHalfDays / 2)}</dd>
+						</dl>
+						<div>
+							<p class="text-muted-foreground">{t('vform.bd.before_title')}</p>
+							{#if b.before.length === 0}
+								<p class="text-xs text-muted-foreground" data-testid="request-before-none">{t('vform.bd.before_none')}</p>
+							{:else}
+								<ul class="mt-1 flex flex-col gap-0.5" data-testid="request-before-list">
+									{#each b.before as block, index (`${block.id}-${index}`)}
+										<li class="grid grid-cols-[1fr_auto] gap-x-4" data-testid="request-before-item">
+											<span>{rangeText({ from: block.from, to: block.to })} <span class="text-muted-foreground">({absenceStatusLabel(block.status)}{block.partial ? `, ${t('vform.bd.partial')}` : ''})</span></span>
+											<span class="text-right">- {formatDaysDe(block.halfDays / 2)}</span>
+										</li>
+									{/each}
+								</ul>
+								<p class="mt-1 grid grid-cols-[1fr_auto] gap-x-4 font-medium"><span>{t('vform.bd.before_sum')}</span><span class="text-right" data-testid="request-before-sum">- {formatDaysDe(b.consumedBeforeHalfDays / 2)}</span></p>
+							{/if}
+						</div>
+						<dl class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+							<dt class="font-medium">{t('vform.bd.this_request')}</dt><dd class="text-right font-medium">- {formatDaysDe(b.requestHalfDays / 2)}</dd>
+							<dt class="font-medium">{t('vform.bd.rest_at_request')}</dt><dd class="text-right font-medium" data-testid="request-rest-at">{formatDaysDe(b.restBeforeHalfDays / 2)} / {formatDaysDe(b.restAfterHalfDays / 2)}</dd>
+						</dl>
+						{#if b.later.length > 0}
+							<div>
+								<p class="text-muted-foreground">{t('vform.bd.later_title')}</p>
+								<ul class="mt-1 flex flex-col gap-0.5" data-testid="request-later-list">
+									{#each b.later as block, index (`${block.id}-${index}`)}
+										<li class="grid grid-cols-[1fr_auto] gap-x-4" data-testid="request-later-item">
+											<span>{rangeText({ from: block.from, to: block.to })} <span class="text-muted-foreground">({absenceStatusLabel(block.status)}{block.partial ? `, ${t('vform.bd.partial')}` : ''})</span></span>
+											<span class="text-right text-muted-foreground">{formatDaysDe(block.halfDays / 2)}</span>
+										</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+						<dl class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+							<dt class="text-muted-foreground">{t('vform.bd.rest_year_end')}</dt><dd class="text-right text-muted-foreground" data-testid="request-rest-year-end">{formatDaysDe(b.restYearEndHalfDays / 2)}</dd>
+						</dl>
+						{#if b.overlapping.length > 0}
+							<p class="text-xs text-muted-foreground" data-testid="request-overlap">{t('vform.bd.overlap', { ranges: b.overlapping.map((block) => rangeText({ from: block.from, to: block.to })).join(', ') })}</p>
+						{/if}
+						{#if !b.blocksKnown}<p class="text-xs text-muted-foreground" data-testid="request-blocks-unknown">{t('vform.bd.unknown')}</p>{/if}
+					</div>
+					<p class="text-xs text-muted-foreground">{t('vform.bd.note')}</p>
+				{/if}
 				<p class="text-xs text-muted-foreground">{t('vform.dialog_stale_balance', { year: data.from.slice(0, 4) })}</p>
 
 				<div class="flex flex-col gap-1.5">

@@ -1,20 +1,27 @@
 import { deAccounts } from './de-accounts';
 import { deCalendar } from './de-calendar';
+import { deCalendarFeeds } from './de-calendar-feeds';
+import { deCompanyDays } from './de-company-days';
 import { deDesign } from './de-design';
 import { deErrors } from './de-errors';
+import { deApns } from './de-apns';
 import { deMail } from './de-mail';
 import { deMcp } from './de-mcp';
+import { deN2 } from './de-n2';
+import { deV6 } from './de-v6';
 import { deModules } from './de-modules';
 import { deOidc } from './de-oidc';
 import { dePlanning } from './de-planning';
 import { deProfile } from './de-profile';
 import { dePwa } from './de-pwa';
 import { deReports } from './de-reports';
+import { deGroups } from './de-groups';
 import { deTrigger } from './de-trigger';
 import { deTransfer } from './de-transfer';
 import { deVacationForm } from './de-vacation-form';
 import { deVacationPlanner } from './de-vacation-planner';
 import { deP12 } from './de-p12';
+import { deP13 } from './de-p13';
 import { deWeek } from './de-week';
 import { deWeekGrid } from './de-weekgrid';
 import { deWorktime } from './de-worktime';
@@ -24,10 +31,15 @@ import { deWorktime } from './de-worktime';
 export const de = {
 	...deAccounts,
 	...deCalendar,
+	...deCalendarFeeds,
+	...deCompanyDays,
 	...deDesign,
 	...deErrors,
 	...deMail,
+	...deApns,
 	...deMcp,
+	...deN2,
+	...deV6,
 	...deModules,
 	...deOidc,
 	...dePlanning,
@@ -36,12 +48,14 @@ export const de = {
 	...deReports,
 	...deTransfer,
 	...deTrigger,
+	...deGroups,
 	...deVacationForm,
 	...deVacationPlanner,
 	...deWorktime,
 	...deWeek,
 	...deWeekGrid,
 	...deP12,
+	...deP13,
 	'app.name': 'Timetrack',
 
 	'common.loading': 'Wird geladen …',
@@ -86,14 +100,14 @@ export const de = {
 	'invite.handle_invalid': 'Nur Kleinbuchstaben, Ziffern sowie . _ - erlaubt (3 bis 32 Zeichen, beginnt mit Buchstabe oder Ziffer).',
 	'invite.display_name': 'Anzeigename',
 	'invite.email': 'E-Mail-Adresse (optional)',
-	'invite.email_hint': 'Wird erst nach Bestätigung für die Wiederherstellung genutzt.',
+	'invite.email_hint': 'Deine Kontomail; nach Bestätigung kann sie auch für die Wiederherstellung per E-Mail genutzt werden.',
 	'invite.passkey_name': 'Name des Passkeys (optional)',
 	'invite.passkey_name_hint': 'Zum Beispiel „MacBook“ oder „iPhone“.',
 	'invite.submit': 'Passkey erstellen und Konto anlegen',
 	'invite.waiting': 'Warte auf Passkey …',
 
 	'setup.title': 'Wiederherstellung einrichten',
-	'setup.description': 'Richte mindestens eine Möglichkeit ein, um wieder ins Konto zu kommen, falls dein Passkey verloren geht.',
+	'setup.description': 'Richte mindestens eine Möglichkeit ein, um wieder ins Konto zu kommen, falls dein Passkey verloren geht. Die Wiederherstellung per E-Mail nutzt deine Kontomail aus dem Profil.',
 	'setup.none_warning': 'Ohne Wiederherstellungsmethode ist dein Konto nicht mehr erreichbar, wenn du alle Passkeys verlierst.',
 	'setup.finish': 'Fertig',
 	'setup.skip': 'Später einrichten',
@@ -164,11 +178,17 @@ export const de = {
 	'recovery.password.saved': 'Rückfallpasswort gespeichert.',
 	'recovery.password.removed': 'Rückfallpasswort entfernt.',
 	'recovery.email.title': 'E-Mail-Code',
-	'recovery.email.description': 'Wir senden einen Code an deine bestätigte Adresse.',
+	'recovery.email.description': 'Wir senden einen Code an deine Kontomail. Eine eigene Wiederherstellungsadresse gibt es nicht.',
 	'recovery.email.unavailable': 'Auf diesem Server ist der E-Mail-Versand nicht eingerichtet. Diese Methode ist nicht verfügbar.',
-	'recovery.email.address': 'E-Mail-Adresse',
+	'recovery.email.uses_account_mail': 'Wiederherstellungs-Codes werden an deine Kontomail gesendet ({email}).',
+	'recovery.email.profile_link': 'Im Profil ändern',
+	'recovery.email.no_account_mail': 'Du hast noch keine Kontomail. Hinterlege sie zuerst im Profil, dann kannst du die Wiederherstellung per E-Mail einschalten.',
+	'recovery.email.add_in_profile': 'Kontomail im Profil hinterlegen',
+	'recovery.email.unconfirmed': 'Deine Kontomail ist noch nicht bestätigt. Bestätige sie zuerst im Profil.',
+	'recovery.email.confirm_in_profile': 'Zum Profil',
+	'recovery.email.enable': 'Per E-Mail wiederherstellen',
 	'recovery.email.send_code': 'Code senden',
-	'recovery.email.code_sent': 'Wir haben einen Bestätigungscode gesendet.',
+	'recovery.email.code_sent': 'Wir haben einen Bestätigungscode an deine Kontomail gesendet.',
 	'recovery.email.code_label': 'Bestätigungscode',
 	'recovery.email.verify': 'Bestätigen',
 	'recovery.email.verified': 'E-Mail-Wiederherstellung ist aktiv.',
@@ -225,6 +245,8 @@ export const de = {
 	'error.not_found': 'Nicht gefunden.',
 	'error.conflict': 'Das ist im aktuellen Zustand nicht möglich.',
 	'error.handle_taken': 'Dieser Kontoname ist bereits vergeben.',
+	'error.account_email_missing': 'Es ist noch keine Kontomail hinterlegt. Trage sie zuerst im Profil ein.',
+	'error.recovery_email_must_be_account_email': 'Die Wiederherstellung nutzt die Kontomail. Ändere die Adresse im Profil.',
 	'error.last_passkey': 'Der letzte Passkey kann nur widerrufen werden, wenn eine Wiederherstellungsmethode aktiv ist.',
 	'error.too_many_requests': 'Zu viele Versuche. Bitte warte einen Moment.',
 	'error.not_implemented': 'Diese Funktion ist auf diesem Server nicht eingerichtet.',
@@ -291,6 +313,18 @@ export const de = {
 	'hint.title': 'Hinweis zu Pausen',
 	'hint.break_missing_30': 'Mehr als 6 Stunden Arbeit, aber insgesamt weniger als 30 Minuten Pause erfasst.',
 	'hint.break_missing_45': 'Mehr als 9 Stunden Arbeit, aber insgesamt weniger als 45 Minuten Pause erfasst.',
+	'hint.break_missing_60': 'Mehr als 6 Stunden Arbeit, aber insgesamt weniger als 60 Minuten Pause erfasst.',
+	'hint.work_over_4h30_without_break': 'Mehr als 4 Stunden 30 Minuten am Stück ohne Pause erfasst.',
+	'hint.all_title': 'Hinweise zu Arbeitszeit und Pausen',
+	'legal.profile.arbzg-adult-de': 'Erwachsene (ArbZG)',
+	'legal.profile.jarbschg-minor-de': 'Jugendliche (JArbSchG)',
+	'legal.warning.daily_limit': 'Die tägliche Arbeitszeit überschreitet die Grenze dieses Profils.',
+	'legal.warning.weekly_limit': 'Die wöchentliche Arbeitszeit überschreitet die Grenze dieses Profils; ausgefallene Arbeitszeit an Feiertagen kann mitgezählt sein.',
+	'legal.warning.five_day_week': 'Mehr als fünf Arbeitstage in dieser Woche erfasst.',
+	'legal.warning.rest_period': 'Die Ruhezeit zwischen zwei Arbeitstagen ist zu kurz.',
+	'legal.warning.weekend_work': 'Arbeit am Wochenende prüfen; Ausnahmen können gelten.',
+	'legal.warning.work_after_full_school_day': 'Arbeit an einem angerechneten vollen Berufsschultag erfasst.',
+	'legal.warning.work_before_school': 'Arbeit vor 9 Uhr an einem Berufsschultag erfasst.',
 	'hint.break_part_too_short': 'Pausen unter 15 Minuten zählen nicht als Pausenanteil.',
 	'hint.work_over_6h_without_break': 'Mehr als 6 Stunden am Stück ohne Pause erfasst.',
 	'hint.disclaimer': 'Nur ein Hinweis auf Basis der tatsächlichen Zeiten, keine Rechtsprüfung. Es werden keine Pausen angenommen oder ergänzt.',
@@ -321,7 +355,9 @@ export const de = {
 	'home.balance': 'Zeitkonto',
 	'home.balance_since': 'Seit {date}',
 	'home.balance_no_start': 'Noch kein Anfangsstand festgelegt.',
-	'home.balance_provisional': 'vorläufig, heutiger Tag läuft noch',
+	'home.balance_provisional': 'vorläufig, ein abgeschlossener Tag ist noch nicht endgültig bewertet',
+	'account.today_note': 'Heute: {delta}, fließt morgen ein',
+	'account.without_today': 'Stand bis gestern, ohne den laufenden Tag',
 	'home.balance_manage': 'Zeitkonto verwalten',
 	'home.suggestions_open': 'Offene Vorschläge: {count}',
 	'home.suggestions_review': 'Ansehen',
@@ -340,7 +376,13 @@ export const de = {
 	'segments.empty': 'Keine Einträge.',
 	'segments.pause': 'Pause {duration}',
 	'segments.voided': 'Storniert',
-	'segments.needs_review': 'Prüfen',
+	'segments.needs_review': 'Zu prüfen',
+	'segments.mark_reviewed': 'Als geprüft markieren',
+	'segments.review_reason': 'Geprüft',
+	'segments.review_saved': 'Eintrag als geprüft markiert.',
+	'segments.review_overview': '{count} Einträge dieser Woche sind zu prüfen.',
+	'segments.show_review_only': 'Nur zu prüfende Tage zeigen',
+	'segments.show_all': 'Alle Tage zeigen',
 	'segments.raw': 'Roh: {range}',
 	'segments.revisions': '{count} Korrektur(en)',
 	'place.archived_or_unknown': 'Unbekannter Ort',
@@ -423,11 +465,18 @@ export const de = {
 	'day_prefs.skip_breaks': 'Feste Pausen an diesem Tag nicht abziehen',
 	'day_prefs.note': 'Notiz zum Tag',
 	'day_prefs.note_hint': 'Höchstens 200 Zeichen. Leer lassen, um die gespeicherte Notiz nicht zu ändern.',
+	'day_prefs.school_lessons': 'Unterrichtsstunden',
+	'day_prefs.school_lessons_hint': 'Anzahl der Unterrichtsstunden mit mindestens 45 Minuten; nicht aus der erfassten Schulzeit geschätzt.',
+	'day_prefs.school_lessons_invalid': 'Bitte gib 0 bis 20 Unterrichtsstunden an.',
 	'day_prefs.saved': 'Tageseinstellungen gespeichert.',
 
 	'work_model.title': 'Arbeitsmodell',
 	'work_model.description': 'Soll, Rundung, Schule und feste Pausen. Ändere ab einem Stichtag (neue Version) oder korrigiere eine Version, wenn ein Wert falsch war.',
 	'work_model.history_note': 'Bestehende Versionen werden nie verändert, solange du „Ab einem Datum ändern“ wählst; nur „Diese Version korrigieren“ überschreibt sie (mit Vorschau). Eine neue Version gilt ab ihrem Startdatum, die laufende Vorversion endet am Vortag. Bereits bewertete Tage vor dem Startdatum bleiben unverändert, so bleibt die Historie (zum Beispiel nach dem Ausbildungsende) erhalten.',
+	'work_model.legal_profile': 'Rechtsprofil',
+	'work_model.legal_profile_hint': 'Das gewählte Profil gilt ab dem Startdatum dieser Modellversion. Ein späterer Wechsel braucht eine neue Version.',
+	'work_model.legal_disclaimer': 'Informative Hinweise, keine Rechtsberatung. Ausnahmen und besondere Fälle bitte gesondert prüfen.',
+	'work_model.legal_sources': 'Quellen',
 	'work_model.empty': 'Noch kein Arbeitsmodell angelegt. Ohne Modell gibt es kein Tages-Soll.',
 	'work_model.current': 'Aktuell',
 	'work_model.future': 'Geplant',
@@ -529,6 +578,11 @@ export const de = {
 	'places.archive_text': 'Der Ort wird archiviert. Bestehende Einträge behalten ihre Zuordnung.',
 	'places.archive_confirm': 'Archivieren',
 	'places.archived': 'Ort archiviert.',
+	'places.archived_title': 'Archivierte Orte',
+	'places.archived_text': 'Archivierte Orte erscheinen nicht mehr in der Auswahl. Bestehende Einträge behalten ihre Zuordnung. Du kannst einen Ort jederzeit wiederherstellen.',
+	'places.restore': 'Wiederherstellen',
+	'places.restore_aria': '{name} wiederherstellen',
+	'places.restored': 'Ort wiederhergestellt.',
 	'places.created': 'Ort angelegt.',
 	'places.updated': 'Ort gespeichert.',
 	'places.name': 'Name',
@@ -571,6 +625,15 @@ export const de = {
 	'account_time.correction_value': 'Korrektur (h:mm)',
 	'account_time.correction_save': 'Korrektur speichern',
 	'account_time.correction_saved': 'Korrektur gespeichert.',
+	'account_time.history': 'Anfangsstand und Korrekturverlauf',
+	'account_time.history_empty': 'Noch keine Anpassungen erfasst.',
+	'account_time.kind.opening': 'Anfangsstand',
+	'account_time.kind.correction': 'Korrektur',
+	'account_time.delete': 'Löschen',
+	'account_time.delete_confirm': 'Diese Zeitkonto-Anpassung wirklich löschen? Der Saldo wird neu berechnet.',
+	'account_time.deleted': 'Anpassung gelöscht und Saldo neu berechnet.',
+	'account_time.previous': 'Zurück',
+	'account_time.next': 'Weiter',
 	'account_time.error_date': 'Bitte gib ein gültiges Datum an.',
 	'account_time.error_value': 'Bitte gib die Dauer als h:mm an, zum Beispiel 1:30 oder -0:45.',
 

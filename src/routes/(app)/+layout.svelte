@@ -10,6 +10,7 @@
 	import HelpDialog from '#lib/components/shell/HelpDialog.svelte';
 	import SidebarNav from '#lib/components/shell/SidebarNav.svelte';
 	import TopBar from '#lib/components/shell/TopBar.svelte';
+	import { sectionShell } from '#lib/nav.js';
 	import { moduleOfPath } from '#lib/modules/map.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { openSuggestions } from '#lib/notifications/open-suggestions.svelte.js';
@@ -39,6 +40,11 @@
 		if (polling && moduleStore.enabled('automation')) void openSuggestions.refresh();
 		else openSuggestions.reset();
 	});
+
+	// Pages of one section keep the section shell (settings nav) mounted: only the page body below is re-created per route.
+	// A key on the full pathname would rebuild the shell nav too (its scroll position and focus got lost on every click, J2).
+	const planRoute = $derived(page.url.pathname === '/plan');
+	const shellKey = $derived(sectionShell(page.url.pathname) ?? page.url.pathname);
 
 	let menuOpen = $state(false);
 	let helpOpen = $state(false);
@@ -100,12 +106,13 @@
 
 	<div class="menu:pl-64">
 		<TopBar {polling} {menuOpen} onmenu={() => (menuOpen = true)} onsignout={signOut} />
-		<main class="app-sheet mx-auto w-full max-w-[1240px] px-4 py-[22px] menu:px-6 menu:py-6 wide:px-10 wide:py-9">
+		<!-- U6: the planner uses the full width and less padding on landscape desktops, the grid needs every pixel. -->
+		<main class="app-sheet mx-auto w-full max-w-[1240px] px-4 py-[22px] menu:px-6 menu:py-6 wide:px-10 wide:py-9 {planRoute ? 'fit:max-w-none! fit:px-5! fit:py-4!' : ''}">
 			{#if blockedBy}
 				<ModuleDisabled module={blockedBy} />
 			{:else}
 				<!-- A render/effect error in one page must not blank the shell: show the error panel with a retry (E1). Reset per route. -->
-				{#key page.url.pathname}
+				{#key shellKey}
 					<svelte:boundary onerror={(error) => console.error(error)}>
 						{@render children()}
 						{#snippet failed(_error, reset)}

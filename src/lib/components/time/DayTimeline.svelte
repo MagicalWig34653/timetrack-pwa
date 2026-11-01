@@ -2,7 +2,7 @@
 	import type { DayEvaluation, Segment } from '#lib/api/types.js';
 	import { t } from '#lib/i18n/index.js';
 	import { dayBounds, localTimeOf } from '#lib/time/dates.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { kindLabel } from '#lib/time/labels.js';
 
 	let {
@@ -95,10 +95,10 @@
 						<div
 							class="absolute inset-y-1 flex items-center justify-center overflow-hidden rounded-sm border border-dashed border-muted-foreground/50 text-[10px] text-muted-foreground"
 							style={box(gap.start, gap.end)}
-							title={t('timeline.pause', { duration: formatDuration((gap.end - gap.start) / 1000) })}
+							title={t('timeline.pause', { duration: timeDisplay.duration((gap.end - gap.start) / 1000) })}
 							data-testid="timeline-gap"
 						>
-							<span class="hidden sm:inline">{formatDuration((gap.end - gap.start) / 1000)}</span>
+							<span class="hidden sm:inline">{timeDisplay.duration((gap.end - gap.start) / 1000)}</span>
 						</div>
 					{/each}
 					{#each evaluated as e (e.s.id)}

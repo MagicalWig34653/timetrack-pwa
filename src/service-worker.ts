@@ -4,7 +4,7 @@
 /// <reference lib="webworker" />
 import { version } from '$app/env';
 import { assets, immutable } from '$app/manifest';
-import { base64urlToBytes, cacheNameFor, isInterceptable, isOldCache, isUsableAssetResponse, offlineUrlFor, parsePushPayload, safeRelativeUrl } from './lib/pwa/core';
+import { base64urlToBytes, cacheNameFor, isGroupPagePath, isInterceptable, isOldCache, isUsableAssetResponse, offlineUrlFor, parsePushPayload, safeRelativeUrl } from './lib/pwa/core';
 import { handleSubscriptionChange, type SubscriptionLike } from './lib/pwa/subscription-change';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
@@ -74,6 +74,8 @@ async function navigate(request: Request, url: URL): Promise<Response> {
 		const cache = await caches.open(CACHE);
 		const shell = await cache.match(SHELL);
 		if (url.pathname === OFFLINE_PATH && shell) return shell;
+		// a public group link keeps its address: the page itself reports that the data cannot be loaded (no token in /offline?from=...)
+		if (isGroupPagePath(url.pathname) && shell) return shell;
 		// remember the requested page so the offline page can send the user back there
 		if (shell) return Response.redirect(sw.location.origin + offlineUrlFor(url.pathname + url.search), 302);
 		// No shell cached (install never completed, cache evicted): never redirect into a loop, show the static page instead.

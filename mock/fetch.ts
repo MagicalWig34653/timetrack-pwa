@@ -41,7 +41,8 @@ export function createMockFetch(options?: MockOptions) {
 			cookies: sessionCookie ? { tt_session: sessionCookie } : {},
 			csrfToken,
 			ifMatch: headers.get('If-Match') ?? undefined,
-			authorization: headers.get('Authorization') ?? undefined
+			authorization: headers.get('Authorization') ?? undefined,
+			editSecret: headers.get('X-Edit-Secret') ?? undefined
 		});
 		if (result.sessionCookie !== undefined) sessionCookie = result.sessionCookie;
 		if (result.redirect) return new Response(null, { status: result.status, headers: { Location: result.redirect } });

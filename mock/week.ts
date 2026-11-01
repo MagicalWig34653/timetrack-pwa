@@ -2,7 +2,7 @@
 // They are composed from the time and planning mocks (day evaluations, account, absences, plan days), like the backend composes
 // them from the day evaluation, so the numbers always agree with /time/days and /time/account.
 import { addDays, DEFAULT_TIMEZONE, isoWeekday, isoWeekLabel, localMinutesOf, mondayOfIsoWeek, todayLocal } from '../src/lib/time/dates.ts';
-import type { Absence, DayEvaluation, PlanBlock, PlanDay, PlanWeek, PlanWeekDay, Segment, TimeAccount, TimeWeek, TimeWeekDay, WeekMark } from '../src/lib/api/types.ts';
+import type { Absence, CalendarDay, DayEvaluation, PlanBlock, PlanDay, PlanWeek, PlanWeekDay, Segment, TimeAccount, TimeWeek, TimeWeekDay, WeekMark } from '../src/lib/api/types.ts';
 import { normalizePlanBody, plannedSecondsOf } from './planning.ts';
 
 export interface WeekResponse {
@@ -14,7 +14,7 @@ type Caller = (accountId: string, method: string, path: string, body?: unknown) 
 const fail = (status: number, code: string): WeekResponse => ({ status, body: { error: { code, message: code } } });
 const ok = (body: unknown): WeekResponse => ({ status: 200, body });
 const BLOCKING = ['holiday', 'vacation', 'sick', 'excused'];
-const ACTIVE = ['planned', 'requested', 'approved', 'taken'];
+const ACTIVE = ['planned', 'requested', 'approved', 'taken', 'recorded'];
 
 export function createWeekMock(deps: { clock: () => number; time: Caller; planning: Caller; planningEnabled: (accountId: string) => boolean }) {
 	const get = <T>(caller: Caller, accountId: string, path: string, fallback: T): T => {
@@ -87,6 +87,16 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 		const plans = new Map(planning ? get<PlanDay[]>(deps.planning, accountId, `plan/days?from=${monday}&to=${sunday}`, []).map((p) => [p.date, p]) : []);
 		const absences = planning ? get<Absence[]>(deps.planning, accountId, `absences?from=${monday}&to=${sunday}`, []) : [];
 
+		// holiday names and company-day treatment (contract 0.31.0/0.32.0), visible on free days too
+		const holidayByDate = new Map<string, { name: string; treatment: 'half' | 'full' | null }>();
+		if (planning) {
+			for (const year of new Set([Number(monday.slice(0, 4)), Number(sunday.slice(0, 4))])) {
+				for (const h of get<CalendarDay[]>(deps.planning, accountId, `calendar/holidays?year=${year}`, [])) {
+					if (h.kind !== 'holiday') continue;
+					for (let d = h.startDate; d <= h.endDate; d = addDays(d, 1)) holidayByDate.set(d, { name: h.name, treatment: h.companyTreatment ?? null });
+				}
+			}
+		}
 		const days: TimeWeekDay[] = evaluations.map((ev) => {
 			const own = segments.filter((s) => ev.segmentIds.includes(s.id)).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
 			let travel = 0;
@@ -111,10 +121,20 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 				date: ev.date,
 				weekday: isoWeekday(ev.date),
 				mark,
+				holidayName: holidayByDate.get(ev.date)?.name ?? null,
+				companyDayTreatment: holidayByDate.get(ev.date)?.treatment ?? null,
+				legalProfileId: ev.legalProfileId,
+				legalWarnings: ev.legalWarnings,
+				breakHints: ev.breakHints,
+				schoolLessonCount: ev.schoolLessonCount,
 				markSource: ev.markSource ?? 'none',
 				targetSeconds: ev.targetSeconds,
 				plannedSeconds: blocked ? (plan ? 0 : null) : (plan?.plannedSeconds ?? null),
 				planMode: plan?.mode ?? null,
+				planBlocks: plan ? (plan.blocks ?? []) : null,
+				planHints: plan?.planHints ?? [],
+				// evaluated work + credit - effective planned seconds; null on future or blocked days and without a planned duration
+				planActualDifferenceSeconds: future || blocked || plan?.plannedSeconds == null ? null : ev.evaluatedWorkSeconds + ev.creditSeconds - plan.plannedSeconds,
 				workSeconds: ev.evaluatedWorkSeconds,
 				creditSeconds: ev.creditSeconds,
 				rawWorkSeconds: ev.rawWorkSeconds,
@@ -135,7 +155,7 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 			};
 		});
 
-		const accountAt = (asOf: string) => get<TimeAccount>(deps.time, accountId, `time/account?asOf=${asOf}`, { asOf, balanceSeconds: 0, openingSeconds: 0, adjustmentSeconds: 0, provisional: false });
+		const accountAt = (asOf: string) => get<TimeAccount>(deps.time, accountId, `time/account?asOf=${asOf}`, { asOf, balanceSeconds: 0, openingSeconds: 0, adjustmentSeconds: 0, provisional: false, includesToday: false, todayDeltaSeconds: null });
 		const before = accountAt(addDays(monday, -1));
 		const after = accountAt(sunday);
 		const worked = days.filter((d) => d.workSeconds > 0);
@@ -153,10 +173,13 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 			days,
 			summary: {
 				targetSeconds: days.reduce((s, d) => s + d.targetSeconds, 0),
-				targetToDateSeconds: days.filter((d) => !d.isFuture).reduce((s, d) => s + d.targetSeconds, 0),
+				targetToDateSeconds: days.filter((d) => !d.isFuture && !d.isToday).reduce((s, d) => s + d.targetSeconds, 0),
 				workSeconds: days.reduce((s, d) => s + d.workSeconds, 0),
 				creditSeconds: days.reduce((s, d) => s + d.creditSeconds, 0),
-				balanceSeconds: days.reduce((s, d) => s + (d.balanceSeconds ?? 0), 0),
+				// contract 0.36.0: completed days only; today's difference is reported separately
+				balanceSeconds: days.filter((d) => !d.isToday).reduce((s, d) => s + (d.balanceSeconds ?? 0), 0),
+				includesToday: false,
+				todayDeltaSeconds: days.find((d) => d.isToday)?.balanceSeconds ?? null,
 				plannedSeconds: hasPlan ? days.reduce((s, d) => s + (d.plannedSeconds ?? 0), 0) : null,
 				accountBalanceBeforeSeconds: before.balanceSeconds,
 				accountBalanceAfterSeconds: after.balanceSeconds,

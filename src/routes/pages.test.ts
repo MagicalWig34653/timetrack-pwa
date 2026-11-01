@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockFetch } from '../../mock/fetch.ts';
-import { setCsrfToken } from '#lib/api/client.js';
+import { api, setCsrfToken } from '#lib/api/client.js';
 import { sessionStore } from '#lib/session.svelte.js';
 
 const goto = vi.hoisted(() => vi.fn());
@@ -145,6 +145,29 @@ describe('recovery settings', () => {
 		await userEvent.click(screen.getByRole('checkbox'));
 		await userEvent.click(done);
 		expect(screen.queryByText(/nur jetzt angezeigt/)).not.toBeInTheDocument();
+	});
+
+	it('uses the account e-mail as the only recovery address: no address input, link to the profile', async () => {
+		await signInAsAdmin();
+		await api.requestEmailChange('konto@example.org');
+		await api.verifyEmailChange('123456');
+		render(RecoveryManager);
+		expect(await screen.findByTestId('recovery-account-email')).toHaveTextContent('Wiederherstellungs-Codes werden an deine Kontomail gesendet (konto@example.org).');
+		expect(screen.queryByLabelText('E-Mail-Adresse')).not.toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Im Profil ändern' })).toHaveAttribute('href', '/settings/profile');
+		// confirmed account mail: active at once (204), no code entry
+		await userEvent.click(screen.getByTestId('recovery-email-enable'));
+		expect(await screen.findByText('E-Mail-Wiederherstellung ist aktiv.')).toBeInTheDocument();
+		expect(screen.queryByLabelText('Bestätigungscode')).not.toBeInTheDocument();
+	});
+
+	it('sends users without an account e-mail to the profile first', async () => {
+		await signInAsAdmin();
+		await api.removeProfileEmail();
+		render(RecoveryManager);
+		expect(await screen.findByTestId('recovery-no-account-email')).toBeInTheDocument();
+		expect(screen.getByTestId('recovery-profile-link')).toHaveAttribute('href', '/settings/profile');
+		expect(screen.queryByTestId('recovery-email-enable')).not.toBeInTheDocument();
 	});
 
 	it('hides the e-mail option when the server has no mail delivery', async () => {

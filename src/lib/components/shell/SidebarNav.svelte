@@ -116,7 +116,7 @@
 					<span class="rounded-full bg-ui-accent px-1.5 text-[11px] leading-[18px] font-semibold text-ui-accent-foreground tabular-nums" data-testid="nav-unread" aria-hidden="true">{unread.count > 99 ? '99+' : unread.count}</span>
 				{/if}
 			</a>
-			<a href="/settings/work-model" class={itemClass} aria-current={settingsActive && !accountActive ? 'page' : undefined} onclick={onnavigate}>
+			<a href="/settings" class={itemClass} aria-current={settingsActive && !accountActive ? 'page' : undefined} onclick={onnavigate}>
 				<Settings class="size-[18px] shrink-0" aria-hidden="true" />
 				<span>{t('nav.settings')}</span>
 			</a>

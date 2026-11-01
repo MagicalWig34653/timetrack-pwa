@@ -99,7 +99,11 @@ export interface RequestOptions {
 export interface RecoveryStatus {
 	recoveryCodes: { active: boolean; remaining?: number };
 	fallbackPassword: { active: boolean };
-	email: { available: boolean; active: boolean; verified?: boolean };
+	/**
+	 * Contract 0.36.0: the account e-mail is the only recovery address. `verified` means that address is confirmed;
+	 * `accountEmail` is null without one. Both are absent on older servers.
+	 */
+	email: { available: boolean; active: boolean; verified?: boolean; accountEmail?: string | null; usesAccountEmail?: boolean };
 }
 
 export type RecoveryMethod = 'email' | 'recovery-code' | 'fallback-password';
@@ -132,7 +136,24 @@ export type SegmentSource = 'timer' | 'manual' | 'automation' | 'suggestion' | '
 export type DayMarkKind = 'none' | 'holiday' | 'vacation' | 'sick' | 'excused' | 'school_credit';
 export type PlaceKind = 'office' | 'home' | 'customer' | 'school' | 'other';
 export type AutomationMode = 'direct' | 'suggest' | 'off';
-export type BreakHintCode = 'break_missing_30' | 'break_missing_45' | 'break_part_too_short' | 'work_over_6h_without_break';
+export type BreakHintCode = 'break_missing_30' | 'break_missing_45' | 'break_missing_60' | 'break_part_too_short' | 'work_over_6h_without_break' | 'work_over_4h30_without_break';
+export type LegalProfileId = 'arbzg-adult-de' | 'jarbschg-minor-de';
+export type LegalWarningCode = 'daily_limit' | 'weekly_limit' | 'five_day_week' | 'rest_period' | 'weekend_work' | 'work_after_full_school_day' | 'work_before_school';
+export interface LegalProfile {
+	id: LegalProfileId;
+	name: string;
+	maxDailySeconds: number | null;
+	maxWeeklySeconds: number | null;
+	maxWorkdaysPerWeek: number | null;
+	breakRules: { afterSeconds: number; requiredSeconds: number }[];
+	minimumBreakPartSeconds: number;
+	maximumContinuousSeconds: number;
+	minimumRestSeconds: number | null;
+	restrictedWeekdays: number[];
+	school?: { noWorkBeforeMinutes: number; fullDayLessons?: number; fullDayCreditSeconds?: number; fullDaysPerWeek?: number; blockWeekLessons?: number; blockWeekDays?: number; blockWeekCreditSeconds?: number } | null;
+	sources: string[];
+	informationalOnly: true;
+}
 
 export interface FixedBreak {
 	start: string;
@@ -140,6 +161,7 @@ export interface FixedBreak {
 }
 
 export interface WorkModelInput {
+	legalProfileId?: LegalProfileId;
 	validFrom: string;
 	validTo?: string | null;
 	timezone?: string;
@@ -202,6 +224,7 @@ export interface SegmentInput {
 }
 
 export interface SegmentCorrection {
+	needsReview?: false;
 	startedAt?: string;
 	endedAt?: string | null;
 	kind?: SegmentKind;
@@ -301,6 +324,9 @@ export interface TimeStatistics {
 	timezone: string;
 	accountStart?: string | null;
 	openingBalanceSeconds?: number | null;
+	includesToday?: boolean;
+	/** Difference of the running day; null when today is outside from..to. */
+	todayDeltaSeconds?: number | null;
 	buckets: StatisticsBucket[];
 	totals: {
 		targetSeconds: number;
@@ -346,9 +372,13 @@ export interface DayEvaluation {
 	targetOverrideSeconds?: number | null;
 	note?: string | null;
 	breakHints: { code: BreakHintCode }[];
+	legalProfileId?: LegalProfileId;
+	legalWarnings?: { code: LegalWarningCode }[];
+	schoolLessonCount?: number | null;
 }
 
 export interface DayPreferences {
+	schoolLessonCount?: number | null;
 	mark?: DayMarkKind;
 	creditSeconds?: number | null;
 	skipFixedBreaks?: boolean;
@@ -364,6 +394,10 @@ export interface TimeAccount {
 	openingSeconds: number;
 	adjustmentSeconds: number;
 	provisional: boolean;
+	/** Contract 0.36.0: always false, the running day is not in the balance. Absent on older servers (balance then includes today). */
+	includesToday?: boolean;
+	/** Difference of the running day (actual + credit - target); null when asOf is before today or the account has not started. */
+	todayDeltaSeconds?: number | null;
 }
 
 export interface AccountAdjustmentInput {
@@ -371,6 +405,18 @@ export interface AccountAdjustmentInput {
 	date: string;
 	seconds: number;
 	reason: string;
+}
+
+export interface AccountAdjustment extends AccountAdjustmentInput {
+	id: string;
+	createdAt: string;
+}
+
+export interface AccountAdjustmentPage {
+	items: AccountAdjustment[];
+	total: number;
+	limit: number;
+	offset: number;
 }
 
 export interface Suggestion {
@@ -412,6 +458,26 @@ export interface TriggerLink {
 	path?: string;
 }
 
+export type CalendarFeedPart = 'absences' | 'holidays' | 'plan' | 'tracked';
+
+/** ICS subscription (contract 0.31.0). `token` and `path` (`/ics/<token>.ics`) only exist in the POST response. */
+export interface CalendarFeed {
+	id: string;
+	label: string;
+	include: CalendarFeedPart[];
+	createdAt: string;
+	expiresAt?: string | null;
+	lastUsedAt?: string | null;
+	token?: string;
+	path?: string;
+}
+
+export interface CalendarFeedInput {
+	label: string;
+	include?: CalendarFeedPart[];
+	expiresInDays?: number;
+}
+
 export interface TriggerLinkInput {
 	label: string;
 	actions: TriggerAction[];
@@ -421,6 +487,17 @@ export interface TriggerLinkInput {
 }
 
 // --- Planning and vacation (contracts/openapi.yaml v0.3.1) ---
+
+/** Contract 0.32.0 (N4, ADR-0029): none = work day, half = half target, full = like a public holiday. */
+export type CompanyDayTreatment = 'none' | 'half' | 'full';
+
+export interface CompanyDay {
+	month: number;
+	day: number;
+	treatment: CompanyDayTreatment;
+	/** null/empty: the server uses Heiligabend (24.12.), Silvester (31.12.) or "Betriebsfreier Tag" */
+	name?: string | null;
+}
 
 export interface VacationSettings {
 	/** Read-only: false while nothing is stored; GET then returns the defaults (200). */
@@ -433,6 +510,8 @@ export interface VacationSettings {
 	carryOverByYear?: Record<string, number>;
 	/** MM-DD or null */
 	carryOverExpiry?: string | null;
+	/** Contract 0.32.0: GET always lists 24.12. and 31.12.; PUT without the field keeps the stored rules, with it replaces the list (max 12). */
+	companyDays?: CompanyDay[];
 }
 
 export interface VacationBalance {
@@ -518,7 +597,9 @@ export interface VacationSuggestionQuery {
 }
 
 export type AbsenceKind = 'vacation' | 'sick' | 'excused' | 'other';
-export type AbsenceStatus = 'planned' | 'requested' | 'approved' | 'rejected' | 'cancelled' | 'taken';
+export type KnownAbsenceStatus = 'planned' | 'requested' | 'approved' | 'rejected' | 'cancelled' | 'taken' | 'recorded';
+/** Contract 0.36.0 adds `recorded`; later servers may add more, so unknown strings must never break a view. */
+export type AbsenceStatus = KnownAbsenceStatus | (string & {});
 export type DocumentStatus = 'not_needed' | 'pending' | 'submitted';
 
 export interface AbsenceInput {
@@ -527,7 +608,8 @@ export interface AbsenceInput {
 	endDate: string;
 	halfDayStart?: boolean;
 	halfDayEnd?: boolean;
-	status: AbsenceStatus;
+	/** Optional since contract 0.36.0: the server defaults to planned (vacation) or recorded (other kinds). */
+	status?: AbsenceStatus;
 	note?: string | null;
 	documentStatus?: DocumentStatus;
 	documentSubmittedOn?: string | null;
@@ -535,8 +617,10 @@ export interface AbsenceInput {
 	documentReferenceEnd?: string | null;
 }
 
-export interface Absence extends AbsenceInput {
+export interface Absence extends Omit<AbsenceInput, 'status'> {
 	id: string;
+	/** Always present on responses; unknown strings are possible (see AbsenceStatus). */
+	status: AbsenceStatus;
 	version: number;
 	countedHalfDays: number;
 	/** Stored attachments of this absence (contract 0.24.0). Absent on older servers, which the UI then counts per absence. */
@@ -552,6 +636,8 @@ export interface CalendarDay {
 	name: string;
 	kind: CalendarDayKind;
 	source: 'builtin' | 'custom';
+	/** Contract 0.32.0: set for company days (kind stays holiday, source builtin); older servers omit it. */
+	companyTreatment?: 'half' | 'full' | null;
 }
 
 export interface CustomDayInput {
@@ -563,8 +649,25 @@ export interface CustomDayInput {
 
 export type PlanMode = 'office' | 'home' | 'customer' | 'school' | 'off';
 
+/** Contract 0.35.0 (P13, ADR-0031): kind of one plan block. */
+export type PlanBlockKind = 'work' | 'school' | 'travel' | 'office' | 'home' | 'customer';
+
+/** Contract 0.35.0: one time block of a plan day; local wall-clock "HH:mm", start < end, no overlap, max 32 per day. */
+export interface PlanTimeBlock {
+	start: string;
+	end: string;
+	kind: PlanBlockKind;
+	placeId?: string | null;
+	note?: string | null;
+}
+
+/** Contract 0.35.0: non-binding planning hints derived from the plan blocks (German texts in the UI). */
+export type PlanHint = 'planned_break_short' | 'planned_work_stretch_long' | 'planned_break_part_short';
+
 export interface PlanDayInput {
 	mode: PlanMode;
+	/** Contract 0.35.0: complete, chronological block list; wins over plannedStart/plannedEnd/plannedBreakMinutes. */
+	blocks?: PlanTimeBlock[];
 	placeId?: string | null;
 	note?: string | null;
 	/** Contract v0.17.0 (K1): rough planned window as local wall-clock "HH:mm"; both or neither, start < end. */
@@ -576,8 +679,10 @@ export interface PlanDayInput {
 
 export interface PlanDay extends PlanDayInput {
 	date: string;
-	/** Derived by the server: end - start - break, never negative; null without times. */
+	/** Derived by the server: end - start - break, never negative; null without times. With blocks: the sum of the block durations. */
 	plannedSeconds?: number | null;
+	/** Contract 0.35.0: absent on older servers. */
+	planHints?: PlanHint[];
 }
 
 /** Contract v0.17.0 (K1): why a day cannot take a plan. */
@@ -614,12 +719,25 @@ export type WeekMark = 'work' | 'school' | 'vacation' | 'sick' | 'holiday' | 'ex
 
 export interface TimeWeekDay {
 	date: string;
+	legalProfileId?: LegalProfileId;
+	legalWarnings?: { code: LegalWarningCode }[];
+	breakHints?: { code: BreakHintCode }[];
+	schoolLessonCount?: number | null;
 	weekday: number;
 	mark: WeekMark;
+	/** Contract 0.31.0/0.32.0: name of a public, custom or company holiday on this date (also on free days); null without one. */
+	holidayName?: string | null;
+	/** Contract 0.32.0: half = mark stays work, target halved; full = mark holiday; null otherwise. */
+	companyDayTreatment?: 'half' | 'full' | null;
 	markSource: DayMarkSource;
 	targetSeconds: number;
 	plannedSeconds: number | null;
 	planMode: PlanMode | null;
+	/** Contract 0.35.0: the plan blocks of the day (null without a plan); absent on older servers. */
+	planBlocks?: PlanTimeBlock[] | null;
+	planHints?: PlanHint[];
+	/** Contract 0.35.0: evaluated work + credit - effective planned seconds; null for future or blocked days or without a planned duration. */
+	planActualDifferenceSeconds?: number | null;
 	workSeconds: number;
 	creditSeconds: number;
 	rawWorkSeconds: number;
@@ -640,10 +758,15 @@ export interface TimeWeekDay {
 
 export interface TimeWeekSummary {
 	targetSeconds: number;
+	/** Contract 0.36.0: target of the completed days (through yesterday). */
 	targetToDateSeconds: number;
 	workSeconds: number;
 	creditSeconds: number;
+	/** Contract 0.36.0: sum of the daily balances of the completed days (through yesterday). */
 	balanceSeconds: number;
+	includesToday?: boolean;
+	/** Balance of the running day; null when the week does not contain today. */
+	todayDeltaSeconds?: number | null;
 	plannedSeconds: number | null;
 	accountBalanceBeforeSeconds: number;
 	accountBalanceAfterSeconds: number;
@@ -690,7 +813,8 @@ export interface IncomingShare {
 }
 
 export interface SharedView {
-	plan?: { date: string; mode: PlanMode; plannedStart?: string; plannedEnd?: string; plannedBreakMinutes?: number; plannedSeconds?: number }[];
+	/** `blocks` (contract 0.35.0) carry start, end and kind only: places and notes never reach a share view. */
+	plan?: { date: string; mode: PlanMode; plannedStart?: string; plannedEnd?: string; plannedBreakMinutes?: number; plannedSeconds?: number; blocks?: { start: string; end: string; kind: PlanBlockKind }[] }[];
 	actual?: { date: string; evaluatedStart?: string | null; evaluatedEnd?: string | null; evaluatedWorkSeconds: number }[];
 	vacation?: { startDate: string; endDate: string }[];
 }
@@ -1080,6 +1204,8 @@ export interface NotificationSettings {
 
 export interface PushConfig {
 	available: boolean;
+	/** APNs push for the Apple apps is configured (contract 0.33.0) */
+	apnsAvailable?: boolean;
 	/** base64url uncompressed P-256 public key */
 	vapidPublicKey?: string;
 }
@@ -1100,7 +1226,7 @@ export interface PushSubscriptionInput {
 
 // --- Module switches (contract v0.9.0, ADR-0012) ---
 
-export const MODULE_KEYS = ['reports', 'planning', 'transfer', 'automation', 'mcp'] as const;
+export const MODULE_KEYS = ['reports', 'planning', 'transfer', 'automation', 'mcp', 'groups'] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 export interface ModuleStatus {
@@ -1191,4 +1317,270 @@ export interface SystemInfo {
 		replicaId?: string;
 	};
 	pwa: { version: string | null; revision: string | null; buildDate: string | null } | null;
+}
+
+// --- Groups module: public polls, group orders, catalogs (contract v0.37.0, ADR-0033) ---
+
+export type PollKind = 'text' | 'date';
+export type PollChoiceMode = 'single' | 'multi';
+export type PollAnswerValue = 'yes' | 'maybe' | 'no';
+
+export interface PollOptionInput {
+	label?: string;
+	/** date poll: required, YYYY-MM-DD */
+	date?: string;
+	startTime?: string;
+	endTime?: string;
+}
+
+export interface PollInput {
+	title: string;
+	description?: string;
+	kind: PollKind;
+	choiceMode: PollChoiceMode;
+	timeZone?: string;
+	options: PollOptionInput[];
+	deadline?: string;
+	hideResults?: boolean;
+}
+
+export interface PollPatch {
+	title?: string;
+	description?: string | null;
+	deadline?: string | null;
+	hideResults?: boolean;
+}
+
+export interface PollOption {
+	id: string;
+	label?: string | null;
+	date?: string | null;
+	startTime?: string | null;
+	endTime?: string | null;
+}
+
+export interface PollAnswer {
+	optionId: string;
+	answer: PollAnswerValue;
+}
+
+export interface PollVote {
+	id: string;
+	name: string;
+	answers: PollAnswer[];
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface PollTally {
+	optionId: string;
+	yes: number;
+	maybe: number;
+	no: number;
+}
+
+/** Owner and public view of a poll; `id`/timestamps only for the owner, `token`/`path` only right after create and rotate-token. */
+export interface Poll {
+	id?: string;
+	title: string;
+	description?: string | null;
+	kind: PollKind;
+	choiceMode: PollChoiceMode;
+	timeZone?: string | null;
+	options: PollOption[];
+	deadline?: string | null;
+	hideResults: boolean;
+	closed: boolean;
+	closedAt?: string | null;
+	finalOptionId?: string | null;
+	resultsVisible: boolean;
+	voteCount: number;
+	votes?: PollVote[];
+	tally?: PollTally[];
+	createdAt?: string;
+	updatedAt?: string;
+	token?: string;
+	path?: string;
+}
+
+export interface PollSummary {
+	id: string;
+	title: string;
+	kind: PollKind;
+	choiceMode: PollChoiceMode;
+	deadline?: string | null;
+	closed: boolean;
+	closedAt?: string | null;
+	voteCount: number;
+	createdAt: string;
+}
+
+export interface VoteInput {
+	name: string;
+	answers: PollAnswer[];
+}
+
+export interface VoteCreated {
+	vote: PollVote;
+	editSecret: string;
+}
+
+export interface OrderInput {
+	title: string;
+	note?: string;
+	deadline?: string;
+	catalogId?: string;
+}
+
+export interface OrderPatch {
+	title?: string;
+	note?: string | null;
+	deadline?: string | null;
+	catalogId?: string | null;
+}
+
+export interface EntryInput {
+	name: string;
+	item: string;
+	note?: string;
+	quantity?: number;
+	priceCents?: number;
+}
+
+export interface EntryTake {
+	name: string;
+	quantity?: number;
+	note?: string;
+}
+
+export interface OrderEntry {
+	id: string;
+	name: string;
+	item: string;
+	note?: string | null;
+	quantity: number;
+	priceCents?: number | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface EntryCreated {
+	entry: OrderEntry;
+	editSecret: string;
+}
+
+export interface AggregatedItem {
+	item: string;
+	note?: string | null;
+	priceCents?: number | null;
+	quantity: number;
+	names: string[];
+}
+
+export interface CatalogItem {
+	name: string;
+	priceCents?: number | null;
+}
+
+export interface CatalogInput {
+	name: string;
+	items: CatalogItem[];
+}
+
+export interface Catalog {
+	id: string;
+	name: string;
+	items: CatalogItem[];
+	itemCount: number;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/** Owner and public view of an order round; `id`, `catalogId`, `createdAt` only for the owner. */
+export interface Order {
+	id?: string;
+	title: string;
+	note?: string | null;
+	deadline?: string | null;
+	closed: boolean;
+	closedAt?: string | null;
+	catalogId?: string | null;
+	entryCount: number;
+	entries: OrderEntry[];
+	aggregated: AggregatedItem[];
+	totalCents: number;
+	unpricedQuantity: number;
+	suggestions: CatalogItem[];
+	createdAt?: string;
+	token?: string;
+	path?: string;
+}
+
+export interface OrderSummary {
+	id: string;
+	title: string;
+	deadline?: string | null;
+	closed: boolean;
+	closedAt?: string | null;
+	entryCount: number;
+	createdAt: string;
+}
+
+export interface ItemSuggestion {
+	item: string;
+	priceCents?: number | null;
+	count: number;
+}
+
+export interface PublicGroup {
+	type: 'poll' | 'order';
+	poll?: Poll;
+	order?: Order;
+}
+
+/** APNs device of an Apple app (contract 0.33.0). The device token is never delivered. */
+export interface PushDeviceInfo {
+	id: string;
+	platform: 'ios' | 'macos' | 'watchos';
+	environment: 'sandbox' | 'production';
+	appBundleId: string;
+	label?: string | null;
+	createdAt: string;
+	lastSuccessAt?: string | null;
+}
+
+/** APNs diagnosis for administrators (contract 0.38.0, P14e). */
+export interface ApnsHint {
+	severity: 'info' | 'warning';
+	code: 'not_configured' | 'incomplete' | 'no_devices';
+	message: string;
+}
+
+export interface ApnsStatus {
+	configured: boolean;
+	keyId?: string;
+	teamId?: string;
+	bundleIds: string[];
+	/** names of missing or invalid APNS_* variables */
+	problems: string[];
+	deviceCount: number;
+	source: 'environment';
+	hints: ApnsHint[];
+}
+
+export interface ApnsProbe {
+	bundleId: string;
+	environment: 'production' | 'sandbox';
+	status: 'ok' | 'failed';
+	httpStatus?: number;
+	reason?: string;
+	advice?: string;
+}
+
+export interface ApnsCheckResult {
+	ok: boolean;
+	summary: string;
+	checkedAt: string;
+	totalMs: number;
+	probes: ApnsProbe[];
 }

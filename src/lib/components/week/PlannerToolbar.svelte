@@ -1,10 +1,12 @@
 <script lang="ts">
 	import './planner-colors.css';
-	import type { Place, PlanMode } from '#lib/api/types.js';
+	import type { Place } from '#lib/api/types.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
 	import { t } from '#lib/i18n/index.js';
-	import { PLAN_MODES, planModeLabel } from '#lib/planning/labels.js';
+	import { BLOCK_KINDS, blockKindLabel, planModeLabel } from '#lib/planning/labels.js';
+	import type { BrushKind } from '#lib/week/grid-edit.js';
+	import BlockKindIcon from './BlockKindIcon.svelte';
 	import type { GridTool } from './WeekGrid.svelte';
 	import Eraser from '@lucide/svelte/icons/eraser';
 	import Ghost from '@lucide/svelte/icons/ghost';
@@ -17,9 +19,10 @@
 	/** Drawing tools of the week grid: tool, brush (kind and optional place), undo/redo, ghost toggle, keyboard-friendly "add block". */
 	let {
 		tool = $bindable(),
-		mode = $bindable(),
+		kind = $bindable(),
 		placeId = $bindable(),
 		showActuals = $bindable(),
+		multi,
 		places,
 		canUndo,
 		canRedo,
@@ -30,9 +33,11 @@
 		onadd
 	}: {
 		tool: GridTool;
-		mode: PlanMode;
+		kind: BrushKind;
 		placeId: string;
 		showActuals: boolean;
+		/** block lists (contract 0.35.0): all six kinds; older servers know the four day modes only */
+		multi: boolean;
 		places: Place[];
 		canUndo: boolean;
 		canRedo: boolean;
@@ -48,29 +53,31 @@
 		{ id: 'draw', label: t('wg.tool_draw'), key: 'B', icon: Paintbrush },
 		{ id: 'erase', label: t('wg.tool_erase'), key: 'E', icon: Eraser }
 	];
+	const brushKinds: BrushKind[] = $derived(multi ? [...BLOCK_KINDS, 'off'] : ['office', 'home', 'customer', 'school', 'off']);
+	const kindLabel = (k: BrushKind) => (k === 'off' ? planModeLabel('off') : blockKindLabel(k));
 	const seg = 'inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground aria-checked:bg-background aria-checked:text-foreground aria-checked:shadow-sm aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 </script>
 
-<div class="flex flex-wrap items-center gap-x-3 gap-y-2" role="toolbar" aria-label={t('wg.toolbar')} data-testid="planner-toolbar">
+<div class="flex flex-wrap items-center gap-x-2.5 gap-y-2 fit:gap-y-1.5" role="toolbar" aria-label={t('wg.toolbar')} data-testid="planner-toolbar">
 	<div class="inline-flex rounded-lg bg-muted p-0.5" role="group" aria-label={t('wg.tools')}>
 		{#each tools as item (item.id)}
 			<button type="button" class={seg} aria-pressed={tool === item.id} onclick={() => (tool = item.id)} title="{item.label} ({item.key})" data-testid="tool-{item.id}">
-				<item.icon class="size-4" /><span class="max-xl:sr-only">{item.label}</span>
+				<item.icon class="size-4" /><span class="max-[1599px]:sr-only">{item.label}</span>
 			</button>
 		{/each}
 	</div>
 
 	<div class="inline-flex max-w-full overflow-x-auto rounded-lg bg-muted p-0.5" role="radiogroup" aria-label={t('wg.brush_kind')} data-testid="brush-kinds">
-		{#each PLAN_MODES as option (option)}
-			<button type="button" role="radio" class={seg} aria-checked={mode === option} data-plan-mode={option} onclick={() => { mode = option; if (tool === 'erase') tool = 'draw'; }} data-testid="brush-{option}">
-				<span class="size-2.5 rounded-full" style="background: var(--pm)"></span>{planModeLabel(option)}
+		{#each brushKinds as option (option)}
+			<button type="button" role="radio" class={seg} aria-checked={kind === option} data-plan-mode={option} onclick={() => { kind = option; if (tool === 'erase') tool = 'draw'; }} data-testid="brush-{option}">
+				{#if option === 'off'}<span class="size-2.5 rounded-full" style="background: var(--pm)" aria-hidden="true"></span>{:else}<span style="color: var(--pm)"><BlockKindIcon kind={option} class="size-3.5" /></span>{/if}{kindLabel(option)}
 			</button>
 		{/each}
 	</div>
 
 	<div class="flex items-center gap-2">
 		<label class="sr-only" for="brush-place">{t('wg.brush_place')}</label>
-		<Select id="brush-place" bind:value={placeId} class="h-8 w-36 text-[13px]" data-testid="brush-place" disabled={mode === 'off'}>
+		<Select id="brush-place" bind:value={placeId} class="h-8 w-28 text-[13px]" data-testid="brush-place" disabled={kind === 'off'}>
 			<option value="">{t('wg.brush_no_place')}</option>
 			{#each places.filter((p) => !p.archived) as place (place.id)}<option value={place.id}>{place.name}</option>{/each}
 		</Select>
@@ -80,8 +87,8 @@
 		<Button variant="outline" size="icon" class="size-8" onclick={onundo} disabled={!canUndo} aria-label={undoLabel ? t('wg.undo_named', { label: undoLabel }) : t('wg.undo')} title="{t('wg.undo')} (Strg+Z)" data-testid="plan-undo"><Undo2 /></Button>
 		<Button variant="outline" size="icon" class="size-8" onclick={onredo} disabled={!canRedo} aria-label={redoLabel ? t('wg.redo_named', { label: redoLabel }) : t('wg.redo')} title="{t('wg.redo')} (Strg+Umschalt+Z)" data-testid="plan-redo"><Redo2 /></Button>
 		<button type="button" class="{seg} border border-border bg-background" aria-pressed={showActuals} onclick={() => (showActuals = !showActuals)} data-testid="toggle-actuals" title={t('wg.actuals_hint')}>
-			<Ghost class="size-4" />{t('wg.actuals')}
+			<Ghost class="size-4" /><span class="fit:max-[1999px]:sr-only">{t('wg.actuals')}</span>
 		</button>
-		<Button size="sm" onclick={onadd} data-testid="plan-add-block"><Plus />{t('wg.add_block')}</Button>
+		<Button size="sm" onclick={onadd} title={t('wg.add_block')} data-testid="plan-add-block"><Plus /><span class="fit:max-[1999px]:sr-only">{t('wg.add_block')}</span></Button>
 	</div>
 </div>

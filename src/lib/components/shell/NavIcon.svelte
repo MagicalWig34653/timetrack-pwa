@@ -16,10 +16,11 @@
 	import Week from '@lucide/svelte/icons/calendar-range';
 	import Users from '@lucide/svelte/icons/users';
 	import Upload from '@lucide/svelte/icons/upload';
+	import Vote from '@lucide/svelte/icons/vote';
 	import type { NavItem } from '#lib/nav.js';
 
 	let { name }: { name: NavItem['icon'] } = $props();
-	const icons = { house: House, clock: Clock, week: Week, calendar: Calendar, book: Book, chart: Chart, plane: Plane, absence: Absence, share: Share, bulb: Bulb, download: Download, upload: Upload, invite: Invite, users: Users, modules: Modules, storage: Storage, mail: Mail };
+	const icons = { house: House, clock: Clock, week: Week, calendar: Calendar, book: Book, chart: Chart, plane: Plane, absence: Absence, share: Share, bulb: Bulb, download: Download, upload: Upload, invite: Invite, users: Users, modules: Modules, storage: Storage, mail: Mail, groups: Vote };
 	const Icon = $derived(icons[name]);
 </script>
 

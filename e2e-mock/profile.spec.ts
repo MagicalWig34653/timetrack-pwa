@@ -38,7 +38,7 @@ test('a new account is offered the setup, the demo admin is not; the settings na
 	await admin.page.goto('/settings/profile');
 	const nav = admin.page.getByTestId('settings-tabs');
 	await expect(nav.getByRole('link', { name: 'Profil' })).toHaveAttribute('aria-current', 'page');
-	for (const group of ['Konto & Sicherheit', 'Arbeit', 'App', 'Verbindungen', 'Verwaltung']) await expect(nav.getByRole('heading', { name: group })).toBeVisible();
+	for (const group of ['Profil & Sicherheit', 'Arbeitszeit & Urlaub', 'Orte & Automatik', 'Benachrichtigungen & Kalender', 'Daten & Export', 'Verwaltung (Admin)']) await expect(nav.getByRole('heading', { name: group })).toBeVisible();
 	await admin.context.close();
 
 	const { page, context } = await newAccount(browser, 'e2e-nina', 'Nina E2E');

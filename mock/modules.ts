@@ -7,7 +7,7 @@ import type { MockResponse } from './api.ts';
 //   `server` sets the server-wide availability without the lock rules.
 // Dev server: MOCK_MODULES_DISABLED=reports,mcp starts the mock with an operator lock.
 
-export const MODULE_KEYS = ['reports', 'planning', 'transfer', 'automation', 'mcp'] as const;
+export const MODULE_KEYS = ['reports', 'planning', 'transfer', 'automation', 'mcp', 'groups'] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 const isKey = (value: unknown): value is ModuleKey => MODULE_KEYS.includes(value as ModuleKey);
@@ -20,6 +20,7 @@ export function moduleOfApiPath(path: string): ModuleKey | null {
 	if (/^\/api\/v1\/reports(\/|$)/.test(path)) return 'reports';
 	if (/^\/api\/v1\/(vacation|absences|calendar|plan|shares)(\/|$)/.test(path)) return 'planning';
 	if (/^\/api\/v1\/(me\/device-tokens|me\/trigger-links|automation\/events|time\/suggestions)(\/|$)/.test(path)) return 'automation';
+	if (/^\/api\/v1\/groups(\/|$)/.test(path)) return 'groups';
 	if (/^\/api\/v1\/(me\/api-tokens|me\/oauth-grants|oauth\/requests)(\/|$)/.test(path)) return 'mcp';
 	if (/^\/(oauth\/register|oauth\/authorize|oauth\/token|oauth\/revoke|mcp|\.well-known\/oauth-[a-z-]+)$/.test(path)) return 'mcp';
 	return null;

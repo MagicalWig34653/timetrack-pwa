@@ -2,11 +2,15 @@
 // day evaluations, time account, suggestions, device tokens, automation events). The backend implements these in C6.
 import { segmentFigures } from '../src/lib/stats/aggregate.ts';
 import { bucketKey } from '../src/lib/stats/aggregate.ts';
-import { addDays, DEFAULT_TIMEZONE, isoWeekLabel, localDateOf, todayLocal, zonedTimeToInstant } from '../src/lib/time/dates.ts';
+import { addDays, DEFAULT_TIMEZONE, isoWeekday, isoWeekLabel, localDateOf, todayLocal, zonedTimeToInstant } from '../src/lib/time/dates.ts';
 import type {
 	DayMarkKind,
+	AccountAdjustment,
+	DayEvaluation,
+	LegalProfile,
 	DeviceToken,
 	TriggerLink,
+	CalendarFeed,
 	Place,
 	PlaceInput,
 	Segment,
@@ -29,14 +33,18 @@ export interface TimeResponse {
 	body?: unknown;
 }
 
-interface Adjustment {
-	kind: 'opening' | 'correction';
-	date: string;
-	seconds: number;
-	reason: string;
-}
+type Adjustment = AccountAdjustment;
+
+const LEGAL_PROFILES: LegalProfile[] = [
+	{ id: 'arbzg-adult-de', name: 'Erwachsene (ArbZG)', maxDailySeconds: 36000, maxWeeklySeconds: null, maxWorkdaysPerWeek: null, breakRules: [{ afterSeconds: 32400, requiredSeconds: 2700 }, { afterSeconds: 21600, requiredSeconds: 1800 }], minimumBreakPartSeconds: 900, maximumContinuousSeconds: 21600, minimumRestSeconds: 39600, restrictedWeekdays: [], sources: ['https://www.gesetze-im-internet.de/arbzg/__4.html'], informationalOnly: true },
+	{ id: 'jarbschg-minor-de', name: 'Jugendliche (JArbSchG)', maxDailySeconds: 28800, maxWeeklySeconds: 144000, maxWorkdaysPerWeek: 5, breakRules: [{ afterSeconds: 21600, requiredSeconds: 3600 }, { afterSeconds: 16200, requiredSeconds: 1800 }], minimumBreakPartSeconds: 900, maximumContinuousSeconds: 16200, minimumRestSeconds: 43200, restrictedWeekdays: [6, 7], school: { noWorkBeforeMinutes: 540 }, sources: ['https://www.gesetze-im-internet.de/jarbschg/__8.html', 'https://www.gesetze-im-internet.de/jarbschg/__9.html'], informationalOnly: true }
+];
 
 interface StoredToken extends DeviceToken {
+	secret: string;
+}
+
+interface StoredCalendarFeed extends CalendarFeed {
 	secret: string;
 }
 
@@ -54,6 +62,7 @@ interface TimeState {
 	suggestions: Suggestion[];
 	tokens: StoredToken[];
 	triggerLinks: StoredTriggerLink[];
+	calendarFeeds: StoredCalendarFeed[];
 	timerEvents: Map<string, string>;
 	automationEvents: Map<string, { result: string; segmentId: string | null; suggestionId: string | null }>;
 }
@@ -75,6 +84,12 @@ export function createTimeMock(clock: () => number) {
 		if (typeof body.restore === 'boolean') trash.restore = body.restore;
 		return { status: 200, body: { ...trash } };
 	};
+	const hookReview = (accountId: string, segmentId: string) => {
+		const segment = stateOf(accountId).segments.find((item) => item.id === segmentId);
+		if (!segment) return fail(404, 'not_found');
+		segment.needsReview = true;
+		return ok(segment);
+	};
 	/** Set by the API mock: how absences and holidays change a day (planning data lives in another module). */
 	let dayContext: (accountId: string, date: string) => DerivedDayContext | null = () => null;
 
@@ -91,6 +106,7 @@ export function createTimeMock(clock: () => number) {
 				suggestions: [],
 				tokens: [],
 				triggerLinks: [],
+				calendarFeeds: [],
 				timerEvents: new Map(),
 				automationEvents: new Map()
 			};
@@ -111,6 +127,7 @@ export function createTimeMock(clock: () => number) {
 			timezone: DEFAULT_TIMEZONE,
 			weeklyTargetSeconds: 38.5 * 3600,
 			workdays: [1, 2, 3, 4, 5],
+			legalProfileId: 'arbzg-adult-de',
 			travelCountsAsWork: true,
 			roundingEnabled: true,
 			roundingMinutes: 15,
@@ -124,7 +141,7 @@ export function createTimeMock(clock: () => number) {
 		const school: Place = { id: uuid(), name: 'Berufsschule', kind: 'school', automationMode: 'suggest', latitude: null, longitude: null, radiusMeters: null, confirmAfterSeconds: 300, defaultSegmentKind: 'school', archived: false };
 		const home: Place = { id: uuid(), name: 'Zuhause', kind: 'home', automationMode: 'off', latitude: null, longitude: null, radiusMeters: null, confirmAfterSeconds: 300, defaultSegmentKind: 'work', archived: false };
 		state.places.push(office, school, home);
-		state.adjustments.push({ kind: 'opening', date: addDays(today, -14), seconds: 4500, reason: 'Anfangsstand' });
+		state.adjustments.push({ id: uuid(), createdAt: new Date(clock()).toISOString(), kind: 'opening', date: addDays(today, -14), seconds: 4500, reason: 'Anfangsstand' });
 
 		const add = (date: string, from: string, to: string, kind: Segment['kind'], placeId: string, source: Segment['source'] = 'timer') => {
 			const startedAt = zonedTimeToInstant(date, from).toISOString();
@@ -168,14 +185,45 @@ export function createTimeMock(clock: () => number) {
 	}
 
 	function evaluate(state: TimeState, date: string) {
-		return evaluateDay({
+		const model = modelForDate(state.models, date);
+		let minorSchoolCredit = false;
+		if (model?.legalProfileId === 'jarbschg-minor-de') {
+			const monday = addDays(date, 1 - isoWeekday(date));
+			const week = Array.from({ length: 7 }, (_, index) => addDays(monday, index));
+			const schoolDays = week.filter((day) => segmentsOfDay(state, day).some((segment) => segment.kind === 'school'));
+			const lessons = schoolDays.reduce((sum, day) => sum + (state.prefs.get(day)?.schoolLessonCount ?? 0), 0);
+			minorSchoolCredit = (schoolDays.length >= 5 && lessons >= 25) || schoolDays.filter((day) => (state.prefs.get(day)?.schoolLessonCount ?? 0) >= 6)[0] === date;
+		}
+		const result = evaluateDay({
 			date,
 			models: state.models,
 			segments: toEval(segmentsOfDay(state, date)),
 			prefs: state.prefs.get(date),
 			derived: dayContext(state.accountId, date),
+			minorSchoolCredit,
 			now: clock()
 		});
+		const segments = segmentsOfDay(state, date);
+		const warnings: NonNullable<DayEvaluation['legalWarnings']> = [];
+		if (result.legalProfileId === 'jarbschg-minor-de') {
+			const counted = segments.filter((segment) => segment.kind !== 'travel' || modelForDate(state.models, date)?.travelCountsAsWork !== false);
+			const workSeconds = counted.reduce((sum, segment) => sum + Math.max(0, (Date.parse(segment.endedAt ?? new Date(clock()).toISOString()) - Date.parse(segment.startedAt)) / 1000), 0);
+			if (workSeconds > 28800) warnings.push({ code: 'daily_limit' });
+			if (isoWeekday(date) > 5 && counted.length > 0) warnings.push({ code: 'weekend_work' });
+			const lessons = state.prefs.get(date)?.schoolLessonCount ?? 0;
+			if (minorSchoolCredit && lessons >= 6 && segments.some((segment) => segment.kind !== 'school')) warnings.push({ code: 'work_after_full_school_day' });
+			if (lessons > 0 && segments.some((segment) => segment.kind !== 'school' && Number(new Intl.DateTimeFormat('en-GB', { timeZone: DEFAULT_TIMEZONE, hour: '2-digit', hourCycle: 'h23' }).format(new Date(segment.startedAt))) < 9)) warnings.push({ code: 'work_before_school' });
+			const monday = addDays(date, 1 - isoWeekday(date));
+			const weekDates = Array.from({ length: 7 }, (_, index) => addDays(monday, index));
+			const activeDays = weekDates.filter((day) => segmentsOfDay(state, day).length > 0);
+			if (activeDays.length > 5) warnings.push({ code: 'five_day_week' });
+			const weekSeconds = weekDates.reduce((sum, day) => sum + segmentsOfDay(state, day).reduce((inner, segment) => inner + Math.max(0, (Date.parse(segment.endedAt ?? new Date(clock()).toISOString()) - Date.parse(segment.startedAt)) / 1000), 0) + (dayContext(state.accountId, day)?.mark === 'holiday' && segmentsOfDay(state, day).length === 0 ? (modelForDate(state.models, day)?.weeklyTargetSeconds ?? 0) / Math.max(1, modelForDate(state.models, day)?.workdays.length ?? 1) : 0), 0);
+			if (weekSeconds > 144000) warnings.push({ code: 'weekly_limit' });
+			const previous = segmentsOfDay(state, addDays(date, -1)).filter((segment) => segment.endedAt).sort((a, b) => b.endedAt!.localeCompare(a.endedAt!))[0];
+			const first = [...segments].sort((a, b) => a.startedAt.localeCompare(b.startedAt))[0];
+			if (previous?.endedAt && first && Date.parse(first.startedAt) - Date.parse(previous.endedAt) < 43200000) warnings.push({ code: 'rest_period' });
+		}
+		return { ...result, segments, legalWarnings: warnings };
 	}
 
 	function account(state: TimeState, asOf: string) {
@@ -183,18 +231,23 @@ export function createTimeMock(clock: () => number) {
 		const opening = state.adjustments.find((a) => a.kind === 'opening');
 		const corrections = state.adjustments.filter((a) => a.kind === 'correction' && a.date <= asOf);
 		const adjustmentSeconds = corrections.reduce((sum, a) => sum + a.seconds, 0);
-		let total = (opening?.seconds ?? 0) + adjustmentSeconds;
-		if (opening) {
-			const last = asOf < today ? asOf : today;
-			for (const date of daysBetween(opening.date, last)) total += evaluate(state, date).deltaSeconds;
+		const start = opening?.date ?? [state.models.map((model) => model.validFrom).sort()[0], state.segments.map((segment) => localDateOf(segment.startedAt, DEFAULT_TIMEZONE)).sort()[0], state.adjustments.map((item) => item.date).sort()[0]].filter((date): date is string => !!date).sort()[0] ?? null;
+		let total = (opening && opening.date <= asOf ? opening.seconds : 0) + adjustmentSeconds;
+		if (start && start <= asOf) {
+			// contract 0.36.0: the running day is not part of the balance, only the days through yesterday
+			const last = asOf < today ? asOf : addDays(today, -1);
+			if (last >= start) for (const date of daysBetween(start, last)) total += evaluate(state, date).deltaSeconds;
 		}
+		const todayDeltaSeconds = start && start <= today && asOf >= today ? evaluate(state, today).deltaSeconds : null;
 		return {
 			asOf,
-			accountStart: opening?.date ?? null,
+			accountStart: start,
 			balanceSeconds: total,
 			openingSeconds: opening?.seconds ?? 0,
 			adjustmentSeconds,
-			provisional: asOf >= today
+			provisional: false,
+			includesToday: false,
+			todayDeltaSeconds
 		};
 	}
 
@@ -214,6 +267,7 @@ export function createTimeMock(clock: () => number) {
 		const buckets = new Map<string, any>();
 		const totals = { targetSeconds: 0, targetToDateSeconds: 0, actualSeconds: 0, creditSeconds: 0, deltaSeconds: 0, overtimeSeconds: 0, undertimeSeconds: 0, breakSeconds: 0, breakDeductionSeconds: 0, kindSeconds: { work: 0, school: 0, travel: 0 }, absenceDays: 0 };
 		let running = openingBalance ?? 0;
+		let todayDeltaSeconds: number | null = null;
 		for (const date of dates) {
 			const key = bucketKey(date, granularity);
 			let b = buckets.get(key);
@@ -226,6 +280,11 @@ export function createTimeMock(clock: () => number) {
 			b.days += 1;
 			b.targetSeconds += ev.targetSeconds;
 			if (date > today) continue;
+			if (date === today) {
+				// the running day stands apart (contract 0.36.0): neither in the sums nor in the cumulative balance
+				todayDeltaSeconds = (basis === 'raw' ? ev.evaluatedWorkSeconds - (ev.startAdjustSeconds + ev.endAdjustSeconds) : ev.evaluatedWorkSeconds) + ev.creditSeconds - ev.targetSeconds;
+				continue;
+			}
 			const rounding = ev.startAdjustSeconds + ev.endAdjustSeconds;
 			const actual = basis === 'raw' ? ev.evaluatedWorkSeconds - rounding : ev.evaluatedWorkSeconds;
 			const delta = actual + ev.creditSeconds - ev.targetSeconds;
@@ -268,7 +327,7 @@ export function createTimeMock(clock: () => number) {
 			totals.kindSeconds.school += f.school;
 			totals.absenceDays += mark === 'vacation' || mark === 'sick' || mark === 'excused' ? weight : 0;
 		}
-		return ok({ from, to, granularity, basis, timezone: DEFAULT_TIMEZONE, accountStart: opening?.date ?? null, openingBalanceSeconds: openingBalance, buckets: [...buckets.values()], totals });
+		return ok({ from, to, granularity, basis, timezone: DEFAULT_TIMEZONE, accountStart: opening?.date ?? null, openingBalanceSeconds: openingBalance, includesToday: false, todayDeltaSeconds, buckets: [...buckets.values()], totals });
 	}
 
 	function findOverlap(state: TimeState, startedAt: number, endedAt: number | null, ignoreId?: string): Segment | undefined {
@@ -310,6 +369,7 @@ export function createTimeMock(clock: () => number) {
 			Array.isArray(input.workdays) &&
 			input.workdays.length > 0 &&
 			input.workdays.every((d) => Number.isInteger(d) && d >= 1 && d <= 7) &&
+			(input.legalProfileId === undefined || LEGAL_PROFILES.some((profile) => profile.id === input.legalProfileId)) &&
 			(input.roundingMinutes === undefined || (input.roundingMinutes >= 1 && input.roundingMinutes <= 60)) &&
 			(input.dayBoundaryMinutes === undefined || (input.dayBoundaryMinutes >= 0 && input.dayBoundaryMinutes <= 719)) &&
 			(input.fixedBreaks ?? []).every((b) => /^[0-2]\d:[0-5]\d$/.test(b.start) && /^[0-2]\d:[0-5]\d$/.test(b.end) && b.start < b.end)
@@ -318,7 +378,7 @@ export function createTimeMock(clock: () => number) {
 
 	const EDITABLE_MODEL_FIELDS = [
 		'validFrom', 'validTo', 'timezone', 'weeklyTargetSeconds', 'workdays', 'dailyTargetSeconds', 'travelCountsAsWork',
-		'roundingEnabled', 'roundingMinutes', 'schoolFullDayThresholdSeconds', 'schoolCreditSeconds', 'dayBoundaryMinutes', 'fixedBreaks'
+		'roundingEnabled', 'roundingMinutes', 'schoolFullDayThresholdSeconds', 'schoolCreditSeconds', 'dayBoundaryMinutes', 'fixedBreaks', 'legalProfileId'
 	] as const;
 	const MODEL_DEFAULTS = {
 		timezone: DEFAULT_TIMEZONE,
@@ -330,7 +390,8 @@ export function createTimeMock(clock: () => number) {
 		dayBoundaryMinutes: 0,
 		fixedBreaks: [],
 		dailyTargetSeconds: {},
-		validTo: null
+		validTo: null,
+		legalProfileId: 'arbzg-adult-de' as const
 	};
 
 	/** Mirrors the backend plan (contract v0.16.0): validation, neighbour adjustment and the changed fields. */
@@ -383,6 +444,7 @@ export function createTimeMock(clock: () => number) {
 		let m: RegExpMatchArray | null;
 
 		// --- work models ---
+		if (route === 'legal-profiles' && method === 'GET') return ok(LEGAL_PROFILES);
 		if (route === 'work-models') {
 			if (method === 'GET') return ok([...state.models].sort((a, b) => a.validFrom.localeCompare(b.validFrom)));
 			if (method === 'POST') {
@@ -400,6 +462,7 @@ export function createTimeMock(clock: () => number) {
 					dayBoundaryMinutes: 0,
 					fixedBreaks: [],
 					validTo: null,
+					legalProfileId: 'arbzg-adult-de',
 					...body,
 					version: 1,
 					id: uuid(),
@@ -454,13 +517,24 @@ export function createTimeMock(clock: () => number) {
 
 		// --- places ---
 		if (route === 'places') {
-			if (method === 'GET') return ok(state.places.filter((p) => !p.archived));
+			if (method === 'GET') {
+				// contract 0.39.0: ?archived=true lists only archived places, ?archived=all both
+				const filter = query.get('archived');
+				if (filter !== null && !['true', 'false', 'all'].includes(filter)) return fail(400, 'bad_request');
+				return ok(state.places.filter((p) => (filter === 'all' ? true : filter === 'true' ? p.archived : !p.archived)));
+			}
 			if (method === 'POST') {
 				if (!validatePlace(body)) return fail(400, 'bad_request');
 				const place: Place = { confirmAfterSeconds: 300, defaultSegmentKind: 'work', latitude: null, longitude: null, radiusMeters: null, ...body, id: uuid(), archived: false };
 				state.places.push(place);
 				return ok(place, 201);
 			}
+		}
+		if ((m = route.match(/^places\/([^/]+)\/restore$/)) && method === 'POST') {
+			const place = state.places.find((p) => p.id === m![1]);
+			if (!place) return fail(404, 'not_found');
+			place.archived = false;
+			return ok(place);
 		}
 		if ((m = route.match(/^places\/([^/]+)$/))) {
 			const place = state.places.find((p) => p.id === m![1] && !p.archived);
@@ -553,6 +627,7 @@ export function createTimeMock(clock: () => number) {
 				if (req.ifMatch === undefined) return fail(400, 'bad_request');
 				if (String(segment.version) !== req.ifMatch) return fail(412, 'stale_version');
 				if (typeof body.reason !== 'string' || body.reason.trim() === '') return fail(400, 'bad_request');
+				if (body.needsReview === true) return fail(400, 'bad_request');
 				const startedAt = body.startedAt ?? segment.startedAt;
 				const endedAt = 'endedAt' in body ? body.endedAt : segment.endedAt;
 				if (!isInstant(startedAt) || (endedAt != null && !isInstant(endedAt))) return fail(400, 'bad_request');
@@ -568,11 +643,13 @@ export function createTimeMock(clock: () => number) {
 				if (findOverlap(state, Date.parse(startedAt), endedAt ? Date.parse(endedAt) : null, segment.id)) {
 					return fail(409, 'segment_overlap');
 				}
+				const endChanged = 'endedAt' in body && body.endedAt !== null && body.endedAt !== segment.endedAt;
 				segment.startedAt = startedAt;
 				segment.endedAt = endedAt ?? null;
 				if (body.kind) segment.kind = body.kind;
 				if ('placeId' in body) segment.placeId = body.placeId;
 				if ('note' in body) segment.note = body.note;
+				if (body.needsReview === false || endChanged) segment.needsReview = false;
 				segment.version += 1;
 				segment.revisions = (segment.revisions ?? 0) + 1;
 				return ok(segment);
@@ -632,6 +709,7 @@ export function createTimeMock(clock: () => number) {
 				if (body.creditSeconds != null && !(Number.isInteger(body.creditSeconds) && body.creditSeconds >= 0)) return fail(400, 'bad_request');
 				if (typeof body.note === 'string' && body.note.length > 200) return fail(400, 'bad_request');
 				if (body.targetOverrideSeconds != null && !(Number.isInteger(body.targetOverrideSeconds) && body.targetOverrideSeconds >= 0)) return fail(400, 'bad_request');
+				if (body.schoolLessonCount != null && !(Number.isInteger(body.schoolLessonCount) && body.schoolLessonCount >= 0 && body.schoolLessonCount <= 20)) return fail(400, 'bad_request');
 				const current = state.prefs.get(date) ?? {};
 				const next = { ...current };
 				if (body.mark !== undefined) next.mark = body.mark === 'none' ? undefined : body.mark;
@@ -639,6 +717,7 @@ export function createTimeMock(clock: () => number) {
 				if (body.skipFixedBreaks !== undefined) next.skipFixedBreaks = body.skipFixedBreaks;
 				if ('note' in body) next.note = body.note;
 				if ('targetOverrideSeconds' in body) next.targetOverrideSeconds = body.targetOverrideSeconds;
+				if ('schoolLessonCount' in body) next.schoolLessonCount = body.schoolLessonCount;
 				state.prefs.set(date, next);
 				return ok(evaluate(state, date));
 			}
@@ -655,8 +734,21 @@ export function createTimeMock(clock: () => number) {
 				return fail(400, 'bad_request');
 			}
 			if (body.kind === 'opening' && state.adjustments.some((a) => a.kind === 'opening')) return fail(409, 'opening_exists');
-			state.adjustments.push({ kind: body.kind, date: body.date, seconds: body.seconds, reason: body.reason });
+			state.adjustments.push({ id: uuid(), createdAt: new Date(clock()).toISOString(), kind: body.kind, date: body.date, seconds: body.seconds, reason: body.reason });
 			return ok(account(state, todayLocal(DEFAULT_TIMEZONE, new Date(clock()))), 201);
+		}
+		if (route === 'time/account/adjustments' && method === 'GET') {
+			const limit = Number(query.get('limit') ?? 50);
+			const offset = Number(query.get('offset') ?? 0);
+			if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(offset) || offset < 0 || offset > 100000) return fail(400, 'bad_request');
+			const sorted = [...state.adjustments].reverse();
+			return ok({ items: sorted.slice(offset, offset + limit), total: sorted.length, limit, offset });
+		}
+		if ((m = route.match(/^time\/account\/adjustments\/([^/]+)$/)) && method === 'DELETE') {
+			const index = state.adjustments.findIndex((item) => item.id === m![1]);
+			if (index < 0) return fail(404, 'not_found');
+			state.adjustments.splice(index, 1);
+			return ok(account(state, todayLocal(DEFAULT_TIMEZONE, new Date(clock()))));
 		}
 
 		// --- suggestions ---
@@ -744,6 +836,37 @@ export function createTimeMock(clock: () => number) {
 				return ok({ ...publicLink, token: secret, path: `/t/${secret}` }, 201);
 			}
 		}
+		// --- ICS subscriptions (contract 0.31.0): token and path exist only in the POST response ---
+		if (route === 'me/calendar-feeds') {
+			if (method === 'GET') return ok(state.calendarFeeds.map(({ secret: _secret, ...rest }) => rest));
+			if (method === 'POST') {
+				const parts = ['absences', 'holidays', 'plan', 'tracked'];
+				const include = body.include ?? ['absences', 'holidays'];
+				if (typeof body.label !== 'string' || !body.label.trim() || body.label.length > 80) return fail(400, 'bad_request');
+				if (!Array.isArray(include) || include.length === 0 || new Set(include).size !== include.length || include.some((p) => !parts.includes(p))) return fail(400, 'bad_request');
+				const days = body.expiresInDays;
+				if (days !== undefined && !(Number.isInteger(days) && days >= 1 && days <= 730)) return fail(400, 'bad_request');
+				if (state.calendarFeeds.length >= 10) return fail(409, 'too_many_calendar_feeds');
+				const secret = (uuid() + uuid()).replace(/-/g, '').slice(0, 43);
+				const feed: StoredCalendarFeed = {
+					id: uuid(),
+					label: body.label.trim(),
+					include: [...include] as CalendarFeed['include'],
+					createdAt: new Date(clock()).toISOString(),
+					expiresAt: days ? new Date(clock() + days * 86400_000).toISOString() : null,
+					lastUsedAt: null,
+					secret
+				};
+				state.calendarFeeds.push(feed);
+				const { secret: _s, ...publicFeed } = feed;
+				return ok({ ...publicFeed, token: secret, path: `/ics/${secret}.ics` }, 201);
+			}
+		}
+		if ((m = route.match(/^me\/calendar-feeds\/([^/]+)$/)) && method === 'DELETE') {
+			const index = state.calendarFeeds.findIndex((f) => f.id === m![1]);
+			if (index >= 0) state.calendarFeeds.splice(index, 1);
+			return { status: 204 };
+		}
 		if ((m = route.match(/^me\/trigger-links\/([^/]+)$/)) && method === 'DELETE') {
 			const index = state.triggerLinks.findIndex((l) => l.id === m![1]);
 			if (index < 0) return fail(404, 'not_found');
@@ -804,5 +927,5 @@ export function createTimeMock(clock: () => number) {
 	const setDayContext = (fn: (accountId: string, date: string) => DerivedDayContext | null) => {
 		dayContext = fn;
 	};
-	return { handle, seedDemo, automationEvent, states, modelsOf, evaluateFor, setDayContext, hookTrash };
+	return { handle, seedDemo, automationEvent, states, modelsOf, evaluateFor, setDayContext, hookTrash, hookReview };
 }

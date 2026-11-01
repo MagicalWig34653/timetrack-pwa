@@ -19,13 +19,15 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { planModeLabel } from '#lib/planning/labels.js';
+	import { blocksTimesText, listsBlocks } from '#lib/week/plan-blocks.js';
 	import CalendarClock from '@lucide/svelte/icons/calendar-clock';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import { sessionStore } from '#lib/session.svelte.js';
 	import { dayBounds, formatDateLong, todayLocal } from '#lib/time/dates.js';
-	import { formatDelta, formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { continuableSegment } from '#lib/time/continue.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
+	import { todayDeltaNote } from '#lib/time/today-delta.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import { onMount } from 'svelte';
 
@@ -134,16 +136,17 @@
 
 		<div class="grid gap-4 sm:grid-cols-2 wide:grid-cols-4" data-testid="kpi-row">
 			{#if day}
-				<KpiCard title={t('kpi.target')} value={formatDuration(day.targetSeconds)} hint={t('kpi.target_hint')} icon={Target} testid="day-target" />
-				<KpiCard title={t('kpi.actual')} value={formatDuration(day.evaluatedWorkSeconds)} hint={t('kpi.actual_hint')} icon={Gauge} testid="day-evaluated" />
-				<KpiCard title={t('kpi.balance')} value={formatDelta(day.deltaSeconds)} hint={t('kpi.balance_hint')} icon={Scale} tone={day.deltaSeconds < 0 ? 'negative' : 'default'} testid="day-delta" />
+				<KpiCard title={t('kpi.target')} seconds={day.targetSeconds} hint={t('kpi.target_hint')} icon={Target} testid="day-target" />
+				<KpiCard title={t('kpi.actual')} seconds={day.evaluatedWorkSeconds} hint={t('kpi.actual_hint')} icon={Gauge} testid="day-evaluated" />
+				<KpiCard title={t('kpi.balance')} seconds={day.deltaSeconds} delta hint={t('kpi.balance_hint')} icon={Scale} tone={day.deltaSeconds < 0 ? 'negative' : 'default'} testid="day-delta" />
 			{/if}
 			{#if account}
 				<KpiCard
 					title={t('kpi.account')}
-					value={formatDelta(account.balanceSeconds)}
+					seconds={account.balanceSeconds} delta
 					hint={account.provisional ? t('home.balance_provisional') : account.accountStart ? t('home.balance_since', { date: account.accountStart.split('-').reverse().join('.') }) : t('home.balance_no_start')}
 					icon={Wallet}
+					note={todayDeltaNote(account)}
 					tone={account.balanceSeconds < 0 ? 'negative' : 'default'}
 					testid="balance"
 				/>
@@ -155,7 +158,7 @@
 				<CalendarClock class="size-4 shrink-0" aria-hidden="true" />
 				<span>
 					{#if todayPlan.plannedStart && todayPlan.plannedEnd}
-						{t('home.plan_today', { time: `${todayPlan.plannedStart}–${todayPlan.plannedEnd}`, mode: planModeLabel(todayPlan.mode) })}
+						{t('home.plan_today', { time: listsBlocks(todayPlan.blocks) ? blocksTimesText(todayPlan.blocks ?? []) : `${todayPlan.plannedStart}–${todayPlan.plannedEnd}`, mode: planModeLabel(todayPlan.mode) })}
 					{:else}
 						{t('home.plan_today_no_time', { mode: planModeLabel(todayPlan.mode) })}
 					{/if}

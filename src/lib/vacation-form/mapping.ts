@@ -9,10 +9,13 @@ export const MAX_TEXT_LENGTH = 500;
 export const MAX_OVERLAYS = 200;
 export const DEFAULT_OVERLAY_FONT_SIZE = 11;
 
+/** 2: "davon abgegolten" means earlier vacation (source `compensated`), "verbleiben" the rest before the request. */
+export const MAPPING_REVISION = 2;
+
 export const EMPTY_PERSON: PersonValues = { lastName: '', firstName: '', personnelNo: '', department: '', place: '' };
 
 export function emptyMapping(): FormMapping {
-	return { version: 1, person: { ...EMPTY_PERSON }, dateFormat: 'dd.MM.yyyy', flatten: false, fields: {}, overlays: [] };
+	return { version: 1, revision: MAPPING_REVISION, person: { ...EMPTY_PERSON }, dateFormat: 'dd.MM.yyyy', flatten: false, fields: {}, overlays: [] };
 }
 
 export class MappingTooLargeError extends Error {
@@ -40,6 +43,7 @@ function parseBinding(value: unknown): Binding | null {
 	if (def.option === 'text') binding.text = str(value.text);
 	if (def.option === 'checked') binding.checked = value.checked === true;
 	if (def.option === 'index') binding.index = Math.min(Math.max(Math.trunc(finite(value.index, 1)), 1), MAX_FREE_RANGES);
+	if (def.option === 'scope') binding.scope = value.scope === 'decided' ? 'decided' : 'all';
 	if (typeof value.dateFormat === 'string' && (DATE_FORMATS as readonly string[]).includes(value.dateFormat)) binding.dateFormat = value.dateFormat as DateFormatId;
 	return binding;
 }
@@ -56,10 +60,11 @@ export function parseMapping(value: unknown): FormMapping {
 	}
 	if (typeof value.dateFormat === 'string' && (DATE_FORMATS as readonly string[]).includes(value.dateFormat)) mapping.dateFormat = value.dateFormat as DateFormatId;
 	mapping.flatten = value.flatten === true;
+	const legacy = !(typeof value.revision === 'number' && value.revision >= MAPPING_REVISION);
 	if (isRecord(value.fields)) {
 		for (const [name, raw] of Object.entries(value.fields)) {
 			const binding = parseBinding(raw);
-			if (binding && name.length <= MAX_FIELD_NAME_LENGTH) mapping.fields[name] = binding;
+			if (binding && name.length <= MAX_FIELD_NAME_LENGTH) mapping.fields[name] = legacy ? migrateLegacyBinding(name, binding) : binding;
 		}
 	}
 	if (Array.isArray(value.overlays)) {
@@ -81,6 +86,19 @@ export function parseMapping(value: unknown): FormMapping {
 	return mapping;
 }
 
+/**
+ * One-time fix of mappings saved before revision 2: the suggestion used to put the negative corrections on "davon abgegolten"
+ * and the rest after the request on "verbleiben", which does not match the form (gesamt - abgegolten = verbleiben, then
+ * the request, then Resttage). Only the old suggested sources on fields with those names are replaced; every other
+ * assignment, and any later deliberate choice (the revision is then saved), stays.
+ */
+function migrateLegacyBinding(fieldName: string, binding: Binding): Binding {
+	const n = fieldName.toLowerCase();
+	if (binding.source === 'paidOut' && n.includes('abgegolten')) return newBinding('compensated');
+	if (binding.source === 'restAfter' && n.includes('anspruch') && n.includes('verbleib')) return newBinding('restBefore');
+	return binding;
+}
+
 export function parseMappingJson(json: string): FormMapping {
 	try {
 		return parseMapping(JSON.parse(json));
@@ -96,6 +114,7 @@ export function newBinding(source: SourceId): Binding {
 	if (def.option === 'text') binding.text = '';
 	if (def.option === 'checked') binding.checked = true;
 	if (def.option === 'index') binding.index = 1;
+	if (def.option === 'scope') binding.scope = 'all';
 	return binding;
 }
 
@@ -111,11 +130,13 @@ export function suggestSource(fieldName: string, kind: TargetKind): SourceId | n
 	if (kind === 'checkbox') return null;
 	if (has('vertret')) return 'substitute';
 	if (has('anspruch') && has('gesamt')) return 'entitlementTotal';
-	if (has('anspruch') && has('verbleib', 'rest')) return 'restAfter';
-	if (has('anspruch')) return 'entitlementYear';
+	if (has('abgegolten')) return 'compensated';
+	if (has('anspruch') && has('verbleib')) return 'restBefore';
+	if (has('anspruch') && has('rest')) return 'restAfter';
+	// "Zusatzurlaub" / "Übertrag Vorjahr" fields may carry "anspruch" in their name, so they are checked first
 	if (has('übertrag', 'uebertrag', 'vorjahr')) return 'carryOver';
 	if (has('zusatz')) return 'additional';
-	if (has('abgegolten')) return 'paidOut';
+	if (has('anspruch')) return 'entitlementYear';
 	if (has('resttage', 'rest')) return 'restAfter';
 	if (has('arbeitstage')) return 'workingDays';
 	if (has('nachname', 'familienname') || (word('last', 'family', 'surname') && word('name'))) return 'lastName';

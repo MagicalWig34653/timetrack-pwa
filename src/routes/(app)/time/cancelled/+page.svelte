@@ -10,7 +10,7 @@
 	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import { addDays, formatDateShort, localDateOf, localTimeOf, todayLocal } from '#lib/time/dates.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { kindLabel, SEGMENT_KINDS } from '#lib/time/labels.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { filterCancelled, isMissingEndpoint, PURGE_WORD, toggleAll, toggleId } from '#lib/time/trash.js';
@@ -218,7 +218,7 @@
 					<Checkbox checked={selected.has(segment.id)} onchange={() => (selected = toggleId(selected, segment.id))} aria-label={t('trash.select_row', { date: formatDateShort(date) })} data-testid="trash-select" />
 					<a class="min-w-24 font-medium underline-offset-4 hover:underline" href="/time/{date}">{formatDateShort(date)}</a>
 					<span class="tabular-nums">{rangeText(segment)}</span>
-					<span class="text-sm text-muted-foreground tabular-nums">{formatDuration(lengthOf(segment))}</span>
+					<span class="text-sm text-muted-foreground tabular-nums">{timeDisplay.duration(lengthOf(segment))}</span>
 					<Badge variant="outline">{kindLabel(segment.kind)}</Badge>
 					{#if reasonOf.get(segment.id)}<span class="min-w-0 truncate text-sm text-muted-foreground" title={t('trash.reason')}>{t('trash.reason_text', { reason: reasonOf.get(segment.id) ?? '' })}</span>{/if}
 					{#if segment.note}<span class="min-w-0 truncate text-sm text-muted-foreground">{segment.note}</span>{/if}

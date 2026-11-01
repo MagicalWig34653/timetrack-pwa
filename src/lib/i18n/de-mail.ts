@@ -87,7 +87,7 @@ export const deMail = {
 	'mail.test.rate_limited': 'Zu viele Testmails. Du kannst alle 10 Minuten drei senden und höchstens drei pro Stunde an dieselbe Adresse.',
 
 	'mail.use.title': 'Wofür wird E-Mail genutzt?',
-	'mail.use.recovery': 'Wiederherstellung: Wer keinen Passkey mehr hat, kann sich einen Code an die hinterlegte Adresse schicken lassen (wenn die Person diesen Weg eingerichtet hat).',
+	'mail.use.recovery': 'Wiederherstellung: Wer keinen Passkey mehr hat, kann sich einen Code an die Kontomail schicken lassen (wenn die Person diesen Weg eingeschaltet hat und die Adresse bestätigt ist).',
 	'mail.use.confirm': 'Adresse bestätigen: Beim Eintragen oder Ändern der E-Mail-Adresse im Profil wird ein Code geschickt, damit niemand fremde Adressen eintragen kann.',
 	'mail.use.optional': 'Ohne E-Mail bleibt alles nutzbar. Es gibt dann nur Wiederherstellung per Codes oder Passwort, und Adressen bleiben unbestätigt.',
 

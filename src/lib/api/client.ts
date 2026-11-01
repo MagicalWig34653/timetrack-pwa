@@ -2,7 +2,10 @@ import { splitRange } from '../time/dates';
 import { pwa } from '../pwa/pwa.svelte';
 import { ApiError } from './errors';
 import type {
+	ApnsCheckResult,
+	ApnsStatus,
 	MailCheckResult,
+	PushDeviceInfo,
 	MailStatus,
 	MailTestResult,
 	AdminAccount,
@@ -38,6 +41,8 @@ import type {
 	Absence,
 	AbsenceInput,
 	AccountAdjustmentInput,
+	AccountAdjustmentPage,
+	LegalProfile,
 	CalendarDay,
 	CustomDayInput,
 	IncomingShare,
@@ -65,6 +70,8 @@ import type {
 	DeviceToken,
 	DeviceTokenCreated,
 	TriggerLink,
+	CalendarFeed,
+	CalendarFeedInput,
 	TriggerLinkInput,
 	Place,
 	PlaceInput,
@@ -84,6 +91,17 @@ import type {
 	WorkModelInput,
 	WorkModelPreview,
 	Invitation,
+	Catalog,
+	CatalogInput,
+	ItemSuggestion,
+	Order,
+	OrderInput,
+	OrderPatch,
+	OrderSummary,
+	Poll,
+	PollInput,
+	PollPatch,
+	PollSummary,
 	ModuleKey,
 	ModuleStatus,
 	ServerModule,
@@ -132,8 +150,11 @@ export function setModuleDisabledHandler(handler: (() => void) | null): void {
 }
 
 export function setCsrfToken(token: string | null): void {
+	// A session refresh with the same token (route changes re-read the session) must not drop the read cache;
+	// login, logout and account switch change the token.
+	const changed = token !== csrfToken;
 	csrfToken = token;
-	invalidateReadCache();
+	if (changed) invalidateReadCache();
 }
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -254,24 +275,32 @@ export function retryAfterMs(header: string | null, now = Date.now()): number | 
 /** Short-lived cache for expensive, rarely changing reads (time account); any successful write clears it. */
 const readCache = new Map<string, { at: number; value: Promise<unknown> }>();
 const READ_CACHE_TTL_MS = 30_000;
+/** Slow-changing reference data (holidays, places, work models, legal profiles): kept across week switches. */
+const STATIC_CACHE_TTL_MS = 5 * 60_000;
 export function invalidateReadCache(): void {
 	readCache.clear();
 }
-function cachedRead<T>(key: string, load: () => Promise<T>): Promise<T> {
+/** Cached (and in-flight deduplicated) read; every successful write, login and logout clears the cache. */
+export function cachedRead<T>(key: string, load: () => Promise<T>, ttlMs = READ_CACHE_TTL_MS): Promise<T> {
 	const hit = readCache.get(key);
-	if (hit && Date.now() - hit.at < READ_CACHE_TTL_MS) return hit.value as Promise<T>;
+	if (hit && Date.now() - hit.at < ttlMs) return hit.value as Promise<T>;
 	const value = load();
 	readCache.set(key, { at: Date.now(), value });
 	value.catch(() => readCache.delete(key));
 	return value;
 }
 
-async function request<T>(
+async function request<T>(method: Method, path: string, body?: unknown, extraHeaders: Record<string, string> = {}): Promise<T> {
+	return (await requestWithStatus<T>(method, path, body, extraHeaders)).data;
+}
+
+/** Like `request`, but also returns the HTTP status for endpoints whose 2xx codes mean different things (204 vs 202). */
+async function requestWithStatus<T>(
 	method: Method,
 	path: string,
 	body?: unknown,
 	extraHeaders: Record<string, string> = {}
-): Promise<T> {
+): Promise<{ status: number; data: T }> {
 	const headers: Record<string, string> = { Accept: 'application/json', ...extraHeaders };
 	if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
 	if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -308,7 +337,7 @@ async function request<T>(
 	if (method !== 'GET') invalidateReadCache();
 	// 204 and bodyless 202 (e.g. PUT /me/recovery/email) carry no JSON.
 	const text = await response.text();
-	return (text ? JSON.parse(text) : undefined) as T;
+	return { status: response.status, data: (text ? JSON.parse(text) : undefined) as T };
 }
 
 /** Session-returning calls refresh the CSRF token held by the client. */
@@ -428,7 +457,11 @@ export const api = {
 	setFallbackPassword: (password: string) =>
 		request<void>('PUT', '/me/recovery/fallback-password', { password }),
 	removeFallbackPassword: () => request<void>('DELETE', '/me/recovery/fallback-password'),
-	enableEmailRecovery: (email: string) => request<void>('PUT', '/me/recovery/email', { email }),
+	/**
+	 * Contract 0.36.0: the account e-mail is the recovery address, so the call has no body. 'active' = 204 (confirmed account
+	 * address, recovery is on), 'code' = 202 (a code went to the account address; confirm it with verifyRecoveryEmail).
+	 */
+	enableEmailRecovery: async (): Promise<'active' | 'code'> => ((await requestWithStatus<void>('PUT', '/me/recovery/email')).status === 202 ? 'code' : 'active'),
 	disableEmailRecovery: () => request<void>('DELETE', '/me/recovery/email'),
 	verifyRecoveryEmail: (code: string) =>
 		request<void>('POST', '/me/recovery/email/verify', { code }),
@@ -446,7 +479,8 @@ export const api = {
 	revokeInvitation: (id: string) => request<void>('DELETE', `/admin/invitations/${id}`),
 
 	// work models
-	listWorkModels: () => request<WorkModel[]>('GET', '/work-models'),
+	listWorkModels: () => cachedRead('work-models', () => request<WorkModel[]>('GET', '/work-models'), STATIC_CACHE_TTL_MS),
+	listLegalProfiles: () => cachedRead('legal-profiles', () => request<LegalProfile[]>('GET', '/legal-profiles'), STATIC_CACHE_TTL_MS),
 	createWorkModel: (input: WorkModelInput) => request<WorkModel>('POST', '/work-models', input),
 	/** Contract v0.16.0: replaces every editable field of one version (the evaluation of its days changes). */
 	correctWorkModel: (id: string, input: WorkModelInput, version?: number) =>
@@ -455,10 +489,13 @@ export const api = {
 	endWorkModel: (id: string, validTo: string) => request<WorkModel>('PATCH', `/work-models/${id}`, { validTo }),
 
 	// places
-	listPlaces: () => request<Place[]>('GET', '/places'),
+	listPlaces: () => cachedRead('places', () => request<Place[]>('GET', '/places'), STATIC_CACHE_TTL_MS),
 	createPlace: (input: PlaceInput) => request<Place>('POST', '/places', input),
 	updatePlace: (id: string, input: PlaceInput) => request<Place>('PUT', `/places/${id}`, input),
 	archivePlace: (id: string) => request<void>('DELETE', `/places/${id}`),
+	/** Contract 0.39.0; servers before it answer 400/404 or the active list (callers filter on `archived`). */
+	listArchivedPlaces: () => request<Place[]>('GET', '/places?archived=true'),
+	restorePlace: (id: string) => request<Place>('POST', `/places/${id}/restore`),
 
 	// segments and timer; `ifMatchVersion` becomes the If-Match header
 	listSegments: (from: string, to: string, includeVoided = false) =>
@@ -508,8 +545,8 @@ export const api = {
 
 	// day evaluations and time account
 	/** time/days allows at most 93 days per request (range_too_large); longer ranges are loaded in chunks. */
-	listDays: async (from: string, to: string) =>
-		(await Promise.all(splitRange(from, to, MAX_DAYS_EVALUATIONS).map((r) => request<DayEvaluation[]>('GET', `/time/days?from=${r.from}&to=${r.to}`)))).flat(),
+	listDays: (from: string, to: string) =>
+		cachedRead(`days:${from}:${to}`, async () => (await Promise.all(splitRange(from, to, MAX_DAYS_EVALUATIONS).map((r) => request<DayEvaluation[]>('GET', `/time/days?from=${r.from}&to=${r.to}`)))).flat()),
 	getDay: (date: string) => request<DayEvaluation>('GET', `/time/days/${date}`),
 	setDayPreferences: (date: string, input: DayPreferences) =>
 		request<DayEvaluation>('PUT', `/time/days/${date}`, input),
@@ -517,6 +554,9 @@ export const api = {
 		cachedRead(`account:${asOf ?? ''}`, () => request<TimeAccount>('GET', `/time/account${asOf ? `?asOf=${asOf}` : ''}`)),
 	createAccountAdjustment: (input: AccountAdjustmentInput) =>
 		request<TimeAccount>('POST', '/time/account/adjustments', input),
+	listAccountAdjustments: (limit = 50, offset = 0) =>
+		request<AccountAdjustmentPage>('GET', `/time/account/adjustments?limit=${limit}&offset=${offset}`),
+	deleteAccountAdjustment: (id: string) => request<TimeAccount>('DELETE', `/time/account/adjustments/${id}`),
 
 	// suggestions
 	listSuggestions: () => request<Suggestion[]>('GET', '/time/suggestions'),
@@ -531,6 +571,10 @@ export const api = {
 	revokeDeviceToken: (id: string) => request<void>('DELETE', `/me/device-tokens/${id}`),
 	listTriggerLinks: () => request<TriggerLink[]>('GET', '/me/trigger-links'),
 	createTriggerLink: (input: TriggerLinkInput) => request<TriggerLink>('POST', '/me/trigger-links', input),
+	// ICS subscriptions (contract 0.31.0)
+	listCalendarFeeds: () => request<CalendarFeed[]>('GET', '/me/calendar-feeds'),
+	createCalendarFeed: (input: CalendarFeedInput) => request<CalendarFeed>('POST', '/me/calendar-feeds', input),
+	revokeCalendarFeed: (id: string) => request<void>('DELETE', `/me/calendar-feeds/${id}`),
 	revokeTriggerLink: (id: string) => request<void>('DELETE', `/me/trigger-links/${id}`),
 
 	// vacation (contract v0.3.1); amounts are half days; GET settings answers 200 with `configured: false` until saved
@@ -559,9 +603,9 @@ export const api = {
 
 	// absences; `ifMatchVersion` becomes the If-Match header; ranges above 366 days are loaded in chunks
 	// `hasAttachment` is the contract 0.24.0 server filter (older servers ignore it and return everything)
-	listAbsences: async (from: string, to: string, options: { hasAttachment?: boolean } = {}) => {
+	listAbsences: (from: string, to: string, options: { hasAttachment?: boolean } = {}) => {
 		const filter = options.hasAttachment === undefined ? '' : `&hasAttachment=${options.hasAttachment}`;
-		return (await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<Absence[]>('GET', `/absences?from=${r.from}&to=${r.to}${filter}`)))).flat();
+		return cachedRead(`absences:${from}:${to}${filter}`, async () => (await Promise.all(splitRange(from, to, MAX_DAYS_RANGE).map((r) => request<Absence[]>('GET', `/absences?from=${r.from}&to=${r.to}${filter}`)))).flat());
 	},
 	getAbsence: (id: string) => request<Absence>('GET', `/absences/${id}`),
 	createAbsence: (input: AbsenceInput) => request<Absence>('POST', '/absences', input),
@@ -571,7 +615,7 @@ export const api = {
 
 	// calendar and plan
 	listHolidays: (year: number, region?: string) =>
-		request<CalendarDay[]>('GET', `/calendar/holidays?year=${year}${region ? `&region=${encodeURIComponent(region)}` : ''}`),
+		cachedRead(`holidays:${year}:${region ?? ''}`, () => request<CalendarDay[]>('GET', `/calendar/holidays?year=${year}${region ? `&region=${encodeURIComponent(region)}` : ''}`), STATIC_CACHE_TTL_MS),
 	createCustomDay: (input: CustomDayInput) => request<CalendarDay>('POST', '/calendar/custom-days', input),
 	deleteCustomDay: (id: string) => request<void>('DELETE', `/calendar/custom-days/${id}`),
 	listPlanDays: async (from: string, to: string) =>
@@ -624,6 +668,8 @@ export const api = {
 	getMailStatus: () => request<MailStatus>('GET', '/admin/mail'),
 	checkMail: () => request<MailCheckResult>('POST', '/admin/mail/check'),
 	sendMailTest: (to?: string) => request<MailTestResult>('POST', '/admin/mail/test', to ? { to } : {}),
+	getApnsStatus: () => request<ApnsStatus>('GET', '/admin/apns'),
+	checkApns: () => request<ApnsCheckResult>('POST', '/admin/apns/check'),
 
 	// file storage (admin) and files
 	getStorageSettings: () => request<StorageSettings>('GET', '/admin/storage'),
@@ -670,6 +716,9 @@ export const api = {
 	createPushSubscription: (input: PushSubscriptionInput) => request<PushSubscriptionInfo>('POST', '/me/push-subscriptions', input),
 	deletePushSubscription: (id: string) => request<void>('DELETE', `/me/push-subscriptions/${id}`),
 	sendTestPush: (id: string) => request<void>('POST', `/me/push-subscriptions/${id}/test`),
+	listPushDevices: () => request<PushDeviceInfo[]>('GET', '/me/push-devices'),
+	deletePushDevice: (id: string) => request<void>('DELETE', `/me/push-devices/${id}`),
+	sendTestPushDevice: (id: string) => request<void>('POST', `/me/push-devices/${id}/test`),
 
 	// version information, contract v0.19.0 (ADR-0023); older servers answer 404
 	getSystemInfo: () => request<SystemInfo>('GET', '/system/info'),
@@ -678,5 +727,33 @@ export const api = {
 	listModules: () => request<ModuleStatus[]>('GET', '/modules'),
 	putMyModules: (modules: Partial<Record<ModuleKey, boolean>>) => request<ModuleStatus[]>('PUT', '/me/modules', { modules }),
 	getServerModules: () => request<ServerModule[]>('GET', '/admin/modules'),
-	putServerModules: (modules: Partial<Record<ModuleKey, boolean>>) => request<ServerModule[]>('PUT', '/admin/modules', { modules })
+	putServerModules: (modules: Partial<Record<ModuleKey, boolean>>) => request<ServerModule[]>('PUT', '/admin/modules', { modules }),
+
+	// groups module, contract v0.37.0 (ADR-0033): owner side; the public participant side lives in lib/groups/public-api.ts
+	listPolls: () => request<PollSummary[]>('GET', '/groups/polls'),
+	createPoll: (input: PollInput) => request<Poll>('POST', '/groups/polls', input),
+	getPoll: (id: string) => request<Poll>('GET', `/groups/polls/${id}`),
+	patchPoll: (id: string, patch: PollPatch) => request<Poll>('PATCH', `/groups/polls/${id}`, patch),
+	deletePoll: (id: string) => request<void>('DELETE', `/groups/polls/${id}`),
+	closePoll: (id: string) => request<Poll>('POST', `/groups/polls/${id}/close`),
+	reopenPoll: (id: string) => request<Poll>('POST', `/groups/polls/${id}/reopen`),
+	setPollFinalOption: (id: string, optionId: string | null) => request<Poll>('POST', `/groups/polls/${id}/final`, { optionId }),
+	rotatePollToken: (id: string) => request<Poll>('POST', `/groups/polls/${id}/rotate-token`),
+	removePollVote: (id: string, voteId: string) => request<void>('DELETE', `/groups/polls/${id}/votes/${voteId}`),
+	listOrders: () => request<OrderSummary[]>('GET', '/groups/orders'),
+	createOrder: (input: OrderInput) => request<Order>('POST', '/groups/orders', input),
+	getOrder: (id: string) => request<Order>('GET', `/groups/orders/${id}`),
+	patchOrder: (id: string, patch: OrderPatch) => request<Order>('PATCH', `/groups/orders/${id}`, patch),
+	deleteOrder: (id: string) => request<void>('DELETE', `/groups/orders/${id}`),
+	closeOrder: (id: string) => request<Order>('POST', `/groups/orders/${id}/close`),
+	reopenOrder: (id: string) => request<Order>('POST', `/groups/orders/${id}/reopen`),
+	rotateOrderToken: (id: string) => request<Order>('POST', `/groups/orders/${id}/rotate-token`),
+	removeOrderEntry: (id: string, entryId: string) => request<void>('DELETE', `/groups/orders/${id}/entries/${entryId}`),
+	exportOrder: (id: string, format: 'csv' | 'txt') => download(`/groups/orders/${id}/export?format=${format}`),
+	listOrderItemSuggestions: () => request<ItemSuggestion[]>('GET', '/groups/orders/suggestions'),
+	listCatalogs: () => request<Catalog[]>('GET', '/groups/catalogs'),
+	createCatalog: (input: CatalogInput) => request<Catalog>('POST', '/groups/catalogs', input),
+	getCatalog: (id: string) => request<Catalog>('GET', `/groups/catalogs/${id}`),
+	replaceCatalog: (id: string, input: CatalogInput) => request<Catalog>('PUT', `/groups/catalogs/${id}`, input),
+	deleteCatalog: (id: string) => request<void>('DELETE', `/groups/catalogs/${id}`)
 };

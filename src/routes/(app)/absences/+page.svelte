@@ -16,6 +16,7 @@
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
 	import { errorMessage, t } from '#lib/i18n/index.js';
+	import { quickStatusesFor, isCancelledLike } from '#lib/planning/absence-status.js';
 	import { ABSENCE_CLASSES, ABSENCE_KINDS, ABSENCE_STATUSES, absenceKindLabel, absenceStatusLabel, documentStatusLabel } from '#lib/planning/labels.js';
 	import {
 		ABSENCE_SORTS,
@@ -41,7 +42,7 @@
 	import { absenceInputOf } from '#lib/planning/operations.js';
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 
 	let load = $state<LoadState>({ status: 'loading' });
 	const currentYear = Number(todayLocal(zoneStore.value).slice(0, 4));
@@ -99,7 +100,36 @@
 	const attachmentsKnown = $derived(absences.every((a) => counts[a.id] !== undefined));
 	const facet = (patch: Partial<AbsenceFilters>) => applyFilters(absences, { ...filters, ...patch }, counts).length;
 
-	// Remember the filters and mirror them in the URL (replace, no history entries).
+	// The text field keeps its own draft: the list and the URL follow after a short pause, so typing never waits for a re-render.
+	const TEXT_DEBOUNCE_MS = 250;
+	let qDraft = $state(untrack(() => filters.q));
+	let qTimer: ReturnType<typeof setTimeout> | undefined;
+	function onQInput() {
+		clearTimeout(qTimer);
+		qTimer = setTimeout(() => {
+			qTimer = undefined;
+			filters.q = qDraft;
+		}, TEXT_DEBOUNCE_MS);
+	}
+	onDestroy(() => clearTimeout(qTimer));
+	// Filters changed from outside (reset, URL navigation) replace the draft; a pending debounce keeps the draft.
+	$effect(() => {
+		const q = filters.q;
+		if (qTimer === undefined && q !== untrack(() => qDraft)) qDraft = q;
+	});
+
+	// While a filter control has the focus the list keeps its height, so a shrinking result never shifts the page under the cursor.
+	let resultsEl = $state<HTMLElement>();
+	let reservedHeight = $state(0);
+	/** Called before a filter change is rendered (input/change bubble up here first): remember the tallest list seen while filtering. */
+	function holdHeight() {
+		reservedHeight = Math.max(reservedHeight, resultsEl?.offsetHeight ?? 0);
+	}
+	function filterFocusOut(event: FocusEvent) {
+		if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) reservedHeight = 0;
+	}
+
+	// Remember the filters and mirror them in the URL (replace, no history entries; the focus and the scroll position stay).
 	$effect(() => {
 		const snapshot = $state.snapshot(filters);
 		saveFilters(snapshot);
@@ -107,7 +137,7 @@
 		const target = search ? `?${search}` : '';
 		if (load.status !== 'ready' || target === page.url.search) return;
 		lastWritten = target;
-		void goto(`${page.url.pathname}${target}`, { replace: true });
+		void goto(`${page.url.pathname}${target}`, { replace: true, reset: false });
 	});
 
 	// Follow external URL changes (e.g. the sidebar link to the plain page, or browser navigation).
@@ -125,7 +155,10 @@
 	});
 
 	function resetFilters() {
+		clearTimeout(qTimer);
+		qTimer = undefined;
 		filters = { ...DEFAULT_ABSENCE_FILTERS, sort: filters.sort };
+		qDraft = '';
 	}
 
 	function toggleAttachments(id: string) {
@@ -187,7 +220,7 @@
 	function menuFor(absence: Absence): MenuEntry[] {
 		return [
 			{ id: 'edit', label: t('absence.edit'), onselect: () => (editing = absence) },
-			...(['planned', 'approved', 'taken', 'cancelled'] as AbsenceStatus[])
+			...quickStatusesFor(absence.kind)
 				.filter((s) => s !== absence.status)
 				.map<MenuEntry>((s) => ({ id: `status-${s}`, label: t('cal.menu_status', { status: absenceStatusLabel(s) }), onselect: () => void setStatus(absence, s) })),
 			{ separator: true },
@@ -199,7 +232,7 @@
 		];
 	}
 
-	const countsNot = (a: Absence) => a.status === 'rejected' || a.status === 'cancelled';
+	const countsNot = (a: Absence) => isCancelledLike(a.status);
 </script>
 
 <PageHeader title={t('absences.title')} description={t('absences.description')} />
@@ -221,10 +254,10 @@
 			<Button class="sm:ml-auto" onclick={() => (editing = 'new')}>{t('absence.create_title')}</Button>
 		</div>
 
-		<section class="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('absences.filters')} data-testid="absence-filters">
+		<section class="grid gap-3 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('absences.filters')} data-testid="absence-filters" onfocusin={holdHeight} oninput={holdHeight} onchange={holdHeight} onfocusout={filterFocusOut}>
 			<div class="flex flex-col gap-1.5 lg:col-span-2">
 				<Label for="filter-q">{t('absences.filter_q')}</Label>
-				<Input id="filter-q" type="search" bind:value={filters.q} placeholder={t('absences.filter_q_placeholder')} autocomplete="off" />
+				<Input id="filter-q" type="search" bind:value={qDraft} oninput={onQInput} placeholder={t('absences.filter_q_placeholder')} autocomplete="off" />
 			</div>
 			<div class="flex flex-col gap-1.5">
 				<Label for="filter-status">{t('absences.filter_status')}</Label>
@@ -260,11 +293,12 @@
 					{#each ABSENCE_SORTS as option (option)}<option value={option}>{t(`absences.sort.${option}`)}</option>{/each}
 				</Select>
 			</div>
-			<div class="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-4">
+			<div class="flex min-h-8 flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-4">
 				<p class="text-sm text-muted-foreground tabular-nums" aria-live="polite" data-testid="absences-count">
 					{t('absences.count', { shown: visible.length, total: absences.length })}
 				</p>
-				{#if active}<Button type="button" variant="outline" size="sm" onclick={resetFilters} data-testid="absences-reset">{t('absences.reset')}</Button>{/if}
+				<!-- always rendered so that the box keeps its height; hidden and inert while no filter is active -->
+				<Button type="button" variant="outline" size="sm" class={active ? '' : 'invisible'} inert={!active} onclick={resetFilters} data-testid="absences-reset">{t('absences.reset')}</Button>
 			</div>
 		</section>
 
@@ -275,6 +309,7 @@
 			<AbsenceForm date={today} onsaved={saved} oncancel={() => (editing = null)} />
 		{/if}
 
+		<div bind:this={resultsEl} style:min-height={reservedHeight > 0 ? `${reservedHeight}px` : undefined} data-testid="absence-results">
 		{#if visible.length === 0}
 			<div class="flex flex-col items-start gap-2 rounded-lg border border-dashed p-4" data-testid="absences-empty">
 				<p class="text-sm text-muted-foreground">{absences.length === 0 ? t('absences.empty_year', { year }) : t('absences.empty')}</p>
@@ -344,6 +379,7 @@
 				{/each}
 			</ul>
 		{/if}
+		</div>
 		<p class="text-xs text-muted-foreground">{t('absences.footnote')}</p>
 	</div>
 {/if}

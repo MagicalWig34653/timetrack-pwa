@@ -1,8 +1,11 @@
 import type { PlanMode, TimeWeekDay, TimeWeekSummary, WeekMark } from '#lib/api/types.js';
 import { t, type MessageKey } from '#lib/i18n/index.js';
+import { holidayHint } from '#lib/planning/company-days.js';
 import { absenceKindLabel } from '#lib/planning/labels.js';
 import { formatDateLong } from '#lib/time/dates.js';
 import { absenceWarning, chipAbsences } from './absences.js';
+import { blocksText, listsBlocks } from './plan-blocks.js';
+import { vacationTooltip, type VacationEntry } from './vacation.js';
 import { formatDelta, formatDuration } from '#lib/time/format.js';
 
 /** Presentation rules of the week overview (K1, ADR-0021); pure so they can be unit tested. */
@@ -41,11 +44,13 @@ export function isEmptyWeek(days: TimeWeekDay[]): boolean {
 }
 
 /** Screen reader label of a day card, e.g. "Dienstag, 20.10.2026: 7:42 Stunden, Saldo plus 0:12, Büro". */
-export function dayAriaLabel(day: TimeWeekDay): string {
+export function dayAriaLabel(day: TimeWeekDay, vacation: VacationEntry[] | null = null): string {
 	const parts = [formatDateLong(day.date)];
 	if (day.mark !== 'work') parts.push(weekMarkLabel(day.mark));
-	for (const absence of chipAbsences(day)) {
-		const warning = absenceWarning(absence.status);
+	if (day.holidayName) parts.push(holidayHint(day.holidayName, day.companyDayTreatment));
+	for (const entry of vacation ?? []) parts.push(vacationTooltip(entry));
+	for (const absence of chipAbsences(day, vacation !== null)) {
+		const warning = absenceWarning(absence.status, absence.kind);
 		parts.push(warning ? `${absenceKindLabel(absence.kind)}, ${warning}` : absenceKindLabel(absence.kind));
 	}
 	if (day.isFuture) {
@@ -58,6 +63,11 @@ export function dayAriaLabel(day: TimeWeekDay): string {
 		}
 	}
 	if (day.planMode && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark)) parts.push(planModeShort(day.planMode));
+	if (listsBlocks(day.planBlocks) && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark)) parts.push(blocksText(day.planBlocks ?? []));
+	if (day.planActualDifferenceSeconds !== null && day.planActualDifferenceSeconds !== undefined) {
+		const sign = day.planActualDifferenceSeconds > 0 ? 'plus ' : day.planActualDifferenceSeconds < 0 ? 'minus ' : '';
+		parts.push(t('weekview.aria_plan_diff', { delta: day.planActualDifferenceSeconds === 0 ? 'genau im Plan' : sign + formatDuration(Math.abs(day.planActualDifferenceSeconds)) }));
+	}
 	if (day.provisional && !day.isFuture) parts.push(t('weekview.provisional'));
 	return parts.join(', ');
 }
@@ -87,6 +97,8 @@ export function summarySentence(summary: TimeWeekSummary, current: boolean, week
 	if (summary.targetToDateSeconds === 0 && diff === 0) comparison = '';
 	else if (diff === 0) comparison = t('weekview.sentence.on_target');
 	else comparison = t(diff < 0 ? 'weekview.sentence.under' : 'weekview.sentence.over', { time: formatDuration(Math.abs(diff)) });
+	// the balance counts completed days only (contract 0.36.0): say so in the running week
+	if (comparison && current && summary.includesToday === false) comparison += ` ${t('weekview.sentence.until_yesterday')}`;
 	const head = t('weekview.sentence.worked', { prefix, time: worked }) + (comparison ? `, ${comparison}` : '');
 	const extras = noteworthyDays(summary);
 	return extras.length > 0 ? `${head}; ${extras.join(', ')}.` : `${head}.`;

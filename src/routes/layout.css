@@ -4,6 +4,8 @@
 @import "@fontsource-variable/inter";
 
 @custom-variant dark (&:is(.dark *));
+/* U1: landscape desktops (sidebar shell, 1280 px wide, at least 640 px high): calendar and planner fill the viewport height instead of scrolling the page. */
+@custom-variant fit (@media (min-width: 1280px) and (min-height: 640px));
 
 /* Design language (docs/DESIGN.md in the backend repo, ADR-0014): Zinc tokens in OKLCH. */
 :root {
@@ -18,7 +20,7 @@
 	--secondary: oklch(0.967 0.001 286.375);
 	--secondary-foreground: oklch(0.21 0.006 285.885);
 	--muted: oklch(0.967 0.001 286.375);
-	--muted-foreground: oklch(0.552 0.016 285.938);
+	--muted-foreground: oklch(0.51 0.016 285.938);
 	--accent: oklch(0.967 0.001 286.375);
 	--accent-foreground: oklch(0.21 0.006 285.885);
 	--destructive: oklch(0.577 0.245 27.325);
@@ -158,6 +160,28 @@
 	:focus-visible {
 		outline: 2px solid var(--ring);
 		outline-offset: 2px;
+	}
+	/* Tailwind 4 resets buttons to the default arrow: every clickable control gets the hand again, disabled ones the barred cursor.
+	   Utility classes (cursor-grab, cursor-text, ...) sit in a later layer and still win where they are set on purpose. */
+	button:not(:disabled),
+	[role='button']:not([aria-disabled='true']),
+	[role='tab']:not([aria-disabled='true']),
+	[role='menuitem']:not([aria-disabled='true']),
+	[role='switch']:not([aria-disabled='true']),
+	a[href],
+	summary,
+	select:not(:disabled),
+	label[for]:not(:has(:disabled)),
+	input:is([type='checkbox'], [type='radio'], [type='submit'], [type='button'], [type='file']):not(:disabled) {
+		cursor: pointer;
+	}
+	button:disabled,
+	[role='button'][aria-disabled='true'],
+	[role='tab'][aria-disabled='true'],
+	[role='menuitem'][aria-disabled='true'],
+	select:disabled,
+	input:is([type='checkbox'], [type='radio'], [type='submit'], [type='button'], [type='file']):disabled {
+		cursor: not-allowed;
 	}
 	input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='color']),
 	select {

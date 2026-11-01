@@ -143,6 +143,23 @@ describe('fetch', () => {
 		expect(await (await offlinePage)!.text()).toBe('shell');
 	});
 
+	it('never intercepts the public group API (G2): participant data is network-only', async () => {
+		const token = 'A'.repeat(43);
+		for (const url of [`https://app.example/api/v1/public/groups/${token}`, `https://app.example/api/v1/public/groups/${token}/votes`, `https://app.example/api/v1/public/groups/${token}/export?format=csv`, 'https://app.example/api/v1/groups/polls']) {
+			expect(await run(url), url).toBeNull();
+			expect(await run(url, { mode: 'navigate' }), url).toBeNull();
+		}
+	});
+
+	it('serves a public group link offline with the cached shell at the same address, never via /offline?from=<token> (G2)', async () => {
+		cacheStore.set('/index.html', new Response('shell'));
+		vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('offline'))));
+		const res = await (await run(`https://app.example/g/${'B'.repeat(43)}`, { mode: 'navigate' }))!;
+		expect(res.status).toBe(200);
+		expect(await res.text()).toBe('shell');
+		expect(res.headers.get('Location')).toBeNull();
+	});
+
 	it('serves the static offline page instead of redirecting when the SPA shell is not cached', async () => {
 		cacheStore.delete('/index.html');
 		cacheStore.set('/offline.html', new Response('<h1>Keine Verbindung</h1>'));

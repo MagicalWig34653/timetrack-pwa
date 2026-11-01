@@ -20,11 +20,11 @@ async function signedIn(options?: Parameters<typeof createMockFetch>[0]) {
 }
 
 describe('module switches mock', () => {
-	it('lists five enabled modules by default', async () => {
+	it('lists six enabled modules by default', async () => {
 		const { get } = await signedIn();
 		const { status, body } = await get('/api/v1/modules');
 		expect(status).toBe(200);
-		expect(body.map((m: any) => m.key)).toEqual(['reports', 'planning', 'transfer', 'automation', 'mcp']);
+		expect(body.map((m: any) => m.key)).toEqual(['reports', 'planning', 'transfer', 'automation', 'mcp', 'groups']);
 		expect(body.every((m: any) => m.effective && m.serverEnabled && m.accountEnabled && !m.lockedByOperator)).toBe(true);
 	});
 

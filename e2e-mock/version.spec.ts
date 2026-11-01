@@ -26,7 +26,7 @@ test('the help dialog shows frontend and backend versions and a copyable support
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('0123456789abcdef0123456789abcdef01234567');
 	await page.getByRole('button', { name: 'Angaben kopieren' }).click();
 	const text = await page.evaluate(() => navigator.clipboard.readText());
-	expect(text).toMatch(/^Timetrack PWA \S+ \([0-9a-f]{7}, \d{4}-\d{2}-\d{2}\), Backend 0\.19\.0-mock \(0123456, 2026-10-18\), API 0\.19\.0, sqlite$/);
+	expect(text).toMatch(/^Timetrack PWA \S+ \([0-9a-f]{7}, \d{4}-\d{2}-\d{2}\), Backend 0\.19\.0-mock \(0123456, 2026-10-18\), API 0\.35\.0, sqlite$/);
 	await context.close();
 });
 
@@ -48,7 +48,7 @@ test('members see only version fields (no database, migrations, uptime, replica)
 	await expect(page.getByTestId('version-mismatch')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Angaben kopieren' }).click();
 	const text = await page.evaluate(() => navigator.clipboard.readText());
-	expect(text).toMatch(/Backend 0\.19\.0-mock \(0123456, 2026-10-18\), API 0\.19\.0$/);
+	expect(text).toMatch(/Backend 0\.19\.0-mock \(0123456, 2026-10-18\), API 0\.35\.0$/);
 	await context.close();
 });
 

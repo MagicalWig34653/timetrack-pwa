@@ -68,7 +68,12 @@ describe('module route classification (ADR-0012)', () => {
 			'/settings/api-tokens': 'mcp',
 			'/settings/connections': 'mcp',
 			'/settings/mcp-help': 'mcp',
-			'/oauth/consent': 'mcp'
+			'/oauth/consent': 'mcp',
+			'/groups': 'groups',
+			'/groups/polls/new': 'groups',
+			'/groups/orders/123': 'groups',
+			'/groups/catalogs': 'groups',
+			'/g/abc': 'groups'
 		};
 		for (const [path, module] of Object.entries(expected)) expect(moduleOfPath(path), path).toBe(module);
 		for (const core of ['/', '/time', '/time/2026-10-15', '/notifications', '/settings/modules', '/settings/work-model', '/admin/modules', '/admin/invitations']) {

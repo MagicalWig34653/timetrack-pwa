@@ -1,20 +1,22 @@
 <script lang="ts">
 	import { t } from '#lib/i18n/index.js';
+	import { holidayHint } from '#lib/planning/company-days.js';
 	import type { DayInfo } from '#lib/planning/calendar.js';
-	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS } from '#lib/planning/labels.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusHint, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS } from '#lib/planning/labels.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
+	import { listsBlocks } from '#lib/week/plan-blocks.js';
 
-	let { info, compact = false, hidden = new Set<string>(), draggable = false }: { info: DayInfo; compact?: boolean; hidden?: Set<string>; draggable?: boolean } = $props();
+	let { info, compact = false, hidden = new Set<string>(), draggable = false, decorative = false }: { info: DayInfo; compact?: boolean; hidden?: Set<string>; draggable?: boolean; /** hidden from assistive technology: the surrounding cell carries the full accessible name */ decorative?: boolean } = $props();
 
 	const chip = 'block max-w-full truncate rounded px-1.5 py-0.5 text-left leading-tight';
 	const text = $derived(compact ? 'text-[11px]' : 'text-xs');
 	const worked = $derived(info.evaluation && info.evaluation.evaluatedWorkSeconds > 0 ? info.evaluation.evaluatedWorkSeconds : 0);
 </script>
 
-<span class="flex min-w-0 flex-col gap-0.5 {text}">
+<span class="flex min-w-0 flex-col gap-0.5 {text}" aria-hidden={decorative ? 'true' : undefined}>
 	{#if !hidden.has('holiday')}
 		{#each info.holidays as holiday (holiday.name + holiday.startDate)}
-			<span class="{chip} {HOLIDAY_CLASS}" data-chip="holiday">{holiday.name}</span>
+			<span class="{chip} {HOLIDAY_CLASS} {holiday.companyTreatment === 'half' ? 'border border-dashed border-current' : ''}" data-chip="holiday" data-treatment={holiday.companyTreatment ?? undefined} title={holidayHint(holiday.name, holiday.companyTreatment)}>{holiday.name}{#if holiday.companyTreatment === 'half'}<span aria-hidden="true"> ½</span><span class="sr-only">, {holidayHint(holiday.name, 'half')}</span>{/if}</span>
 		{/each}
 	{/if}
 	{#if !hidden.has('school_holiday')}
@@ -30,16 +32,16 @@
 			data-absence-id={draggable ? absence.id : undefined}
 		>
 			{#if draggable && absence.startDate === info.date}<span class="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize rounded-l bg-current/30" data-resize="start" aria-hidden="true"></span>{/if}
-			{absenceKindLabel(absence.kind)}{#if !compact} ({absenceStatusLabel(absence.status)}){/if}
+			{absenceKindLabel(absence.kind)}{#if !compact && absenceStatusHint(absence)} ({absenceStatusHint(absence)}){/if}
 			{#if draggable && absence.endDate === info.date}<span class="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize rounded-r bg-current/30" data-resize="end" aria-hidden="true"></span>{/if}
 		</span>
 	{/each}
 	{#if info.plan && !hidden.has('plan')}
 		<span class="{chip} {PLAN_CLASSES[info.plan.mode]}" data-chip="plan">
-			{planModeLabel(info.plan.mode)}{#if !compact && info.plan.plannedStart && info.plan.plannedEnd}<span class="tabular-nums"> {info.plan.plannedStart}–{info.plan.plannedEnd}</span>{/if}
+			{planModeLabel(info.plan.mode)}{#if !compact && info.plan.plannedStart && info.plan.plannedEnd}<span class="tabular-nums"> {info.plan.plannedStart}–{info.plan.plannedEnd}</span>{#if listsBlocks(info.plan.blocks)}<span> · {t('calendar.plan_blocks', { count: info.plan.blocks?.length ?? 0 })}</span>{/if}{/if}
 		</span>
 	{/if}
 	{#if worked > 0 && !hidden.has('worked')}
-		<span class="px-1.5 tabular-nums text-muted-foreground" data-chip="worked">{t('calendar.worked', { time: formatDuration(worked) })}</span>
+		<span class="px-1.5 tabular-nums text-foreground/80" data-chip="worked">{t('calendar.worked', { time: timeDisplay.duration(worked) })}</span>
 	{/if}
 </span>

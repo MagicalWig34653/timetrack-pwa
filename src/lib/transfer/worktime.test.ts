@@ -104,9 +104,9 @@ describe('evaluateWorktime', () => {
 		expect(out.segments).toHaveLength(0);
 	});
 
-	it('uses taken for past and approved for current or future absences', () => {
-		const out = evaluateWorktime([row('2026-10-13', null, null, 'Urlaub'), row('2026-10-20', null, null, 'Krank')], {}, ctx());
-		expect(out.absences.map((a) => a.status)).toEqual(['taken', 'approved']);
+	it('uses taken/approved for vacation and recorded for sick leave', () => {
+		const out = evaluateWorktime([row('2026-10-13', null, null, 'Urlaub'), row('2026-10-20', null, null, 'Urlaub'), row('2026-10-14', null, null, 'Krank')], {}, ctx());
+		expect(out.absences.map((a) => [a.kind, a.status])).toEqual([['vacation', 'taken'], ['sick', 'recorded'], ['vacation', 'approved']]);
 	});
 
 	it('handles holidays: built-in skipped, others become custom holidays, existing ones duplicates', () => {

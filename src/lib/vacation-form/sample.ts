@@ -12,6 +12,9 @@ export const SAMPLE_REQUEST: RequestData = {
 	adjustmentHalfDays: 0,
 	restBeforeHalfDays: 44,
 	restAfterHalfDays: 24,
+	restYearEndHalfDays: 16,
+	compensatedHalfDays: 24,
+	compensatedDecidedHalfDays: 20,
 	workingDays: 10,
 	freeRanges: [
 		{ from: '2026-07-11', to: '2026-07-12' },

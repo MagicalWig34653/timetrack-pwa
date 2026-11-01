@@ -5,6 +5,7 @@ import type { FormMapping } from './types';
 describe('mapping serialisation', () => {
 	const sample: FormMapping = {
 		version: 1,
+		revision: 2,
 		person: { lastName: 'Muster', firstName: 'Max', personnelNo: '4711', department: 'Technik', place: 'Magdeburg' },
 		dateFormat: 'd.M.yy',
 		flatten: true,
@@ -62,7 +63,11 @@ describe('suggestSource', () => {
 		expect(suggestSource('Vorname', 'text')).toBe('firstName');
 		expect(suggestSource('Personalnummer', 'text')).toBe('personnelNo');
 		expect(suggestSource('urlaub_anspruch_gesamt', 'text')).toBe('entitlementTotal');
-		expect(suggestSource('urlaub_anspruch_verbleibend', 'text')).toBe('restAfter');
+		expect(suggestSource('urlaub_anspruch_verbleibend', 'text')).toBe('restBefore');
+		expect(suggestSource('urlaub_anspruch_abgegolten', 'text')).toBe('compensated');
+		expect(suggestSource('urlaub_anspruch_zusatz', 'text')).toBe('additional');
+		expect(suggestSource('urlaub_anspruch_zusatz_vorjahr', 'text')).toBe('carryOver');
+		expect(suggestSource('Resttage', 'text')).toBe('restAfter');
 		expect(suggestSource('urlaub_anspruch', 'text')).toBe('entitlementYear');
 		expect(suggestSource('arbeitstage', 'text')).toBe('workingDays');
 		expect(suggestSource('Vertreter', 'text')).toBe('substitute');
@@ -76,5 +81,26 @@ describe('suggestSource', () => {
 		expect(suggestSource('Check Box1', 'checkbox')).toBeNull();
 		expect(suggestSource('Feld 17', 'text')).toBeNull();
 		expect(suggestSource('Fortbildung', 'text')).toBeNull();
+	});
+});
+
+describe('legacy mapping migration', () => {
+	const legacy = { version: 1, fields: { urlaub_anspruch_abgegolten: { source: 'paidOut' }, urlaub_anspruch_verbleibend: { source: 'restAfter' }, Resttage: { source: 'restAfter' }, other: { source: 'paidOut' } } };
+	it('moves the old suggestions on "abgegolten" and "verbleiben" to the corrected sources once', () => {
+		const mapping = parseMapping(legacy);
+		expect(mapping.fields.urlaub_anspruch_abgegolten).toEqual({ source: 'compensated', scope: 'all' });
+		expect(mapping.fields.urlaub_anspruch_verbleibend).toEqual({ source: 'restBefore' });
+		expect(mapping.fields.Resttage).toEqual({ source: 'restAfter' });
+		expect(mapping.fields.other).toEqual({ source: 'paidOut' });
+	});
+	it('leaves a current revision alone, so a deliberate choice survives', () => {
+		const mapping = parseMapping({ ...legacy, revision: 2 });
+		expect(mapping.fields.urlaub_anspruch_abgegolten).toEqual({ source: 'paidOut' });
+		expect(parseMapping(JSON.parse(serializeMapping(emptyMapping()))).revision).toBe(2);
+	});
+	it('reads and clamps the compensated scope', () => {
+		const mapping = parseMapping({ version: 1, revision: 2, fields: { a: { source: 'compensated', scope: 'decided' }, b: { source: 'compensated', scope: 'x' } } });
+		expect(mapping.fields.a.scope).toBe('decided');
+		expect(mapping.fields.b.scope).toBe('all');
 	});
 });

@@ -11,7 +11,7 @@
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
-	import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import { Label } from '#lib/components/ui/label/index.js';
 	import { Select } from '#lib/components/ui/select/index.js';
 	import { Textarea } from '#lib/components/ui/textarea/index.js';
@@ -45,11 +45,14 @@
 	let voidError = $state('');
 	let voidPending = $state(false);
 	let notice = $state('');
+	let reviewPending = $state<string | null>(null);
+	let reviewError = $state('');
 
 	// day preferences
 	let mark = $state<DayMarkKind>('none');
 	let creditText = $state('');
 	let skipFixedBreaks = $state(false);
+	let schoolLessonCount = $state('');
 	let note = $state('');
 	let noteTouched = $state(false);
 	let prefsError = $state('');
@@ -73,6 +76,7 @@
 			places = placeList;
 			mark = evaluation.mark ?? 'none';
 			skipFixedBreaks = !!evaluation.skipFixedBreaks;
+			schoolLessonCount = evaluation.schoolLessonCount == null ? '' : String(evaluation.schoolLessonCount);
 			// Pre-fill from the stored values (contract v0.2.1) unless the user is typing right now.
 			if (!noteTouched) note = evaluation.note ?? '';
 			if (!creditText.trim()) creditText = evaluation.markCreditSeconds != null ? formatDuration(evaluation.markCreditSeconds) : '';
@@ -148,6 +152,21 @@
 		onchanged?.();
 	}
 
+	async function acknowledgeReview(segment: Segment) {
+		if (reviewPending) return;
+		reviewPending = segment.id;
+		reviewError = '';
+		try {
+			await api.correctSegment(segment.id, { needsReview: false, reason: t('segments.review_reason') }, segment.version);
+			await saved(t('segments.review_saved'));
+		} catch (error) {
+			reviewError = errorMessage(error);
+			await refresh();
+		} finally {
+			reviewPending = null;
+		}
+	}
+
 	async function cancelForm() {
 		adding = false;
 		editingId = null;
@@ -190,10 +209,15 @@
 				return;
 			}
 		}
+		if (schoolLessonCount && (!Number.isInteger(Number(schoolLessonCount)) || Number(schoolLessonCount) < 0 || Number(schoolLessonCount) > 20)) {
+			prefsError = t('day_prefs.school_lessons_invalid');
+			return;
+		}
 		prefsPending = true;
 		try {
 			day = await api.setDayPreferences(date, {
 				mark,
+				schoolLessonCount: schoolLessonCount === '' ? null : Number(schoolLessonCount),
 				creditSeconds: mark === 'none' ? null : creditSeconds,
 				skipFixedBreaks,
 				...(noteTouched ? { note: note.trim() || null } : {})
@@ -219,6 +243,7 @@
 	<div class="flex flex-col gap-4">
 		{#if notice}<Alert variant="success">{notice}</Alert>{/if}
 		{#if continueError}<Alert variant="destructive">{continueError}</Alert>{/if}
+		{#if reviewError}<Alert variant="destructive">{reviewError}</Alert>{/if}
 
 		<Card>
 			<CardHeader>
@@ -255,6 +280,7 @@
 							</form>
 						{:else}
 							<div class="flex gap-2">
+								{#if segment.needsReview}<Button variant="outline" size="sm" onclick={() => acknowledgeReview(segment)} disabled={reviewPending !== null}>{t('segments.mark_reviewed')}</Button>{/if}
 								<Button variant="outline" size="sm" onclick={() => { editingId = segment.id; voidingId = null; adding = false; }}>{t('day_detail.correct')}</Button>
 								<Button variant="ghost" size="sm" onclick={() => { voidingId = segment.id; voidReason = ''; editingId = null; adding = false; }}>{t('day_detail.void')}</Button>
 							</div>
@@ -292,8 +318,11 @@
 							<Field id="day-credit" label={t('day_prefs.credit')} hint={t('day_prefs.credit_hint')} placeholder="7:42" inputmode="numeric" bind:value={creditText} error={creditError} disabled={prefsPending} />
 						{/if}
 					</div>
+					{#if day?.legalProfileId === 'jarbschg-minor-de'}
+						<Field id="day-school-lessons" type="number" min="0" max="20" label={t('day_prefs.school_lessons')} hint={t('day_prefs.school_lessons_hint')} bind:value={schoolLessonCount} disabled={prefsPending} />
+					{/if}
 					<div class="flex items-center gap-2">
-						<Checkbox id="day-skip-breaks" bind:checked={skipFixedBreaks} disabled={prefsPending} />
+						<Switch id="day-skip-breaks" bind:checked={skipFixedBreaks} disabled={prefsPending} />
 						<Label for="day-skip-breaks">{t('day_prefs.skip_breaks')}</Label>
 					</div>
 					<div class="flex flex-col gap-1.5">

@@ -28,14 +28,26 @@ describe('mock GET /time/weeks/{isoWeek}', () => {
 		// days after today carry no balance and do not count into the balance
 		expect(week.days.map((d) => d.isFuture)).toEqual([false, false, false, true, true, true, true]);
 		expect(week.days[3].balanceSeconds).toBeNull();
-		expect(week.summary.balanceSeconds).toBe(days.filter((d) => d.date <= '2026-10-14').reduce((s, d) => s + d.deltaSeconds, 0));
-		expect(week.summary.targetToDateSeconds).toBe(3 * 27720);
+		// contract 0.36.0: completed days only (through yesterday); today stands apart
+		expect(week.summary.balanceSeconds).toBe(days.filter((d) => d.date < '2026-10-14').reduce((s, d) => s + d.deltaSeconds, 0));
+		expect(week.summary.includesToday).toBe(false);
+		expect(week.summary.todayDeltaSeconds).toBe(days.find((d) => d.date === '2026-10-14')!.deltaSeconds);
+		expect(week.summary.targetToDateSeconds).toBe(2 * 27720);
 		expect(week.days[2].isToday).toBe(true);
 		expect(week.summary.provisional).toBe(true);
 		const before = await api.getTimeAccount('2026-10-11');
 		expect(week.summary.accountBalanceBeforeSeconds).toBe(before.balanceSeconds);
 		expect(week.summary.accountBalanceAfterSeconds).toBe((await api.getTimeAccount('2026-10-18')).balanceSeconds);
 		expect(week.summary.accountBalanceAsOf).toBe('2026-10-14');
+	});
+
+	it('keeps the running day out of the account and reports it separately', async () => {
+		const account = await api.getTimeAccount('2026-10-14');
+		const yesterday = await api.getTimeAccount('2026-10-13');
+		expect(account.includesToday).toBe(false);
+		expect(account.balanceSeconds).toBe(yesterday.balanceSeconds);
+		expect(typeof account.todayDeltaSeconds).toBe('number');
+		expect(yesterday.todayDeltaSeconds).toBeNull();
 	});
 
 	it('reports plan hours and mode per day, and the plan total only when a plan exists', async () => {
@@ -50,7 +62,7 @@ describe('mock GET /time/weeks/{isoWeek}', () => {
 		const sick = await api.getTimeWeek('2026-W40');
 		expect(sick.days.filter((d) => d.mark === 'sick').map((d) => d.date)).toEqual(['2026-09-28', '2026-09-29']);
 		expect(sick.summary.sickDays).toBe(2);
-		expect(sick.days[0].absences).toEqual([{ kind: 'sick', status: 'taken', halfDay: false }]);
+		expect(sick.days[0].absences).toEqual([{ kind: 'sick', status: 'recorded', halfDay: false }]);
 		const worked = await api.getTimeWeek('2026-W41');
 		const thursday = worked.days[3]; // school day with a travel segment
 		expect(thursday.schoolSeconds).toBe(5.5 * 3600);

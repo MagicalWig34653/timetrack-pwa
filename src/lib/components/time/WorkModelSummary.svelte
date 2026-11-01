@@ -20,6 +20,7 @@
 		})
 	);
 	const tiles = $derived([
+		{ key: 'legal', label: t('work_model.legal_profile'), value: t(`legal.profile.${model.legalProfileId ?? 'arbzg-adult-de'}`), note: '' },
 		{ key: 'weekly', label: t('work_model.weekly'), value: `${formatDuration(model.weeklyTargetSeconds)} h`, note: '' },
 		{ key: 'workdays', label: t('work_model.workdays'), value: workdays, note: '' },
 		{ key: 'daily', label: t('work_model.daily'), value: `${daily} h`, note: hasOverrides ? t('work_model.daily_override_short') : '' },

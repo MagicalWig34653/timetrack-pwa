@@ -29,6 +29,12 @@ describe('aggregate', () => {
 		expect(data.totals.deltaSeconds).toBe(0);
 		expect(data.empty).toBe(false);
 	});
+	it('keeps today out of the balance and reports it separately', () => {
+		const data = aggregate({ ...base, granularity: 'day', openingBalanceSeconds: 0, today: '2026-10-20', days: [day('2026-10-19', 28800, 30600), day('2026-10-20', 28800, 27000)] });
+		expect(data.points.map((p) => p.balanceSeconds)).toEqual([1800, 1800]);
+		expect(data.includesToday).toBe(false);
+		expect(data.todayDeltaSeconds).toBe(-1800);
+	});
 	it('uses raw times when rounding is off', () => {
 		const data = aggregate({ ...base, rounded: false, granularity: 'day', days: [day('2026-10-19', 28800, 30600, 29000)] });
 		expect(data.points[0].actualSeconds).toBe(29000);

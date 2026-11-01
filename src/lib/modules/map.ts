@@ -19,10 +19,12 @@ export const CORE_ROUTES = [
 	'/mock-idp',
 	'/mock-oauth',
 	'/onboarding',
+	'/settings',
 	'/settings/profile',
 	'/settings/work-model',
 	'/settings/appearance',
 	'/settings/places',
+	'/settings/calendar-feeds',
 	'/settings/account-time',
 	'/settings/notifications',
 	'/settings/passkeys',
@@ -34,7 +36,8 @@ export const CORE_ROUTES = [
 	'/admin/invitations',
 	'/admin/accounts',
 	'/admin/modules',
-	'/admin/mail'
+	'/admin/mail',
+	'/admin/apns'
 ] as const;
 
 export const MODULE_ROUTES: Record<ModuleKey, readonly string[]> = {
@@ -42,11 +45,14 @@ export const MODULE_ROUTES: Record<ModuleKey, readonly string[]> = {
 	planning: ['/vacation', '/calendar', '/plan', '/absences', '/shared', '/settings/sharing', '/settings/vacation-form'],
 	transfer: ['/export', '/import', '/settings/storage'],
 	automation: ['/settings/devices', '/settings/trigger-links', '/suggestions'],
-	mcp: ['/settings/api-tokens', '/settings/connections', '/settings/mcp-help', '/oauth/consent']
+	mcp: ['/settings/api-tokens', '/settings/connections', '/settings/mcp-help', '/oauth/consent'],
+	// '/g' is the public participant page of a poll or order link (no login, outside the app shell); the owner screens live under /groups
+	groups: ['/groups', '/g']
 };
 
 function covers(route: string, pathname: string): boolean {
-	if (route === '/') return pathname === '/';
+	// '/' and the settings landing match only themselves; every settings sub page is classified individually
+	if (route === '/' || route === '/settings') return pathname === route;
 	return pathname === route || pathname.startsWith(route + '/');
 }
 

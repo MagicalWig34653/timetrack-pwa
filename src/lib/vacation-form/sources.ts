@@ -14,7 +14,7 @@ export interface SourceDef {
 	/** PDF target kinds the source can fill */
 	targets: readonly TargetKind[];
 	/** extra option the binding needs */
-	option?: 'text' | 'checked' | 'index';
+	option?: 'text' | 'checked' | 'index' | 'scope';
 	/** The value is asked at request time and not stored in the profile. */
 	askedAtRequest?: boolean;
 	resolve: (binding: Binding, mapping: FormMapping, request: RequestData) => ResolvedValue;
@@ -48,8 +48,10 @@ export const SOURCES: readonly SourceDef[] = [
 	textSource('carryOver', 'vform.source.carry_over', 'balance', (_b, _m, r) => days(r.carryOverHalfDays)),
 	textSource('additional', 'vform.source.additional', 'balance', (_b, _m, r) => days(Math.max(r.adjustmentHalfDays, 0))),
 	textSource('paidOut', 'vform.source.paid_out', 'balance', (_b, _m, r) => days(Math.max(-r.adjustmentHalfDays, 0))),
+	textSource('compensated', 'vform.source.compensated', 'balance', (b, _m, r) => days(b.scope === 'decided' ? r.compensatedDecidedHalfDays : r.compensatedHalfDays), { option: 'scope' }),
 	textSource('restBefore', 'vform.source.rest_before', 'balance', (_b, _m, r) => days(r.restBeforeHalfDays)),
 	textSource('restAfter', 'vform.source.rest_after', 'balance', (_b, _m, r) => days(r.restAfterHalfDays)),
+	textSource('restYearEnd', 'vform.source.rest_year_end', 'balance', (_b, _m, r) => days(r.restYearEndHalfDays)),
 
 	textSource('dateFrom', 'vform.source.date_from', 'request', (b, m, r) => formatFormDate(r.from, dateFormatOf(b, m))),
 	textSource('dateTo', 'vform.source.date_to', 'request', (b, m, r) => formatFormDate(r.to, dateFormatOf(b, m))),

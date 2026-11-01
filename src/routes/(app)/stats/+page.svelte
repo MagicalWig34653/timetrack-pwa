@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Switch } from '#lib/components/ui/switch/index.js';
 	import Chart from '#lib/components/stats/Chart.svelte';
 	import EmptyState from '#lib/components/app/EmptyState.svelte';
 	import KpiCard from '#lib/components/app/KpiCard.svelte';
@@ -12,7 +13,8 @@
 	import { hourTicks } from '#lib/stats/scale.js';
 	import { statsSource } from '#lib/stats/source.js';
 	import { addDays, isValidDate, todayLocal } from '#lib/time/dates.js';
-	import { formatDelta, formatDuration } from '#lib/time/format.js';
+	import Dur from '#lib/components/app/Dur.svelte';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import BarChart3 from '@lucide/svelte/icons/chart-column';
@@ -22,6 +24,7 @@
 	import Plane from '@lucide/svelte/icons/plane';
 	import Scale from '@lucide/svelte/icons/scale';
 	import Target from '@lucide/svelte/icons/target';
+	import { todayDeltaNote } from '#lib/time/today-delta.js';
 	import Wallet from '@lucide/svelte/icons/wallet';
 
 	const PRESETS: Exclude<RangePreset, 'custom'>[] = ['w4', 'w12', 'w26', 'w52', 'year'];
@@ -77,8 +80,8 @@
 	});
 
 	const hours = (seconds: number) => Math.round((seconds / 3600) * 100) / 100;
-	const fmtHours = (h: number) => formatDuration(h * 3600);
-	const fmtDeltaHours = (h: number) => formatDelta(Math.round(h * 3600));
+	const fmtHours = (h: number) => timeDisplay.duration(h * 3600);
+	const fmtDeltaHours = (h: number) => timeDisplay.delta(Math.round(h * 3600));
 	const labels = $derived(data?.points.map((p) => p.label) ?? []);
 
 	const accountSeries = $derived<ChartSeries[]>([{ key: 'balance', label: t('stats.series.balance'), values: data?.points.map((p) => hours(p.balanceSeconds)) ?? [], cls: 'text-ui-accent' }]);
@@ -134,7 +137,7 @@
 		{/each}
 	</div>
 	<label class="flex items-center gap-2 text-sm" title={t('stats.rounded_hint')}>
-		<input type="checkbox" bind:checked={rounded} class="size-4 accent-primary" data-testid="stats-rounded" />
+		<Switch bind:checked={rounded} data-testid="stats-rounded" />
 		{t('stats.rounded')}
 	</label>
 </div>
@@ -153,17 +156,17 @@
 			<EmptyState title={t('stats.empty_title')} description={t('stats.empty_text')} icon={BarChart3} testid="stats-empty" />
 		{:else}
 			<section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('stats.title')} data-testid="stats-kpis">
-				<KpiCard title={t('stats.kpi.actual')} value={formatDuration(data.totals.actualSeconds)} icon={Gauge} testid="stats-actual" />
-				<KpiCard title={t('stats.kpi.target')} value={formatDuration(data.totals.targetSeconds)} icon={Target} testid="stats-target" />
-				<KpiCard title={t('stats.kpi.balance')} value={formatDelta(data.totals.deltaSeconds)} icon={Scale} tone={data.totals.deltaSeconds < 0 ? 'negative' : 'default'} testid="stats-delta" />
-				<KpiCard title={t('stats.kpi.account')} value={endBalance === null ? '–' : formatDelta(endBalance)} icon={Wallet} tone={(endBalance ?? 0) < 0 ? 'negative' : 'default'} testid="stats-account" />
+				<KpiCard title={t('stats.kpi.actual')} seconds={data.totals.actualSeconds} icon={Gauge} testid="stats-actual" />
+				<KpiCard title={t('stats.kpi.target')} seconds={data.totals.targetSeconds} icon={Target} testid="stats-target" />
+				<KpiCard title={t('stats.kpi.balance')} seconds={data.totals.deltaSeconds} delta icon={Scale} tone={data.totals.deltaSeconds < 0 ? 'negative' : 'default'} testid="stats-delta" />
+				<KpiCard title={t('stats.kpi.account')} value={endBalance === null ? '–' : timeDisplay.delta(endBalance)} icon={Wallet} hint={data.includesToday === false ? t('stats.kpi.account_hint') : undefined} note={todayDeltaNote(data)} tone={(endBalance ?? 0) < 0 ? 'negative' : 'default'} testid="stats-account" />
 				<KpiCard title={t('stats.kpi.avg_start')} value={data.totals.avgStartMinutes === null ? '–' : clockText(data.totals.avgStartMinutes)} icon={Clock} testid="stats-avg-start" />
 				<KpiCard title={t('stats.kpi.avg_end')} value={data.totals.avgEndMinutes === null ? '–' : clockText(data.totals.avgEndMinutes)} icon={Clock} testid="stats-avg-end" />
-				<KpiCard title={t('stats.kpi.breaks')} value={formatDuration(data.totals.breakSeconds)} icon={Coffee} testid="stats-breaks" />
-				<KpiCard title={t('stats.kpi.absences')} value={String(data.totals.absenceDays).replace('.', ',')} icon={Plane} testid="stats-absences" />
+				<KpiCard title={t('stats.kpi.breaks')} seconds={data.totals.breakSeconds} icon={Coffee} testid="stats-breaks" />
+				<KpiCard title={t('stats.kpi.absences')} value={data.absencesAvailable === false ? '–' : String(data.totals.absenceDays).replace('.', ',')} icon={Plane} testid="stats-absences" />
 			</section>
 
-			<div class="grid gap-4 lg:grid-cols-2">
+			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
 				<Panel class="lg:col-span-2">
 					{#if data.balanceAvailable}
 						<Chart title={t('stats.chart.account')} description={t('stats.chart.account_desc')} categories={labels} series={accountSeries} type="line" format={fmtDeltaHours} ticks={hourTicks} axisFormat={(v) => `${Math.round(v)} h`} testid="chart-account" legend={false} />
@@ -189,7 +192,7 @@
 								<li class="flex items-center gap-2" data-testid="kind-{k.key}">
 									<span class="inline-block size-2.5 rounded-sm {k.cls}"></span>
 									<span class="flex-1">{k.label}</span>
-									<span class="tabular-nums">{formatDuration(k.seconds)}</span>
+									<Dur seconds={k.seconds} class="tabular-nums" />
 									<span class="w-12 text-right text-muted-foreground tabular-nums">{Math.round(k.share * 100)} %</span>
 								</li>
 							{/each}
@@ -197,7 +200,12 @@
 					{/if}
 				</Panel>
 				<Panel>
+					{#if data.absencesAvailable === false}
+						<h3 class="text-sm font-medium">{t('stats.chart.absences')}</h3>
+						<p class="mt-2 text-sm text-muted-foreground" data-testid="chart-absences-unavailable">{t('stats.absences_unavailable')}</p>
+					{:else}
 					<Chart title={t('stats.chart.absences')} description={t('stats.chart.absences_desc')} categories={monthLabels} series={absenceSeries} type="stacked" format={(v) => t('stats.days', { count: String(v).replace('.', ',') })} axisFormat={(v) => String(v)} testid="chart-absences" />
+					{/if}
 				</Panel>
 				<Panel>
 					<Chart title={t('stats.chart.times')} description={t('stats.chart.times_desc')} categories={labels} series={timesSeries} type="line" format={(v) => clockText(Math.round(v))} ticks={(lo, hi) => { const step = 60; const out: number[] = []; for (let v = Math.floor(lo / step) * step; v <= hi + step; v += step) out.push(v); return out.length > 7 ? out.filter((_, i) => i % 2 === 0) : out; }} axisFormat={(v) => clockText(Math.round(v))} testid="chart-times" />

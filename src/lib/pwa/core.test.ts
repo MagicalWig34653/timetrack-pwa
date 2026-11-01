@@ -4,6 +4,7 @@ import {
 	bytesToBase64url,
 	cacheNameFor,
 	isBypassPath,
+	isGroupPagePath,
 	isInterceptable,
 	isIosDevice,
 	isOldCache,
@@ -87,10 +88,22 @@ describe('parsePushPayload', () => {
 describe('request interception rules', () => {
 	const origin = 'https://app.example';
 	it('never touches API, OAuth, MCP, discovery and probes', () => {
-		for (const p of ['/api/v1/time/segments', '/api', '/oauth/consent', '/oauth/authorize', '/mcp', '/.well-known/oauth-authorization-server', '/health', '/ready', '/t', '/t/abc/start', '/t/abc/toggle?at=2026-10-22T08:00:00Z']) {
+		for (const p of ['/api/v1/time/segments', '/api', '/oauth/consent', '/oauth/authorize', '/mcp', '/.well-known/oauth-authorization-server', '/health', '/ready', '/t', '/ics/abc.ics', '/t/abc/start', '/t/abc/toggle?at=2026-10-22T08:00:00Z']) {
 			expect(isBypassPath(p), p).toBe(true);
 			expect(isInterceptable(new URL(p, origin), 'GET', origin), p).toBe(false);
 		}
+	});
+
+	it('keeps the public group API out of the worker and recognises the /g/<token> pages (G2)', () => {
+		expect(isBypassPath('/api/v1/public/groups/abc')).toBe(true);
+		expect(isInterceptable(new URL('/api/v1/public/groups/abc/export?format=csv', origin), 'GET', origin)).toBe(false);
+		expect(isGroupPagePath('/g/' + 'A'.repeat(43))).toBe(true);
+		expect(isGroupPagePath('/g/')).toBe(false);
+		expect(isGroupPagePath('/g')).toBe(false);
+		expect(isGroupPagePath('/groups')).toBe(false);
+		expect(isGroupPagePath('/groups/polls/x')).toBe(false);
+		// the pages themselves stay interceptable (shell from cache), only their data is network-only
+		expect(isInterceptable(new URL('/g/' + 'A'.repeat(43), origin), 'GET', origin)).toBe(true);
 	});
 
 	it('intercepts same-origin GET navigations and assets only', () => {
@@ -103,6 +116,8 @@ describe('request interception rules', () => {
 		expect(isBypassPath('/time')).toBe(false);
 		expect(isBypassPath('/time/2026-10-15')).toBe(false);
 		expect(isBypassPath('/tx')).toBe(false);
+		// '/ics' is the calendar subscription prefix, but not a path that merely starts with ics
+		expect(isBypassPath('/icsx')).toBe(false);
 	});
 });
 

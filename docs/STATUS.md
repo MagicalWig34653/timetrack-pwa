@@ -1,4 +1,46 @@
-# Stand der PWA – 17.10.2026 (Pakete bis P2, W1; Dokumentationsabgleich D3)
+**Stand 01.11.2026:** `main` 4a71c83 (Vertrag 0.39.0 gelesen: Archiv-Orte, `/admin/apns`, Apple-Geräte, Link wieder sichtbar). Offene Punkte und Stolpersteine (jsdom-Reparatur, Mock-Build): `docs/handoffs/SESSION-2026-11-01.md` im Backend-Repo.
+
+**P14e-pwa (30.10.2026):** Admin-Seite `/admin/apns` (Zustand ohne Schlüssel, Live-Prüfung bei Apple je Bundle-ID/Umgebung, Vertrag 0.38.0) und Karte „Apple-Geräte“ in den Benachrichtigungen (Liste, Testmitteilung, Entfernen). 1340 Unit-Tests, Mock-E2E 248 grün; gegen das echte Backend ungeprüft.
+
+**U9 (30.10.2026):** Stimmenmatrix im Gruppenmodul mit Seitenumbruch (25 je Seite, Summen über alle); Monatskopf und Statistik rechnen den Saldo nur bis gestern (heute separat, `includesToday: false`); An/Aus-Optionen (Rundung, Fahrtzeit, Pausen überspringen, Ruhezeit, Transparenz, Statistik „gerundet“) sind echte Schalter. 1333 Unit-Tests, Mock-E2E 248 grün.
+
+# Stand der PWA – 26.10.2026 (Paket P15 im Worktree, uncommittet)
+
+## Paket G2-pwa (30.10.2026, Branch g2-groups, nicht gemergt)
+Gruppenmodul (Vertrag 0.37.0/0.37.1, ADR-0033): **seit 0.37.1 zeigt der Besitzerbereich den Teilnehmerlink jederzeit wieder (Kopieren/Teilen/Öffnen); nur ältere Zeilen ohne gespeicherten Link brauchen einmal „Link erneuern“.** öffentliche Seite `/g/<token>` ohne Anmeldung und ohne App-Hülle (Umfragen mit Ja/Vielleicht/Nein, Bestellrunden mit Übernehmen und Export, Bearbeitungsschlüssel im localStorage), Besitzerbereich `/groups` (Umfragen, Bestellrunden, Kataloge, Link nur einmalig, erneuern), sechster Modulschalter `groups`, Service Worker ohne Gruppen-Daten im Cache, Mock und Tests. Details: `docs/handoffs/G2-pwa.md`.
+
+## Paket U4-pwa (29.10.2026, Branch u4-pwa-bugs, nicht gemergt)
+Vertrag 0.36.0: Abwesenheitsstatus je Art (`recorded`/„erfasst“, Statusauswahl nur bei Urlaub, unbekannte Status tolerant), Zeitkonto ohne laufenden Tag mit getrenntem „Heute: …, fließt morgen ein“, Konto-Mail als einzige Recovery-Adresse, Zeigercursor für klickbare Elemente, stabile /absences-Filter (Fokus bleibt beim Tippen). Details: `docs/handoffs/U4-pwa.md`.
+
+## Paket U1-pwa (29.10.2026, Branch u1-calendar-planner, nicht gemergt)
+Kalender und Planer passen ohne Seitenscroll in 1366x768 und 1920x1080 (Variante `fit`); Monatsraster neu (Pills statt Mini-Zeitleisten, durchgehende Abwesenheitsbalken, KW-Spalte mit Link auf /week), Wochenmodus entfernt, ein Segmented-Umschalter (Monat/Jahr, Raster/Liste). Details: `docs/handoffs/U1-pwa.md`.
+
+## Paket W3-perf (27.10.2026, Branch w3-week-perf, nicht gemergt)
+Wochenwechsel schneller: Lesecache für Referenzdaten und Wochen, Prefetch der Nachbarwochen im Leerlauf, Stale-while-revalidate statt Skelett. Details und Messung: `docs/handoffs/W3-perf.md`.
+## Paket C2-pwa (27.10.2026, Branch c2-month-calendar, nicht gemergt)
+Monatskalender im Stil des Wochenplaners: Mini-Zeitleisten je Tag, schraffierter Urlaub, Monatskopf mit Ist/Soll/Saldo, schwebende Aktionsleiste, Jahresübersicht, Nachbarmonate vorgeladen, axe sauber. Details: `docs/handoffs/C2-pwa.md`.
+
+## Paket P13-pwa (27.10.2026, Branch p13-plan-blocks, nicht gemergt)
+Planer (Raster und Liste) mit mehreren Planblöcken pro Tag (Vertrag 0.35.0, ADR-0031): Malen/Teilen/Pause/Verbinden mit Arten (Farbe, Icon, Muster, Tastatur), ganze Blockliste beim Speichern, Planungshinweise, Wochenkarten und Tagesdetail mit Blöcken und Plan-Ist-Differenz, Freigabe ohne Ort/Notiz, Rückfall auf den Einzelblock bei API < 0.35.0, Mock validiert wie das Backend. Details: `docs/handoffs/P13-pwa.md`.
+
+## Paket N3-pwa (26.10.2026, Branch n3-week-vacation, nicht gemergt)
+Urlaub (geplant/beantragt/genehmigt, auch Halbtage) erscheint in der Wochenübersicht als Icon-Chip (schraffiert bis genehmigt) mit Tooltip/aria-Text, im Tagesdetail mit Link zur Urlaubsübersicht; falscher Warn-Chip an freien Tagen entfernt. Details: `docs/handoffs/N3-pwa.md`.
+
+## Paket N2-pwa (26.10.2026, Branch p15-profile-adjustments, nicht gemergt)
+Globale Zeitanzeige (h:mm/Dezimal, klickbar), Urlaubsantrag-Rest ohne nicht eingereichte Planung, Kalender-Monatsraster mit Punkten (Phone), Woche mit Tagespanel statt Tagesseite (`/time` leitet auf `/week` um), Planer mit fester Speichern-Leiste und Urlaub im Raster, Kalender-Abos `/settings/calendar-feeds` (Vertrag 0.31.0). Details und offene Punkte: `docs/handoffs/N2-pwa.md`.
+
+## Paket P15 (Rechtsprofile, Zeitkonto-Anpassungen, Prüfmarkierungen)
+
+Die PWA lädt die Rechtsprofile aus Vertrag 0.30.1 und speichert die Wahl in datierten Arbeitsmodell-Versionen. Die Tagesansicht zeigt Pausen- und Rechtswarnungen, Quellen und den Hinweis „Informative Hinweise, keine Rechtsberatung“; Unterrichtsstunden lassen sich für das Jugendprofil erfassen. Der grafische Wochenplaner verwendet die geladenen Profilgrenzen. Die Zeitkonto-Seite listet Anfangsstand und Korrekturen paginiert und löscht einzelne Anpassungen nach Bestätigung. In der Zeitübersicht sind zu prüfende Tage filterbar; ein Segment lässt sich mit Revision als geprüft markieren. Mock, Unit-Tests und Mock-E2E-Spec `e2e-mock/p15.spec.ts` sind ergänzt. Details und Grenzen: `docs/handoffs/P15.md`.
+
+Prüfstand: `npm run check` und `npm test` grün, Mock-E2E im Produktions-Build grün (siehe N2-pwa). Commit `P15: ...` auf dem Branch.
+
+## Paket X4 (Review-Fixes Statistik und Lizenzbeilage; Branch `x4-review-fixes`, 25.10.2026)
+
+Statistik-Fallback ohne `/time/statistics`: Ein 404 `module_disabled` von `/absences` (Planungsmodul aus) gilt als leere
+Abwesenheitsliste (`absencesAvailable: false`, Anzeige „Abwesenheiten nicht verfügbar“), alle anderen Fehler bleiben
+sichtbar. `THIRD-PARTY-NOTICES.txt` enthält jetzt auch gebündelte devDependencies (`@lucide/svelte`, `cn`,
+`tailwind-variants`, `svelte`, `clsx` …), ermittelt aus den Importen in `src/`. Details: `docs/handoffs/X4.md`.
 
 ## Paket CX2 (Stabilität, Lizenzbeilage, Barrierefreiheit; Branch `cx2-stability`, 24.10.2026)
 
@@ -28,6 +70,9 @@ Planer behält Änderungen während des Speicherns, Statistik-Fallback zeigt Feh
 
 ## Paket P12 (Wochensaldo, Statistik, stornierte Einträge, Woche; 23.10.2026, Branch p12-stats-trash-week, nicht gemergt)
 Kalender zeigt unter der KW die Differenz zum Wochensoll (laufende Woche neutral „noch X offen“). Neue Seiten `/stats` (Diagramme als eigene SVG, Datenschicht austauschbar) und `/time/cancelled` (Wiederherstellen, endgültig löschen einzeln/mehrfach/alle mit getipptem Wort; Endpunkte nach Entwurf, Funktionserkennung, Mock). `/week` merkt die letzte Woche (sessionStorage) und zeigt Abwesenheiten mit Warnung für geplant/beantragt. Details: `docs/handoffs/P12.md`.
+
+## Paket J2 (Layout-Sprung, zweiter Anlauf, 26.10.2026, Branch j2-layout-jump, nicht gemergt)
+Ursache: `{#key pathname}` im App-Layout baute bei jedem Seitenwechsel auch die Einstellungsnavigation neu auf (DOM-Knoten und eigene Scrollposition der Navigation gingen verloren, Navigation sprang nach oben). Jetzt bleibt die Navigation je Bereich gemountet (`sectionShell` in `nav.ts`, Key plus Fehlergrenze im `SettingsShell`). Zusätzlich: `/stats` erzeugte auf Telefon/Tablet seitliches Überlaufen (Grid ohne `minmax(0,1fr)`). Alle 40 Routen messen sich in vier Fenstergrößen unverändert (Mock-E2E `e2e-mock/layout-routes.spec.ts`). Details: `docs/handoffs/J2-pwa.md`.
 
 ## Paket J1 (Layout-Sprung in den Einstellungen, 23.10.2026, Branch j1-layout-jump, nicht gemergt)
 Ursache: Scrollleiste erschien/verschwand je nach Seitenhöhe (Inhalt sprang 15 px) → `scrollbar-gutter: stable` global. `/admin/mail` stand in der Einstellungsnavigation, öffnete aber ohne sie → gemeinsames `SettingsShell` auch dort. Einstellungsnavigation ist jetzt unter der Kopfzeile sticky und scrollt selbst. Mock-E2E `e2e-mock/layout-stability.spec.ts` misst Navigation und Inhaltsspalte über alle Einstellungsseiten (Desktop, hoch, Telefon). Details: `docs/handoffs/J1.md`.
@@ -148,10 +193,10 @@ Favicon + App-Icons im Design der nativen App (F1, Branch `f1-icons`): `static/f
 | Befehl | Inhalt |
 | --- | --- |
 | `npm run check` | svelte-check + tsc des Service Workers (0 Fehler/Warnungen) |
-| `npm test` | vitest, 643 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung; Lead, Paket P2) |
+| `npm test` | vitest, 1149 Tests (Komponenten, Mock-Regeln, Modul-Routenabdeckung; Lead, Paket P2) |
 | `npm run build` | statisches Build nach `build/` |
 | `npm run test:e2e` | baut, startet je Spec-Gruppe eine Swift-Backend-Instanz (SQLite-Wegwerf-DB, virtueller WebAuthn-Authenticator), 181 Specs (inkl. Modul-, Arbeitszeit-, Konten-, Profil- und Darstellungs-Specs; Lead gegen frisch gebautes Backend, Paket P2) |
-| `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), 84 Specs (Lead, P2), inkl. `modules.spec.ts` und `worktime.spec.ts` |
+| `npm run test:e2e:mock` | Playwright gegen `dev:mock` (kein Backend), 174 Specs (Lead, P2; N4), inkl. `modules.spec.ts` und `worktime.spec.ts` |
 | `npm run test:e2e:pwa` | Produktionsbuild mit Mock-API: Manifest, Service Worker, Offline, Push; 6 Specs |
 
 Umgebungsvariablen: `E2E_BACKEND_DIR` (Backend-Checkout, Standard `../timetrack-backend`), `E2E_PORT` (Basisport, Standard 18090; weitere Instanzen +1 bis +10, Arbeitszeit-Tabelle +9, Konten +10, Profil +11 und +12, Profil-SMTP +13), `E2E_SKIP_BUILD=1` (vorhandenes Backend-Binary/Build nutzen), `E2E_MOCK_PORT` (Standard 5199).
@@ -176,3 +221,9 @@ Echtgeräte: Passkey auf Plattform-Authenticator, Installation als PWA (iOS/Andr
 
 ## Y1 (Import der Arbeitszeit-Tabelle als geführter Ablauf)
 Erkennungskarte mit Vorlage, Vorschau mit einem Hauptknopf, „Anpassen“ eingeklappt, Ergebnis mit Schritt „Arbeitsmodell anlegen“, leere Vorlage. Details und Zahlen: docs/handoffs/Y1.md (Branch `y1-import-ux`, nicht integriert).
+
+## N4-pwa (Betriebstage 24.12./31.12.)
+Einstellung Keine/Halber/Ganzer Tag plus eigene Regeln, Anzeige mit ½-Variante für halbe Betriebstage in Woche, Tag, Kalender und Planer (Vertrag 0.32.0). Details: docs/handoffs/N4-pwa.md (Branch `n4-company-days`, nicht integriert).
+
+## V6-pwa (Urlaubsantrag: Resttage, „davon abgegolten“, PDF tauschen)
+Resttage zum Antrag ziehen früheren Urlaub ab (alle Status), Aufstellung mit Blockliste und Jahresende-Rest; „davon abgegolten“ = vor dem Antrag verbrauchter Urlaub (einstellbar); beim PDF-Tausch bleiben Zuordnungen gleicher Feldnamen erhalten, neue Felder werden markiert. Details: docs/handoffs/V6-pwa.md (Branch `v6-vacation-form`, nicht integriert).

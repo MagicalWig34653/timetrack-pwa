@@ -43,9 +43,12 @@ test('overview: numbers, marks and aria labels of a past week', async ({ browser
 	expect(marks).toEqual(['work', 'work', 'vacation', 'sick', 'work', 'off', 'off']);
 	await expect(page.getByTestId(`week-day-${d(0)}`)).toHaveAttribute('aria-label', /8:00 Stunden, Saldo plus 0:18/);
 	await expect(page.getByTestId(`week-day-${d(4)}`)).toHaveAttribute('aria-label', /Saldo minus 7:42/);
-	// a day card opens the day
+	// a day card opens the day panel in place (no navigation away); the day page stays available as a link
 	await page.getByTestId(`week-day-${d(0)}`).click();
-	await expect(page).toHaveURL(new RegExp(`/time/${d(0)}$`));
+	await expect(page).toHaveURL(new RegExp(`/week\\?week=.*&day=${d(0)}`));
+	await expect(page.getByTestId('week-day-panel')).toHaveAttribute('data-date', d(0));
+	await expect(page.getByTestId('week-day-panel').getByTestId('segment-row')).toHaveCount(1);
+	await expect(page.getByTestId('week-day-open')).toHaveAttribute('href', `/time/${d(0)}`);
 	await context.close();
 });
 
@@ -96,9 +99,11 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 
 	// edit Monday precisely, apply to all workdays
 	await page.locator('#plan-mode-2032-03-15').selectOption('home');
-	await page.locator('#plan-start-2032-03-15').fill('08:00');
-	await page.locator('#plan-end-2032-03-15').fill('16:30');
-	await page.locator('#plan-break-2032-03-15').fill('30');
+	// with block lists (contract 0.35.0) the break is the gap between two blocks
+	await page.locator('#plan-start-0-2032-03-15').fill('08:00');
+	await page.locator('#plan-end-0-2032-03-15').fill('12:00');
+	await page.locator('#plan-start-1-2032-03-15').fill('12:30');
+	await page.locator('#plan-end-1-2032-03-15').fill('16:30');
 	await expect(page.getByTestId('plan-hours-2032-03-15')).toHaveText('8:00');
 	await page.getByTestId('plan-same').click();
 	await expect(page.locator('#plan-mode-2032-03-19')).toHaveValue('home');
@@ -107,16 +112,16 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	await expect(page.getByTestId('plan-diff')).toHaveText(targetMinutes === 1920 ? 'genau im Soll' : targetMinutes < 1920 ? `${hm(1920 - targetMinutes)} über Soll` : `${hm(targetMinutes - 1920)} unter Soll`);
 
 	// validation: end before start blocks saving and names the day
-	await page.locator('#plan-end-2032-03-16').fill('07:00');
+	await page.locator('#plan-end-1-2032-03-16').fill('07:00');
 	await page.getByTestId('plan-save').click();
 	await expect(page.getByTestId('plan-problem-2032-03-16')).toHaveText('Das Ende muss nach dem Beginn liegen.');
-	await page.locator('#plan-end-2032-03-16').fill('16:30');
+	await page.locator('#plan-end-1-2032-03-16').fill('16:30');
 
 	await page.getByTestId('plan-save').click();
 	await expect(page.getByTestId('toast')).toHaveText('Woche gespeichert.');
 	await expect(page.getByTestId('plan-dirty')).toHaveAttribute('data-dirty', 'false');
 	await page.reload();
-	await expect(page.locator('#plan-end-2032-03-18')).toHaveValue('16:30');
+	await expect(page.locator('#plan-end-1-2032-03-18')).toHaveValue('16:30');
 	await expect(page.getByTestId('plan-total-text')).toHaveText(`Plan 32:00 von ${hm(targetMinutes)} Soll`);
 
 	// overview shows the plan as ghost bars and the plan card

@@ -38,7 +38,7 @@ test('edits made while the plan is being saved are kept and stay unsaved', async
 	await page.getByTestId('week-grid-scroll').evaluate((el) => (el.scrollTop = 0));
 
 	await paint(page, day(1), 9 * 60, 12 * 60);
-	await expect(page.getByTestId(`block-time-${day(1)}`)).toHaveText('09:00–12:00');
+	await expect(page.getByTestId(`block-time-${day(1)}-0`)).toHaveText('09:00–12:00');
 
 	// hold the PUT response back so the second edit happens while the save is in flight
 	let release: () => void = () => {};
@@ -53,20 +53,20 @@ test('edits made while the plan is being saved are kept and stay unsaved', async
 	await expect(page.getByTestId('plan-save')).toHaveAttribute('aria-busy', 'true');
 
 	await paint(page, day(2), 10 * 60, 13 * 60);
-	await expect(page.getByTestId(`block-time-${day(2)}`)).toHaveText('10:00–13:00');
+	await expect(page.getByTestId(`block-time-${day(2)}-0`)).toHaveText('10:00–13:00');
 	release();
 
 	await expect(page.getByTestId('plan-save')).toHaveAttribute('aria-busy', 'false');
 	// the newer edit survived the response, the saved one is still there, and the plan is dirty again
-	await expect(page.getByTestId(`block-time-${day(2)}`)).toHaveText('10:00–13:00');
-	await expect(page.getByTestId(`block-time-${day(1)}`)).toHaveText('09:00–12:00');
+	await expect(page.getByTestId(`block-time-${day(2)}-0`)).toHaveText('10:00–13:00');
+	await expect(page.getByTestId(`block-time-${day(1)}-0`)).toHaveText('09:00–12:00');
 	await expect(page.getByTestId('plan-dirty')).toHaveAttribute('data-dirty', 'true');
 
 	// the second edit can still be saved and undone history is coherent
 	await page.unroute(`**/plan/weeks/${WEEK}`);
 	await page.getByTestId('plan-save').click();
 	await expect(page.getByTestId('plan-dirty')).toHaveAttribute('data-dirty', 'false');
-	await expect(page.getByTestId(`block-time-${day(2)}`)).toHaveText('10:00–13:00');
+	await expect(page.getByTestId(`block-time-${day(2)}-0`)).toHaveText('10:00–13:00');
 	await context.close();
 });
 

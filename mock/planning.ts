@@ -7,6 +7,7 @@ import type {
 	AbsenceInput,
 	CalendarDay,
 	PlanDay,
+	PlanTimeBlock,
 	PlanMode,
 	Share,
 	ShareScopes,
@@ -18,6 +19,7 @@ import type {
 import { holidaysFor } from './holidays.ts';
 import { suggestVacation } from './vacation-suggestions.ts';
 import { daysBetween, modelForDate, type DerivedDayContext } from './evaluate.ts';
+import { blockSeconds, legacyBlocks, planHints, validateBlocks } from './plan-blocks.ts';
 
 export interface PlanningRequest {
 	method: string;
@@ -63,7 +65,6 @@ interface StoredShare extends Share {
 	ownerId: string;
 	recipientId: string;
 }
-
 const uuid = () => crypto.randomUUID();
 /** K1: server-side derivation of the planned seconds (end - start - break, never negative). */
 export function plannedSecondsOf(start?: string | null, end?: string | null, breakMinutes?: number | null): number | null {
@@ -77,37 +78,106 @@ export function plannedSecondsOf(start?: string | null, end?: string | null, bre
 	return Math.max(0, (to - from - (breakMinutes ?? 0)) * 60);
 }
 
-/** Validates and normalizes one plan day body (contract v0.17.0): both or neither time, start < end, break 0..600, off ignores times. */
+/**
+ * Validates and normalizes one plan day body (contract 0.35.0): with `blocks` the list wins (ordered, no overlap, at most
+ * 32, none for `off`) and the old window fields are derived from it; without it the old window is validated (both or
+ * neither time, start < end, break 0..600, off ignores times) and converted into blocks like the real server.
+ */
 export function normalizePlanBody(body: any): { day: Omit<PlanDay, 'date'> } | { error: string } {
 	if (!body || !PLAN_MODES.includes(body.mode) || (body.note != null && (typeof body.note !== 'string' || body.note.length > 200))) return { error: 'bad_request' };
 	const base = { mode: body.mode as PlanMode, placeId: body.placeId ?? null, note: body.note ?? null };
+	let start: string | null = null;
+	let end: string | null = null;
+	let breakMinutes: number | null = null;
+	let blocks: PlanTimeBlock[];
+	if (body.blocks !== undefined && body.blocks !== null) {
+		const checked = validateBlocks(body.mode, body.blocks);
+		if ('error' in checked) return checked;
+		({ blocks, start, end, breakMinutes } = checked);
+	} else {
+		const legacy = normalizeWindow(body);
+		if ('error' in legacy) return legacy;
+		({ start, end, breakMinutes } = legacy);
+		blocks = legacyBlocks(start, end, breakMinutes, body.mode, base.placeId, base.note);
+	}
+	const plannedSeconds = blocks.length > 0 ? blockSeconds(blocks) : plannedSecondsOf(start, end, breakMinutes);
+	return { day: { ...base, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes, plannedSeconds, blocks, planHints: planHints(blocks) } };
+}
+
+/** The old window fields of a write (before blocks): both or neither time, start < end, break 0..600, mode off ignores everything. */
+function normalizeWindow(body: any): { start: string | null; end: string | null; breakMinutes: number | null } | { error: string } {
 	const start = body.plannedStart ?? null;
 	const end = body.plannedEnd ?? null;
 	const breakMinutes = body.plannedBreakMinutes ?? null;
-	if (body.mode === 'off') return { day: { ...base, plannedStart: null, plannedEnd: null, plannedBreakMinutes: null, plannedSeconds: null } };
-	if (start === null && end === null) {
-		if (breakMinutes !== null) return { error: 'plan_break_invalid' };
-		return { day: { ...base, plannedStart: null, plannedEnd: null, plannedBreakMinutes: null, plannedSeconds: null } };
-	}
+	if (body.mode === 'off') return { start: null, end: null, breakMinutes: null };
+	if (start === null && end === null) return breakMinutes !== null ? { error: 'plan_break_invalid' } : { start: null, end: null, breakMinutes: null };
 	if (typeof start !== 'string' || typeof end !== 'string' || plannedSecondsOf(start, end, 0) === null) return { error: 'plan_time_invalid' };
 	if (breakMinutes !== null && !(Number.isInteger(breakMinutes) && breakMinutes >= 0 && breakMinutes <= 600)) return { error: 'plan_break_invalid' };
-	return { day: { ...base, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes, plannedSeconds: plannedSecondsOf(start, end, breakMinutes) } };
+	return { start, end, breakMinutes };
 }
 
 const fail = (status: number, code: string, message = code): PlanningResponse => ({ status, body: { error: { code, message } } });
 const ok = (body: unknown, status = 200): PlanningResponse => ({ status, body });
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && addDays(v, 0) === v;
 const KINDS = ['vacation', 'sick', 'excused', 'other'];
-const STATUSES = ['planned', 'requested', 'approved', 'rejected', 'cancelled', 'taken'];
+const STATUSES = ['planned', 'requested', 'approved', 'rejected', 'cancelled', 'taken', 'recorded'];
+/** Statuses a kind accepts as stored value (contract 0.36.0, ADR-0032). */
+const STATUSES_BY_KIND: Record<string, string[]> = {
+	vacation: ['planned', 'requested', 'approved', 'rejected', 'cancelled', 'taken'],
+	sick: ['recorded', 'cancelled'],
+	excused: ['recorded', 'cancelled'],
+	other: ['planned', 'recorded', 'cancelled']
+};
+/**
+ * Server-side normalisation like the backend: an omitted status becomes the kind default; the old vacation workflow values
+ * sent for other kinds are mapped; `recorded` for vacation and `rejected` for other kinds are errors.
+ */
+function statusFor(kind: string, status: unknown): { status: string } | { code: string } {
+	if (status === undefined || status === null) return { status: kind === 'vacation' ? 'planned' : 'recorded' };
+	if (typeof status !== 'string' || !STATUSES.includes(status)) return { code: 'bad_request' };
+	if (kind === 'vacation') return status === 'recorded' ? { code: 'absence_status_invalid_for_kind' } : { status };
+	if (status === 'rejected') return { code: 'absence_status_invalid_for_kind' };
+	if (STATUSES_BY_KIND[kind].includes(status)) return { status };
+	if (kind === 'other') return { status: status === 'requested' ? 'planned' : 'recorded' };
+	return { status: 'recorded' };
+}
 const DOC_STATUSES = ['not_needed', 'pending', 'submitted'];
 const PLAN_MODES: PlanMode[] = ['office', 'home', 'customer', 'school', 'off'];
-const BOOKED = ['approved', 'taken'];
+const BOOKED = ['approved', 'taken', 'recorded'];
 const PLANNED = ['planned', 'requested'];
 const MAX_SPAN_DAYS = 800;
 /** Contract v0.3.1: absences, plan/days and shared views accept at most 366 days (else 400 range_too_large). */
 const MAX_RANGE_DAYS = 366;
 
 export const DEFAULT_VACATION_SETTINGS: VacationSettings = { region: 'DE-ST', annualEntitlementHalfDays: 60, carryOverByYear: {}, carryOverExpiry: null };
+
+type CompanyRule = { month: number; day: number; treatment: 'none' | 'half' | 'full'; name?: string | null };
+const DEFAULT_COMPANY_NAMES: Record<string, string> = { '12-24': 'Heiligabend', '12-31': 'Silvester' };
+const ruleKey = (r: { month: number; day: number }) => `${String(r.month).padStart(2, '0')}-${String(r.day).padStart(2, '0')}`;
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** Contract 0.32.0: GET always lists 24.12. and 31.12.; the name falls back to Heiligabend/Silvester/Betriebsfreier Tag. */
+export function normalizedCompanyDays(rules: CompanyRule[] | undefined): (CompanyRule & { name: string })[] {
+	const list = [...(rules ?? [])];
+	for (const d of [{ month: 12, day: 24 }, { month: 12, day: 31 }]) if (!list.some((r) => r.month === d.month && r.day === d.day)) list.push({ ...d, treatment: 'none' });
+	return list
+		.map((r) => ({ month: r.month, day: r.day, treatment: r.treatment, name: r.name?.trim() || DEFAULT_COMPANY_NAMES[ruleKey(r)] || 'Betriebsfreier Tag' }))
+		.sort((a, b) => a.month - b.month || a.day - b.day);
+}
+
+/** Validation of PUT companyDays like the backend (400 on invalid/duplicate dates, 29.02., > 12 rules, unknown treatment, name > 80). */
+function validCompanyDays(value: any): value is CompanyRule[] {
+	if (!Array.isArray(value) || value.length > 12) return false;
+	const seen = new Set<string>();
+	for (const r of value) {
+		if (!r || !Number.isInteger(r.month) || !Number.isInteger(r.day) || r.month < 1 || r.month > 12 || r.day < 1 || r.day > DAYS_IN_MONTH[r.month - 1]) return false;
+		if (!['none', 'half', 'full'].includes(r.treatment)) return false;
+		if (r.name != null && (typeof r.name !== 'string' || r.name.length > 80)) return false;
+		if (seen.has(ruleKey(r))) return false;
+		seen.add(ruleKey(r));
+	}
+	return true;
+}
 
 export function createPlanningMock(deps: PlanningDeps) {
 	const states = new Map<string, PlanningState>();
@@ -124,11 +194,26 @@ export function createPlanningMock(deps: PlanningDeps) {
 
 	const regionOf = (state: PlanningState) => state.settings?.region ?? DEFAULT_VACATION_SETTINGS.region;
 
+	/** Built-in holidays plus the company days with a treatment; a statutory holiday on the same date wins. */
+	function calendarFor(state: PlanningState, year: number, region = regionOf(state)): CalendarDay[] {
+		const builtin = holidaysFor(year, region);
+		const result: CalendarDay[] = [...builtin];
+		for (const rule of normalizedCompanyDays(state.settings?.companyDays)) {
+			if (rule.treatment === 'none') continue;
+			const date = `${year}-${ruleKey(rule)}`;
+			if (builtin.some((h) => h.kind === 'holiday' && h.startDate <= date && h.endDate >= date)) continue;
+			result.push({ id: null, startDate: date, endDate: date, name: rule.name, kind: 'holiday', source: 'builtin', companyTreatment: rule.treatment });
+		}
+		return result;
+	}
+	/** Company days of kind half on a date (they cost at most one half day of vacation and keep the mark work). */
+	const halfCompanyDay = (state: PlanningState, date: string) => calendarFor(state, Number(date.slice(0, 4))).some((h) => h.companyTreatment === 'half' && h.startDate === date);
+
 	/** Holiday dates of a region: built-in plus the account's own `holiday` custom days. */
 	function holidayDates(state: PlanningState, from: string, to: string): Set<string> {
 		const set = new Set<string>();
 		for (let year = Number(from.slice(0, 4)); year <= Number(to.slice(0, 4)); year++) {
-			for (const h of holidaysFor(year, regionOf(state))) set.add(h.startDate);
+			for (const h of calendarFor(state, year)) if (h.companyTreatment !== 'half') set.add(h.startDate);
 		}
 		for (const c of state.customDays) {
 			if (c.kind !== 'holiday') continue;
@@ -154,7 +239,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 			if (!workdays.includes(isoWeekday(date)) || holidays.has(date)) continue;
 			const single = a.startDate === a.endDate;
 			const half = single ? !!(a.halfDayStart || a.halfDayEnd) : (date === a.startDate && !!a.halfDayStart) || (date === a.endDate && !!a.halfDayEnd);
-			total += half ? 1 : 2;
+			total += half || halfCompanyDay(state, date) ? 1 : 2;
 		}
 		return total;
 	}
@@ -210,7 +295,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const models = deps.modelsOf(accountId);
 		const holidays = new Map<string, string>();
 		for (let year = Number(from.slice(0, 4)); year <= Number(to.slice(0, 4)); year++) {
-			for (const h of holidaysFor(year, regionOf(state))) if (h.kind === 'holiday') holidays.set(h.startDate, h.name);
+			for (const h of calendarFor(state, year)) if (h.kind === 'holiday' && h.companyTreatment !== 'half') holidays.set(h.startDate, h.name);
 		}
 		for (const c of state.customDays) if (c.kind === 'holiday') for (const d of daysBetween(c.startDate, c.endDate)) holidays.set(d, c.name);
 		const vacationDates = new Set<string>();
@@ -268,17 +353,27 @@ export function createPlanningMock(deps: PlanningDeps) {
 		if (!model || !model.workdays.includes(isoWeekday(date))) return null;
 		const state = stateOf(accountId);
 		if (holidayDates(state, date, date).has(date)) return { mark: 'holiday' };
+		const halfCompany = halfCompanyDay(state, date);
 		const absence = state.absences.find((a) => BOOKED.includes(a.status) && (a.kind === 'vacation' || a.kind === 'sick' || a.kind === 'excused') && a.startDate <= date && a.endDate >= date);
-		if (!absence) return null;
+		if (!absence) return halfCompany ? { mark: 'none', halfTarget: true } : null;
 		if (absence.kind === 'sick') return { mark: 'sick' };
 		if (absence.kind === 'excused') return { mark: 'excused' };
 		const single = absence.startDate === absence.endDate;
 		const half = single ? !!(absence.halfDayStart || absence.halfDayEnd) : (date === absence.startDate && !!absence.halfDayStart) || (date === absence.endDate && !!absence.halfDayEnd);
-		return half ? { mark: 'vacation', halfTarget: true } : { mark: 'vacation' };
+		return half && !halfCompany ? { mark: 'vacation', halfTarget: true } : { mark: 'vacation' };
 	}
 
-	function normalize(input: any): AbsenceInput | null {
-		if (!input || !KINDS.includes(input.kind) || !STATUSES.includes(input.status)) return null;
+	type Normalized = { input: AbsenceInput & { status: string } } | { code: string };
+
+	function normalize(input: any): Normalized {
+		if (!input || !KINDS.includes(input.kind)) return { code: 'bad_request' };
+		const resolved = statusFor(input.kind, input.status);
+		if ('code' in resolved) return resolved;
+		const parsed = normalizeFields(input);
+		return parsed ? { input: { ...parsed, status: resolved.status } } : { code: 'bad_request' };
+	}
+
+	function normalizeFields(input: any): AbsenceInput | null {
 		if (!isDate(input.startDate) || !isDate(input.endDate) || input.endDate < input.startDate) return null;
 		if (daysBetween(input.startDate, input.endDate).length > MAX_SPAN_DAYS) return null;
 		if (input.note != null && (typeof input.note !== 'string' || input.note.length > 500)) return null;
@@ -303,7 +398,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 	}
 
 	/** Contract v0.3.1: cancelled and rejected absences do not block other ones. */
-	const blocks = (a: Pick<Absence, 'status'>) => a.status !== 'cancelled' && a.status !== 'rejected';
+	const blocks = (a: { status?: string }) => a.status !== 'cancelled' && a.status !== 'rejected';
 
 	function overlaps(state: PlanningState, input: AbsenceInput, ignoreId?: string): boolean {
 		if (!blocks(input)) return false;
@@ -322,7 +417,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const state = stateOf(share.ownerId);
 		const view: SharedView = {};
 		if (share.scopes.plan) {
-			view.plan = [...state.plan.values()].filter((p) => p.date >= from && p.date <= to).sort((a, b) => a.date.localeCompare(b.date)).map((p) => ({ date: p.date, mode: p.mode, ...(p.plannedStart ? { plannedStart: p.plannedStart, plannedEnd: p.plannedEnd!, ...(p.plannedBreakMinutes != null ? { plannedBreakMinutes: p.plannedBreakMinutes } : {}), plannedSeconds: p.plannedSeconds ?? 0 } : {}) }));
+			view.plan = [...state.plan.values()].filter((p) => p.date >= from && p.date <= to).sort((a, b) => a.date.localeCompare(b.date)).map((p) => ({ date: p.date, mode: p.mode, ...(p.plannedStart ? { plannedStart: p.plannedStart, plannedEnd: p.plannedEnd!, ...(p.plannedBreakMinutes != null ? { plannedBreakMinutes: p.plannedBreakMinutes } : {}), plannedSeconds: p.plannedSeconds ?? 0 } : {}), blocks: (p.blocks ?? []).map(({ start, end, kind }) => ({ start, end, kind })) }));
 		}
 		if (share.scopes.actual) {
 			view.actual = daysBetween(from, to)
@@ -346,15 +441,17 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const monday = startOfWeek(today);
 		if (options.configured ?? true) state.settings = { ...DEFAULT_VACATION_SETTINGS };
 		const add = (input: Partial<AbsenceInput> & Pick<AbsenceInput, 'kind' | 'startDate' | 'endDate' | 'status'>) => {
-			state.absences.push(withCount(accountId, { id: uuid(), version: 1, ...(normalize(input) as AbsenceInput) }));
+			state.absences.push(withCount(accountId, { id: uuid(), version: 1, ...(normalize(input) as { input: AbsenceInput & { status: string } }).input }));
 		};
 		add({ kind: 'vacation', startDate: addDays(monday, -35), endDate: addDays(monday, -33), status: 'taken' });
-		add({ kind: 'sick', startDate: addDays(monday, -14), endDate: addDays(monday, -13), status: 'taken', documentStatus: 'pending', documentReferenceStart: addDays(monday, -14), documentReferenceEnd: addDays(monday, -13), note: 'Erkältung' });
+		add({ kind: 'sick', startDate: addDays(monday, -14), endDate: addDays(monday, -13), status: 'recorded', documentStatus: 'pending', documentReferenceStart: addDays(monday, -14), documentReferenceEnd: addDays(monday, -13), note: 'Erkältung' });
 		add({ kind: 'vacation', startDate: addDays(monday, 14), endDate: addDays(monday, 18), status: 'approved' });
 		add({ kind: 'vacation', startDate: addDays(monday, 42), endDate: addDays(monday, 44), halfDayEnd: true, status: 'planned' });
 		state.customDays.push({ id: uuid(), kind: 'school_holiday', startDate: addDays(monday, 21), endDate: addDays(monday, 25), name: 'Berufsschulferien', source: 'custom' });
-		const put = (date: string, mode: PlanMode, start: string | null, end: string | null, breakMinutes: number | null, note: string | null = null) =>
-			state.plan.set(date, { date, mode, placeId: null, note, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes, plannedSeconds: plannedSecondsOf(start, end, breakMinutes) });
+		const put = (date: string, mode: PlanMode, start: string | null, end: string | null, breakMinutes: number | null, note: string | null = null) => {
+			const normalized = normalizePlanBody({ mode, note, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes });
+			if ('day' in normalized) state.plan.set(date, { date, ...normalized.day });
+		};
 		put(addDays(monday, 0), 'office', '08:00', '16:30', 30);
 		put(addDays(monday, 1), 'office', '08:00', '16:30', 30);
 		put(addDays(monday, 2), 'home', '08:30', '17:00', 30);
@@ -398,7 +495,10 @@ export function createPlanningMock(deps: PlanningDeps) {
 
 		// --- vacation ---
 		if (route === 'vacation/settings') {
-			if (method === 'GET') return ok(state.settings ? { ...state.settings, configured: true } : { ...DEFAULT_VACATION_SETTINGS, carryOverByYear: {}, configured: false });
+			if (method === 'GET') {
+				const companyDays = normalizedCompanyDays(state.settings?.companyDays);
+				return ok(state.settings ? { ...state.settings, companyDays, configured: true } : { ...DEFAULT_VACATION_SETTINGS, carryOverByYear: {}, companyDays, configured: false });
+			}
 			if (method === 'PUT') {
 				const carry = body.carryOverByYear ?? {};
 				const expiry = body.carryOverExpiry ?? null;
@@ -407,10 +507,13 @@ export function createPlanningMock(deps: PlanningDeps) {
 					!Number.isInteger(body.annualEntitlementHalfDays) || body.annualEntitlementHalfDays < 0 ||
 					carry === null || typeof carry !== 'object' || Array.isArray(carry) ||
 					Object.entries(carry).some(([year, value]) => !/^\d{4}$/.test(year) || !Number.isInteger(value) || (value as number) < 0) ||
-					(expiry !== null && !/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(expiry))
+					(expiry !== null && !/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(expiry)) ||
+					(body.companyDays !== undefined && !validCompanyDays(body.companyDays))
 				) return fail(400, 'bad_request');
-				state.settings = { region: body.region, annualEntitlementHalfDays: body.annualEntitlementHalfDays, carryOverByYear: { ...carry }, carryOverExpiry: expiry };
-				return ok({ ...state.settings, configured: true });
+				// PUT without companyDays keeps the stored rules
+				const companyDays = body.companyDays !== undefined ? body.companyDays.map((r: CompanyRule) => ({ month: r.month, day: r.day, treatment: r.treatment, name: r.name?.trim() || null })) : state.settings?.companyDays;
+				state.settings = { region: body.region, annualEntitlementHalfDays: body.annualEntitlementHalfDays, carryOverByYear: { ...carry }, carryOverExpiry: expiry, ...(companyDays ? { companyDays } : {}) };
+				return ok({ ...state.settings, companyDays: normalizedCompanyDays(state.settings.companyDays), configured: true });
 			}
 		}
 		if (route === 'vacation/suggestions' && method === 'GET') return suggestions(accountId, query);
@@ -468,8 +571,9 @@ export function createPlanningMock(deps: PlanningDeps) {
 				);
 			}
 			if (method === 'POST') {
-				const input = normalize(body);
-				if (!input) return fail(400, 'bad_request');
+				const parsed = normalize(body);
+				if ('code' in parsed) return fail(400, parsed.code);
+				const input = parsed.input;
 				if (overlaps(state, input)) return fail(409, 'absence_overlap');
 				const absence = withCount(accountId, { id: uuid(), version: 1, ...input });
 				state.absences.push(absence);
@@ -483,8 +587,9 @@ export function createPlanningMock(deps: PlanningDeps) {
 			if (method === 'PUT') {
 				if (req.ifMatch === undefined) return fail(400, 'bad_request');
 				if (String(absence.version) !== req.ifMatch) return fail(412, 'stale_version');
-				const input = normalize(body);
-				if (!input) return fail(400, 'bad_request');
+				const parsed = normalize(body);
+				if ('code' in parsed) return fail(400, parsed.code);
+				const input = parsed.input;
 				if (overlaps(state, input, absence.id)) return fail(409, 'absence_overlap');
 				Object.assign(absence, input, { version: absence.version + 1 });
 				return ok(withCount(accountId, absence));
@@ -501,7 +606,7 @@ export function createPlanningMock(deps: PlanningDeps) {
 			if (year === null) return fail(400, 'bad_request');
 			const region = query.get('region') ?? regionOf(state);
 			const custom = state.customDays.filter((c) => c.startDate <= `${year}-12-31` && c.endDate >= `${year}-01-01`);
-			return ok([...holidaysFor(year, region), ...custom].sort((a, b) => a.startDate.localeCompare(b.startDate)));
+			return ok([...calendarFor(state, year, region), ...custom].sort((a, b) => a.startDate.localeCompare(b.startDate)));
 		}
 		if (route === 'calendar/custom-days' && method === 'POST') {
 			if (

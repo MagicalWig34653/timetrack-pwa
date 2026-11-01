@@ -31,6 +31,9 @@ export interface StatsPoint {
 }
 
 export interface StatsData {
+	/** Contract 0.36.0: the series counts completed days only; the running day's difference stands apart (null/absent: none). */
+	includesToday?: boolean;
+	todayDeltaSeconds?: number | null;
 	from: string;
 	to: string;
 	granularity: Granularity;
@@ -54,6 +57,8 @@ export interface StatsData {
 	openingBalanceSeconds: number;
 	/** false when the server cannot tell the account balance: the balance must then be shown as unavailable, not as 0 */
 	balanceAvailable: boolean;
+	/** false when absences could not be loaded because the planning module is disabled (shown as unavailable) */
+	absencesAvailable?: boolean;
 	/** true when there is nothing to show (no Soll and no time) */
 	empty: boolean;
 	/** the same range per month, always present (absence chart) */
@@ -70,7 +75,7 @@ export interface AggregateInput {
 	timeZone: string;
 }
 
-const ACTIVE = ['planned', 'requested', 'approved', 'taken'];
+const ACTIVE = ['planned', 'requested', 'approved', 'taken', 'recorded'];
 
 export function bucketKey(date: string, granularity: Granularity): string {
 	if (granularity === 'day') return date;
@@ -123,6 +128,8 @@ function build(input: AggregateInput): Omit<StatsData, 'monthly'> {
 	const to = days.at(-1)?.date ?? today;
 	const buckets = new Map<string, { point: StatsPoint; starts: number[]; ends: number[] }>();
 	let running = input.openingBalanceSeconds;
+	// the account counts completed days only (ADR-0032): today's difference stands apart and flows in tomorrow
+	let todayDelta: number | null = null;
 	const allStarts: number[] = [];
 	const allEnds: number[] = [];
 	const totals = { targetSeconds: 0, actualSeconds: 0, deltaSeconds: 0, breakSeconds: 0, workSeconds: 0, travelSeconds: 0, schoolSeconds: 0, absenceDays: 0, days: 0 };
@@ -149,7 +156,8 @@ function build(input: AggregateInput): Omit<StatsData, 'monthly'> {
 		p.targetSeconds += day.targetSeconds;
 		p.actualSeconds += actual;
 		p.deltaSeconds += delta;
-		running += delta;
+		if (day.date < today) running += delta;
+		else todayDelta = delta;
 		p.balanceSeconds = running;
 		p.workSeconds += figures.work;
 		p.travelSeconds += figures.travel;
@@ -188,6 +196,8 @@ function build(input: AggregateInput): Omit<StatsData, 'monthly'> {
 		rounded,
 		points: elapsed,
 		totals: { ...totals, avgStartMinutes: mean(allStarts), avgEndMinutes: mean(allEnds) },
+		includesToday: false,
+		todayDeltaSeconds: todayDelta,
 		openingBalanceSeconds: input.openingBalanceSeconds,
 		balanceAvailable: true,
 		empty: totals.targetSeconds === 0 && totals.actualSeconds === 0

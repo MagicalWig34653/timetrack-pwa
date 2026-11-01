@@ -1,4 +1,6 @@
+import { createGroupsMock } from './groups.ts';
 import { createMcpMock } from './mcp.ts';
+import { createApnsMock } from './apns.ts';
 import { createMailMock } from './mail.ts';
 import { createModulesMock, type ModuleKey } from './modules.ts';
 import { createNotificationsMock } from './notifications.ts';
@@ -26,6 +28,8 @@ export interface MockRequest {
 	ifMatch?: string;
 	/** value of the Authorization header (device tokens for /automation/events) */
 	authorization?: string;
+	/** value of the X-Edit-Secret header (public group votes and entries, ADR-0033) */
+	editSecret?: string;
 	/** multipart upload (field `file`) */
 	file?: UploadedFile;
 	/** raw binary body (PUT of the vacation form template) and its percent-encoded X-File-Name header */
@@ -161,6 +165,7 @@ export function createMockApi(options: MockOptions = {}) {
 		attachmentCountOf: (accountId, absenceId) => transfer.attachmentCount(accountId, absenceId)
 	});
 	const mail = createMailMock({ configured: options.mailAvailable ?? true });
+	const apns = createApnsMock({ now: options.now });
 	const modules = createModulesMock({ disabledByOperator: options.modulesDisabled });
 	// With planning switched off, absences and holidays do not act on the day evaluation (ADR-0012).
 	time.setDayContext((accountId, date) => (modules.effective(accountId, 'planning') ? planning.dayContext(accountId, date) : null));
@@ -188,7 +193,11 @@ export function createMockApi(options: MockOptions = {}) {
 		}
 	});
 	const mcp = createMcpMock({ clock: options.now ?? Date.now });
-	const notifications = createNotificationsMock({ clock: options.now ?? Date.now });
+	const groups = createGroupsMock({
+		clock: options.now ?? Date.now,
+		ownerState: (ownerId) => (!modules.serverEnabled('groups') && modules.state.locked.has('groups') ? 'locked' : modules.effective(ownerId, 'groups') ? 'ok' : 'off')
+	});
+	const notifications = createNotificationsMock({ clock: options.now ?? Date.now, apnsAvailable: () => apns.state.configured });
 	const oidc = {
 		enabled: !!options.oidc,
 		name: typeof options.oidc === 'object' ? (options.oidc.name ?? 'Mock-IdP') : 'Mock-IdP'
@@ -472,7 +481,9 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 200, body: { enabled: oidc.enabled, name: oidc.name } };
 		}
 		if (path === '/api/v1/mock/mail' && method === 'POST') return mail.hook(body);
+		if (path === '/api/v1/mock/apns' && method === 'POST') return apns.hook(admin.id, body);
 		if (path === '/api/v1/mock/trash' && method === 'POST') return time.hookTrash(body);
+		if (path === '/api/v1/mock/review' && method === 'POST') return time.hookReview(admin.id, body.segmentId);
 		if (path === '/api/v1/mock/accounts' && method === 'POST') {
 			// test hook, not part of the contract: add accounts, fail the next deletion, age sessions (reauth_required)
 			if (typeof body.failDeletion === 'boolean') failDeletion = body.failDeletion;
@@ -596,6 +607,11 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 201, body: sessionBody(opened), sessionCookie: id };
 		}
 
+		// Public group links (ADR-0033): no login, the link token in the path is the only credential.
+		if (path.startsWith('/api/v1/public/groups/')) {
+			return groups.handlePublic({ method, path, body: req.body, editSecret: req.editSecret, query: req.path.split('?')[1] }) ?? error(404, 'not_found');
+		}
+
 		// Shortcuts: device token instead of cookie/CSRF.
 		if (path === '/api/v1/automation/events' && method === 'POST') {
 			// the token's account is not known here; the server-wide switch is enough for the mock
@@ -627,7 +643,7 @@ export function createMockApi(options: MockOptions = {}) {
 						revision: '0123456789abcdef0123456789abcdef01234567',
 						revisionShort: '0123456',
 						buildDate: '2026-10-18T08:00:00Z',
-						apiVersion: '0.19.0',
+						apiVersion: '0.35.0',
 						// operator details are admin-only since contract v0.23.0: the keys are absent for members
 						...(account.role === 'admin'
 							? {
@@ -750,6 +766,7 @@ export function createMockApi(options: MockOptions = {}) {
 				account.email = undefined;
 				account.emailVerified = false;
 				account.pendingEmail = undefined;
+				account.emailRecovery = { active: false, verified: false }; // removing the account address switches e-mail recovery off
 				return { status: 204 };
 			}
 		}
@@ -817,7 +834,9 @@ export function createMockApi(options: MockOptions = {}) {
 					email: {
 						available: mailAvailable,
 						active: account.emailRecovery.active,
-						verified: account.emailRecovery.verified
+						verified: !!account.emailVerified && !!account.email,
+						accountEmail: account.email ?? null,
+						usesAccountEmail: true
 					}
 				}
 			};
@@ -848,7 +867,14 @@ export function createMockApi(options: MockOptions = {}) {
 		if (path === '/api/v1/me/recovery/email') {
 			if (method === 'PUT') {
 				if (!mailAvailable) return error(501, 'not_implemented');
-				account.email = body.email;
+				// contract 0.36.0: the account e-mail is the recovery address; the call needs no body
+				if (!account.email) return error(409, 'account_email_missing');
+				const given = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+				if (given && given !== account.email && account.emailVerified) return error(409, 'recovery_email_must_be_account_email');
+				if (account.emailVerified) {
+					account.emailRecovery = { active: true, verified: true };
+					return { status: 204 };
+				}
 				account.emailRecovery = { active: false, verified: false };
 				return { status: 202 };
 			}
@@ -859,6 +885,7 @@ export function createMockApi(options: MockOptions = {}) {
 		}
 		if (path === '/api/v1/me/recovery/email/verify' && method === 'POST') {
 			if (body.code !== '123456') return error(400, 'invalid_code');
+			account.emailVerified = true; // the code went to the account address, so it confirms that too
 			account.emailRecovery = { active: true, verified: true };
 			return { status: 204 };
 		}
@@ -869,10 +896,16 @@ export function createMockApi(options: MockOptions = {}) {
 		);
 		if (mailResponse) return mailResponse;
 
+		const apnsResponse = apns.handle({ admin: account.role === 'admin', accountId: account.id }, { method, path });
+		if (apnsResponse) return apnsResponse;
+
 		const modulesResponse = modules.handle(account.id, account.role, { method, path, body: req.body });
 		if (modulesResponse) return modulesResponse;
 		const disabled = modules.guard(account.id, path);
 		if (disabled) return disabled;
+
+		const groupsResponse = groups.handleOwner(account.id, { method, path, query: req.path.split('?')[1], body: req.body });
+		if (groupsResponse) return groupsResponse;
 
 		const notificationsResponse = notifications.handle(account.id, { method, path: req.path, body: req.body });
 		if (notificationsResponse) return notificationsResponse;

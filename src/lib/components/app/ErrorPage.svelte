@@ -37,7 +37,6 @@
 	const links = [
 		{ href: '/', key: 'errorpage.link_today' },
 		{ href: '/calendar', key: 'errorpage.link_calendar' },
-		{ href: '/time', key: 'errorpage.link_time' },
 		{ href: '/week', key: 'errorpage.link_week' }
 	] as const;
 	// not found and forbidden are final: retrying the same address does not help

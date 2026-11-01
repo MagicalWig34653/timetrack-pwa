@@ -9,7 +9,7 @@ test('login has accessible labels, contrast, and landmarks', async ({ page }) =>
 	expect(results.violations).toEqual([]);
 });
 
-for (const route of ['/', '/time', '/reports', '/vacation', '/settings/profile']) {
+for (const route of ['/', '/reports', '/vacation', '/settings/profile']) {
 	test(`${route} has accessible labels, contrast, and landmarks`, async ({ browser }) => {
 		const { page, context } = await loginAsAdmin(browser);
 		await page.goto(route);

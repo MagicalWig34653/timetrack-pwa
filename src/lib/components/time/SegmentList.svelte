@@ -4,7 +4,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { localTimeOf } from '#lib/time/dates.js';
-	import { formatDuration } from '#lib/time/format.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { isCorrected, kindLabel, sourceLabel } from '#lib/time/labels.js';
 	import type { Snippet } from 'svelte';
 
@@ -60,14 +60,14 @@
 			{#if row.type === 'gap'}
 				<li class="flex items-center gap-2 rounded-lg border border-dashed px-3 py-1.5 text-sm text-muted-foreground" data-testid="gap-row">
 					<span class="tabular-nums">{range(row.start, row.end)}</span>
-					<span>{t('segments.pause', { duration: formatDuration(row.seconds) })}</span>
+					<span>{t('segments.pause', { duration: timeDisplay.duration(row.seconds) })}</span>
 				</li>
 			{:else}
 				{@const s = row.segment}
 				<li class="rounded-lg border bg-card px-3 py-2 {s.voided ? 'opacity-60' : ''}" data-testid="segment-row" use:contextmenu={() => menuFor?.(s) ?? null}>
 					<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
 						<span class="font-medium tabular-nums {s.voided ? 'line-through' : ''}">{range(s.startedAt, s.endedAt)}</span>
-						<span class="tabular-nums text-sm text-muted-foreground">{formatDuration(seconds(s))}</span>
+						<span class="tabular-nums text-sm text-muted-foreground">{timeDisplay.duration(seconds(s))}</span>
 						<Badge variant="outline">{kindLabel(s.kind)}</Badge>
 						{#if placeName(s.placeId)}<span class="text-sm text-muted-foreground">{placeName(s.placeId)}</span>{/if}
 						{#if !s.endedAt && !s.voided}<Badge variant="secondary">{t('timer.running')}</Badge>{/if}

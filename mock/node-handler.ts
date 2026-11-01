@@ -32,7 +32,8 @@ export async function handleNodeRequest(api: ReturnType<typeof createMockApi>, p
 		cookies,
 		csrfToken: Array.isArray(csrf) ? csrf[0] : csrf,
 		ifMatch: req.headers['if-match'] as string | undefined,
-		authorization: req.headers.authorization
+		authorization: req.headers.authorization,
+		editSecret: req.headers['x-edit-secret'] as string | undefined
 	});
 	res.statusCode = result.status;
 	if (result.sessionCookie !== undefined) {

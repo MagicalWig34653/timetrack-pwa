@@ -234,7 +234,9 @@ describe('calendar page', () => {
 		const grid = await screen.findByTestId('month-grid');
 		expect(within(grid).getByText('Tag der Deutschen Einheit')).toBeInTheDocument(); // 03.10.
 		expect(within(grid).getByText('Reformationstag')).toBeInTheDocument(); // 31.10.
-		expect(within(grid).getAllByText('Urlaub').length).toBeGreaterThanOrEqual(5); // 26.-30.10.
+		// 26.-30.10.: one continuous bar, labelled once per week row, one segment per day
+		expect(within(grid).getAllByText('Urlaub').length).toBeGreaterThanOrEqual(1);
+		expect(grid.querySelectorAll('[data-chip="absence"]:is([data-continues-left],[data-continues-right])').length).toBeGreaterThanOrEqual(5);
 		expect(within(grid).getAllByText('Homeoffice').length).toBeGreaterThan(0);
 		expect(within(grid).getAllByText('Krank').length).toBeGreaterThan(0); // seeded sick leave 28.-29.09. in the first grid row
 	});
@@ -247,7 +249,9 @@ describe('calendar page', () => {
 		const panel = await screen.findByTestId('day-panel');
 		await userEvent.click(within(panel).getByRole('button', { name: 'Abwesenheit anlegen' }));
 		await userEvent.selectOptions(screen.getByLabelText('Art'), 'sick');
-		await userEvent.selectOptions(screen.getByLabelText('Status'), 'taken');
+		// sick leave has no approval workflow: no status selector, only the "recorded" note (contract 0.36.0)
+		expect(screen.queryByLabelText('Status')).toBeNull();
+		expect(screen.getByTestId('absence-recorded-note')).toHaveTextContent('Erfasst');
 		await userEvent.click(within(screen.getByTestId('absence-form')).getByRole('button', { name: 'Speichern' }));
 		expect(await screen.findByText('Abwesenheit gespeichert.')).toBeInTheDocument();
 		await waitFor(() => expect(within(screen.getByTestId('month-grid')).getAllByText('Krank').length).toBeGreaterThan(0));

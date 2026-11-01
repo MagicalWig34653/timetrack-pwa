@@ -35,6 +35,15 @@ export function absenceInputOf(absence: Absence): AbsenceInput {
 }
 
 export function planInputOf(plan: PlanDay): PlanDayInput {
+	// contract 0.35.0: the block list is the plan; sending only the window would flatten a split day
+	if (Array.isArray(plan.blocks) && (plan.blocks.length > 0 || !plan.plannedStart)) {
+		return {
+			mode: plan.mode,
+			placeId: plan.placeId ?? null,
+			note: plan.note ?? null,
+			blocks: plan.mode === 'off' ? [] : plan.blocks.map((b) => ({ start: b.start, end: b.end, kind: b.kind, placeId: b.placeId ?? null, note: b.note ?? null }))
+		};
+	}
 	return {
 		mode: plan.mode,
 		placeId: plan.placeId ?? null,
