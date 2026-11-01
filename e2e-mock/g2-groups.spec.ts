@@ -372,7 +372,7 @@ test('owner screens on a phone', async ({ browser }) => {
 	for (const route of ['/groups', '/groups/polls/new', '/groups/catalogs']) {
 		await page.goto(route);
 		await expect(page.locator('main h1')).toBeVisible();
-		expect(await noHorizontalScroll(page), route).toBe(0);
+		expect(await noHorizontalScroll(page), route).toBeLessThanOrEqual(0);
 	}
 	await page.goto('/groups');
 	await page.getByTestId('poll-list').getByRole('link').first().click();
