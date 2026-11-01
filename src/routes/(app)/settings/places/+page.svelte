@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { api } from '#lib/api/client.js';
+	import { api, ApiError } from '#lib/api/client.js';
 	import type { AutomationMode, Place, PlaceInput, PlaceKind, SegmentKind } from '#lib/api/types.js';
 	import CopyButton from '#lib/components/app/CopyButton.svelte';
 	import Field from '#lib/components/app/Field.svelte';
@@ -47,16 +47,44 @@
 	let notice = $state('');
 	let pending = $state(false);
 	let archiving = $state<string | null>(null);
+	// archived places (contract 0.39.0); null = not loaded or the server does not know the filter
+	let archivedPlaces = $state<Place[] | null>(null);
 
 	async function refresh() {
 		try {
 			places = await api.listPlaces();
 			load = { status: 'ready' };
+			await refreshArchived();
 		} catch (error) {
 			load = toLoadState(error);
 		}
 	}
+	async function refreshArchived() {
+		try {
+			// an older server ignores the filter and returns the active list: keep only archived rows then
+			archivedPlaces = (await api.listArchivedPlaces()).filter((p) => p.archived);
+		} catch (error) {
+			// 400/404 = server before 0.39.0: the section stays hidden; other errors are not worth blocking the page
+			archivedPlaces = error instanceof ApiError && (error.status === 400 || error.status === 404) ? null : (archivedPlaces ?? null);
+		}
+	}
 	onMount(refresh);
+
+	async function restore(place: Place) {
+		if (pending) return;
+		pending = true;
+		formError = '';
+		try {
+			await api.restorePlace(place.id);
+			notice = t('places.restored');
+			await refresh();
+		} catch (e) {
+			notice = '';
+			formError = errorMessage(e);
+		} finally {
+			pending = false;
+		}
+	}
 
 	function edit(place: Place | 'new') {
 		editing = place;
@@ -206,6 +234,21 @@
 				</li>
 			{/each}
 		</ul>
+
+		{#if archivedPlaces && archivedPlaces.length > 0}
+			<section class="flex flex-col gap-2" data-testid="archived-places" aria-labelledby="archived-places-title">
+				<h2 id="archived-places-title" class="text-base font-semibold">{t('places.archived_title')}</h2>
+				<p class="text-sm text-muted-foreground">{t('places.archived_text')}</p>
+				<ul class="flex flex-col gap-2">
+					{#each archivedPlaces as place (place.id)}
+						<li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-3" data-testid="archived-place">
+							<span class="min-w-0"><span class="font-medium break-words">{place.name}</span> <span class="text-xs text-muted-foreground">{placeKindLabel(place.kind)}</span></span>
+							<Button variant="outline" size="sm" onclick={() => restore(place)} disabled={pending} aria-label={t('places.restore_aria', { name: place.name })}>{t('places.restore')}</Button>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
 
 		{#if editing !== null}
 			<Card>

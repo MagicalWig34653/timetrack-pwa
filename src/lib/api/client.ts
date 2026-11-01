@@ -493,6 +493,9 @@ export const api = {
 	createPlace: (input: PlaceInput) => request<Place>('POST', '/places', input),
 	updatePlace: (id: string, input: PlaceInput) => request<Place>('PUT', `/places/${id}`, input),
 	archivePlace: (id: string) => request<void>('DELETE', `/places/${id}`),
+	/** Contract 0.39.0; servers before it answer 400/404 or the active list (callers filter on `archived`). */
+	listArchivedPlaces: () => request<Place[]>('GET', '/places?archived=true'),
+	restorePlace: (id: string) => request<Place>('POST', `/places/${id}/restore`),
 
 	// segments and timer; `ifMatchVersion` becomes the If-Match header
 	listSegments: (from: string, to: string, includeVoided = false) =>

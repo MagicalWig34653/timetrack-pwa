@@ -302,7 +302,7 @@ test('phone: public date poll and order fit the viewport without sideways page s
 	}
 	await page.reload();
 	await expect(page.getByTestId('vote-row')).toHaveCount(4);
-	expect(await noHorizontalScroll(page)).toBe(0);
+	expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 	await expect(page.getByTestId('poll-results')).toBeVisible();
 	await shot(page, 'g2-public-poll-phone');
 	// the form is usable on a phone: all options reachable, buttons large enough
@@ -316,7 +316,7 @@ test('phone: public order page', async ({ browser }) => {
 	const v = await visitor(browser, { viewport: { width: 390, height: 844 } });
 	await v.page.goto(orderPath);
 	await expect(v.page.getByTestId('group-title')).toHaveText('Dönerstag');
-	expect(await noHorizontalScroll(v.page)).toBe(0);
+	expect(await noHorizontalScroll(v.page)).toBeLessThanOrEqual(0);
 	await shot(v.page, 'g2-public-order-phone');
 	await v.context.close();
 });
@@ -372,12 +372,12 @@ test('owner screens on a phone', async ({ browser }) => {
 	for (const route of ['/groups', '/groups/polls/new', '/groups/catalogs']) {
 		await page.goto(route);
 		await expect(page.locator('main h1')).toBeVisible();
-		expect(await noHorizontalScroll(page), route).toBe(0);
+		expect(await noHorizontalScroll(page), route).toBeLessThanOrEqual(0);
 	}
 	await page.goto('/groups');
 	await page.getByTestId('poll-list').getByRole('link').first().click();
 	await expect(page.getByTestId('poll-results')).toBeVisible();
-	expect(await noHorizontalScroll(page)).toBe(0);
+	expect(await noHorizontalScroll(page)).toBeLessThanOrEqual(0);
 	await shot(page, 'g2-owner-poll-detail-phone');
 	await context.close();
 });

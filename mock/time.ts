@@ -517,13 +517,24 @@ export function createTimeMock(clock: () => number) {
 
 		// --- places ---
 		if (route === 'places') {
-			if (method === 'GET') return ok(state.places.filter((p) => !p.archived));
+			if (method === 'GET') {
+				// contract 0.39.0: ?archived=true lists only archived places, ?archived=all both
+				const filter = query.get('archived');
+				if (filter !== null && !['true', 'false', 'all'].includes(filter)) return fail(400, 'bad_request');
+				return ok(state.places.filter((p) => (filter === 'all' ? true : filter === 'true' ? p.archived : !p.archived)));
+			}
 			if (method === 'POST') {
 				if (!validatePlace(body)) return fail(400, 'bad_request');
 				const place: Place = { confirmAfterSeconds: 300, defaultSegmentKind: 'work', latitude: null, longitude: null, radiusMeters: null, ...body, id: uuid(), archived: false };
 				state.places.push(place);
 				return ok(place, 201);
 			}
+		}
+		if ((m = route.match(/^places\/([^/]+)\/restore$/)) && method === 'POST') {
+			const place = state.places.find((p) => p.id === m![1]);
+			if (!place) return fail(404, 'not_found');
+			place.archived = false;
+			return ok(place);
 		}
 		if ((m = route.match(/^places\/([^/]+)$/))) {
 			const place = state.places.find((p) => p.id === m![1] && !p.archived);
