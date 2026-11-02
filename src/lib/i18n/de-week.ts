@@ -94,6 +94,7 @@ export const deWeek = {
 	'weekview.half_day': 'halber Tag',
 	'weekview.today': 'Heute',
 	'weekview.provisional': 'läuft noch',
+	'weekview.off_booking': 'Überstunde',
 	'weekview.planned': 'Plan {time}',
 	'weekview.planned_none': 'Kein Plan',
 	'weekview.target_of': 'Soll {time}',

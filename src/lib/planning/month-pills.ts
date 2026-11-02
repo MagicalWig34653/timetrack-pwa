@@ -8,7 +8,7 @@ import type { DayInfo } from './calendar.js';
  */
 export interface MonthPill {
 	key: string;
-	kind: 'absence' | 'holiday' | 'school_holiday' | 'plan';
+	kind: 'absence' | 'holiday' | 'school_holiday' | 'plan' | 'worked';
 	/** Visible label; empty for a continuation segment of a bar (the bar of the previous cell carries the text) */
 	label: string;
 	absence?: Absence;
@@ -36,6 +36,8 @@ export interface PillLabels {
 	absence: (a: Absence) => string;
 	plan: (mode: PlanMode) => string;
 	holidayHint: (name: string, treatment: string | null | undefined) => string;
+	/** Label of the tracked time on an absence or holiday day, e.g. "Ist 8:00" */
+	worked?: (seconds: number) => string;
 }
 
 /** Monday = 0 ... Sunday = 6 */
@@ -58,6 +60,12 @@ export function monthPills(info: DayInfo, hidden: Set<string>, labels: PillLabel
 			const half = h.companyTreatment === 'half';
 			all.push({ key: `h-${h.name}-${h.startDate}`, kind: 'holiday', label: h.name, continuesLeft: false, continuesRight: false, open: false, half, treatment: h.companyTreatment, nameText: half ? `${h.name} ½ ${labels.holidayHint(h.name, 'half')}`.replace(/\s+/g, ' ') : h.name });
 		}
+	}
+	// Tracked time on a vacation/sick/holiday day stays visible (ADR-0034): it counts as overtime, so the cell must not hide it.
+	const worked = info.evaluation && info.evaluation.evaluatedWorkSeconds > 0 ? info.evaluation.evaluatedWorkSeconds : 0;
+	if (worked > 0 && labels.worked && !hidden.has('worked') && (info.absences.length > 0 || info.holidays.length > 0)) {
+		const label = labels.worked(worked);
+		all.push({ key: 'worked', kind: 'worked', label, continuesLeft: false, continuesRight: false, open: false, half: false, nameText: label });
 	}
 	if (!hidden.has('school_holiday')) {
 		for (const h of info.schoolHolidays) all.push({ key: `s-${h.name}-${h.startDate}`, kind: 'school_holiday', label: h.name, continuesLeft: false, continuesRight: false, open: false, half: false, nameText: h.name });

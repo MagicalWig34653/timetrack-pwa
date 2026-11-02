@@ -3,6 +3,7 @@ import { t, type MessageKey } from '#lib/i18n/index.js';
 import { holidayHint } from '#lib/planning/company-days.js';
 import { absenceKindLabel } from '#lib/planning/labels.js';
 import { formatDateLong } from '#lib/time/dates.js';
+import { offDayBookingHint } from '#lib/time/off-day-booking.js';
 import { absenceWarning, chipAbsences } from './absences.js';
 import { blocksText, listsBlocks } from './plan-blocks.js';
 import { vacationTooltip, type VacationEntry } from './vacation.js';
@@ -68,6 +69,8 @@ export function dayAriaLabel(day: TimeWeekDay, vacation: VacationEntry[] | null 
 		const sign = day.planActualDifferenceSeconds > 0 ? 'plus ' : day.planActualDifferenceSeconds < 0 ? 'minus ' : '';
 		parts.push(t('weekview.aria_plan_diff', { delta: day.planActualDifferenceSeconds === 0 ? 'genau im Plan' : sign + formatDuration(Math.abs(day.planActualDifferenceSeconds)) }));
 	}
+	const offHint = offDayBookingHint(day);
+	if (offHint) parts.push(offHint);
 	if (day.provisional && !day.isFuture) parts.push(t('weekview.provisional'));
 	return parts.join(', ');
 }

@@ -20,6 +20,21 @@ const evaluation = (extra: Partial<DayEvaluation>): DayEvaluation => ({
 });
 
 describe('DaySummary absence effects', () => {
+	it('shows a quiet overtime hint for a booking on a vacation day, whole and half', () => {
+		const { unmount } = render(DaySummary, { evaluation: evaluation({ mark: 'vacation', targetSeconds: 0, rawWorkSeconds: 28800, evaluatedWorkSeconds: 28800, deltaSeconds: 28800 }) });
+		expect(screen.getByTestId('day-off-booking')).toHaveTextContent('Buchung an Urlaubstag: Die gebuchte Zeit zählt als Überstunde.');
+		expect(screen.getByTestId('day-raw')).toHaveTextContent('8:00');
+		unmount();
+		render(DaySummary, { evaluation: evaluation({ mark: 'vacation', targetSeconds: 13860, rawWorkSeconds: 18000, evaluatedWorkSeconds: 18000, deltaSeconds: 4140 }) });
+		expect(screen.getByTestId('day-off-booking')).toBeInTheDocument();
+		expect(screen.getByTestId('day-target-note')).toHaveTextContent('halber Urlaubstag');
+	});
+
+	it('shows no overtime hint on a vacation day without a booking', () => {
+		render(DaySummary, { evaluation: evaluation({ mark: 'vacation', targetSeconds: 0, deltaSeconds: 0 }) });
+		expect(screen.queryByTestId('day-off-booking')).toBeNull();
+	});
+
 	it('explains a zero target from a vacation, sick or holiday mark neutrally', () => {
 		render(DaySummary, { evaluation: evaluation({ mark: 'vacation', targetSeconds: 0, deltaSeconds: 0 }) });
 		expect(screen.getByTestId('day-target-note')).toHaveTextContent('Soll 0: Der Tag ist als „Urlaub“ gewertet.');

@@ -286,6 +286,11 @@ export const dePlanning = {
 	'day.mark_source_absence': 'Markierung: aus einer Abwesenheit abgeleitet.',
 	'day.mark_source_holiday': 'Markierung: aus dem Feiertagskalender abgeleitet.',
 	'day.target_note_half': 'Soll halbiert: halber Urlaubstag.',
+	// bookings on off days are allowed and count as overtime (ADR-0034); quiet hints, never a block
+	'day.off_booking_vacation': 'Buchung an Urlaubstag: Die gebuchte Zeit zählt als Überstunde.',
+	'day.off_booking_sick': 'Buchung an Krankheitstag: Die gebuchte Zeit zählt als Überstunde.',
+	'day.off_booking_excused': 'Buchung an Freistellungstag: Die gebuchte Zeit zählt als Überstunde.',
+	'day.off_booking_holiday': 'Buchung an Feiertag: Die gebuchte Zeit zählt als Überstunde.',
 
 	// errors
 	'error.absence_overlap': 'In diesem Zeitraum gibt es bereits eine andere Abwesenheit. Abwesenheiten dürfen sich nicht überschneiden.',

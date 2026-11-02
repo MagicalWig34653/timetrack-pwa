@@ -2,6 +2,7 @@
 	import { contextmenu, type MenuEntry } from '#lib/a11y/context-menu.svelte.js';
 	import type { Absence } from '#lib/api/types.js';
 	import { t } from '#lib/i18n/index.js';
+	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import type { DayInfo, DayWorkState } from '#lib/planning/calendar.js';
 	import type { ConflictSeverity } from '#lib/planning/conflicts.js';
 	import { beginMove, beginResize, beginSelect, dragTo, exceedsThreshold, isNoop, previewRange, type DragOp } from '#lib/planning/drag.js';
@@ -104,6 +105,7 @@
 	const pillLabels = {
 		absence: (a: Absence) => absenceKindLabel(a.kind),
 		plan: planModeLabel,
+		worked: (seconds: number) => t('calendar.worked', { time: timeDisplay.duration(seconds) }),
 		holidayHint: (name: string, treatment: string | null | undefined) => holidayHint(name, treatment as never)
 	};
 	const pillsOf = (date: string) => monthPills(infoOf(date), hidden, pillLabels, maxPills);
@@ -307,6 +309,8 @@
 										<span class="pill mx-1.5 rounded-md {HOLIDAY_CLASS} {pill.half ? 'border border-dashed border-current' : ''}" data-chip="holiday" data-treatment={pill.treatment ?? undefined} title={holidayHint(pill.label, pill.treatment as never)}>{pill.label}{#if pill.half}<span aria-hidden="true"> ½</span><span class="sr-only">, {holidayHint(pill.label, 'half')}</span>{/if}</span>
 									{:else if pill.kind === 'school_holiday'}
 										<span class="pill mx-1.5 rounded-md {SCHOOL_HOLIDAY_CLASS}" data-chip="school-holiday">{pill.label}</span>
+									{:else if pill.kind === 'worked'}
+										<span class="pill mx-1.5 rounded-md bg-muted text-foreground/80 tabular-nums" data-chip="worked">{pill.label}</span>
 									{:else if pill.planMode}
 										<span class="pill mx-1.5 gap-1 rounded-md {PLAN_CLASSES[pill.planMode]}" data-chip="plan"><span class="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true"></span>{pill.label}</span>
 									{/if}

@@ -7,6 +7,7 @@
 	import Dur from '#lib/components/app/Dur.svelte';
 	import { timeDisplay } from '#lib/time/display.svelte.js';
 	import { hintLabel, markLabel } from '#lib/time/labels.js';
+	import { offDayBookingHint } from '#lib/time/off-day-booking.js';
 	import { onMount } from 'svelte';
 
 	let { evaluation, showHints = true, kpis = true }: { evaluation: DayEvaluation; showHints?: boolean; /** false when target/evaluated/delta are shown as KPI cards next to this summary */ kpis?: boolean } = $props();
@@ -14,6 +15,7 @@
 	const targetNote = $derived(
 		!markedOff ? '' : evaluation.targetSeconds === 0 ? t('day.target_note_zero', { mark: markLabel(evaluation.mark!) }) : evaluation.mark === 'vacation' ? t('day.target_note_half') : ''
 	);
+	const bookingHint = $derived(offDayBookingHint({ mark: evaluation.mark, rawWorkSeconds: evaluation.rawWorkSeconds, workSeconds: evaluation.evaluatedWorkSeconds, segmentsCount: evaluation.segmentIds?.length }));
 	const sourceNote = $derived(
 		!markedOff || !evaluation.markSource || evaluation.markSource === 'none' ? '' : t(`day.mark_source_${evaluation.markSource}` as 'day.mark_source_explicit')
 	);
@@ -32,6 +34,7 @@
 		{#if evaluation.mark && evaluation.mark !== 'none'}<Badge variant="outline">{markLabel(evaluation.mark)}</Badge>{/if}
 	</div>
 	{#if targetNote}<p class="text-sm text-muted-foreground" data-testid="day-target-note">{targetNote}</p>{/if}
+	{#if bookingHint}<p class="text-sm text-muted-foreground" data-testid="day-off-booking">{bookingHint}</p>{/if}
 	{#if sourceNote}<p class="text-xs text-muted-foreground" data-testid="day-mark-source" data-source={evaluation.markSource}>{sourceNote}</p>{/if}
 	<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
 		{#if kpis}<div><dt class="text-muted-foreground">{t('day.target')}</dt><dd class="text-lg font-medium tabular-nums" data-testid="day-target"><Dur seconds={evaluation.targetSeconds} /></dd></div>{/if}

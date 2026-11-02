@@ -25,7 +25,8 @@ describe('day card facts', () => {
 		expect(text).toBe('Dienstag, 20.10.2026, 7:54 Stunden, Saldo plus 0:12, Büro');
 	});
 	it('names the mark and omits hours for future days', () => {
-		expect(dayAriaLabel(day({ mark: 'vacation', isFuture: true, workSeconds: 0, balanceSeconds: null, plannedSeconds: 28_800 }))).toBe('Dienstag, 20.10.2026, Urlaub, geplant 8:00 Stunden');
+		expect(dayAriaLabel(day({ mark: 'vacation', workSeconds: 3600, balanceSeconds: 3600 }))).toContain('Buchung an Urlaubstag: Die gebuchte Zeit zählt als Überstunde.');
+		expect(dayAriaLabel(day({ mark: 'vacation', isFuture: true, workSeconds: 0, rawWorkSeconds: 0, segmentsCount: 0, balanceSeconds: null, plannedSeconds: 28_800 }))).toBe('Dienstag, 20.10.2026, Urlaub, geplant 8:00 Stunden');
 		expect(dayAriaLabel(day({ balanceSeconds: -5400, workSeconds: 22_320 }))).toContain('Saldo minus 1:30');
 	});
 	it('reads a half company day aloud although the mark stays work', () => {

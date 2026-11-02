@@ -56,4 +56,14 @@ describe('monthPills', () => {
 		expect(visibleText('2026-10-13', shown, 2)).toBe('13 Urlaub +2');
 		expect(visibleText('2026-10-14', monthPills(info('2026-10-14'), new Set(), labels, 3).pills)).toBe('14');
 	});
+	it('keeps tracked time visible on a vacation day as a worked pill after the absence (ADR-0034)', () => {
+		const worked = { ...labels, worked: (seconds: number) => `Ist ${seconds / 3600}h` };
+		const evaluation = { evaluatedWorkSeconds: 28800 } as DayInfo['evaluation'];
+		const pills = monthPills(info('2026-10-14', { evaluation }), new Set(), worked, 3).pills;
+		expect(pills.map((p) => p.kind)).toEqual(['absence', 'worked']);
+		expect(pills[1].label).toBe('Ist 8h');
+		expect(monthPills(info('2026-10-14', { evaluation }), new Set(['worked']), worked, 3).pills.map((p) => p.kind)).toEqual(['absence']);
+		expect(monthPills(info('2026-10-14'), new Set(), worked, 3).pills.map((p) => p.kind)).toEqual(['absence']);
+		expect(monthPills(info('2026-10-14', { absences: [], evaluation }), new Set(), worked, 3).pills).toEqual([]);
+	});
 });
