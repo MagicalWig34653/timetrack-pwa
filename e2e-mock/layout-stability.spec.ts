@@ -13,6 +13,7 @@ const SETTINGS = [
 	'trigger-links', 'sharing', 'vacation-form', 'passkeys', 'identities', 'connections', 'api-tokens', 'mcp-help', 'recovery',
 	'sessions', 'privacy', 'storage'
 ].map((p) => `/settings/${p}`);
+const ADMIN = ['invitations', 'accounts', 'modules', 'mail', 'apns'].map((p) => `/admin/${p}`);
 
 interface Metrics {
 	nav: { x: number; y: number; w: number } | null;
@@ -54,15 +55,16 @@ async function openViaNav(page: Page, route: string, wideNav: boolean): Promise<
 }
 
 // 'tall': a large monitor where short pages fit without a scrollbar and long ones need one
+for (const [group, routesOfGroup] of [['settings', SETTINGS], ['admin', ADMIN]] as const)
 for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['tall', { width: 1280, height: 1400 }], ['phone', { width: 390, height: 800 }]] as const) {
-	test(`settings routes keep nav, content column and viewport width stable (${label})`, async ({ browser }) => {
+	test(`${group} routes keep nav, content column and viewport width stable (${label})`, async ({ browser }) => {
 		const { page, context } = await loginAsAdmin(browser, { viewport });
-		await page.goto(SETTINGS[0]);
+		await page.goto(routesOfGroup[0]);
 		await settle(page);
 		const base = await measure(page);
 		const wideNav = viewport.width >= 1100;
 		const problems: string[] = [];
-		for (const route of SETTINGS.slice(1)) {
+		for (const route of routesOfGroup.slice(1)) {
 			const early = await openViaNav(page, route, wideNav);
 			const m = await measure(page);
 			// the page head is part of the first paint and does not move while data loads (no title pop-in)
@@ -132,6 +134,42 @@ for (const [label, routes] of [
 			widths[route] = (await measure(page)).clientWidth;
 		}
 		expect(new Set(Object.values(widths)).size, JSON.stringify(widths)).toBe(1);
+		await context.close();
+	});
+}
+
+// J3: the section nav sits at the same spot at scroll 0 and when scrolled (sticky offset == natural offset), and
+// switching pages with slow responses neither moves it nor waits for a session round trip before reacting.
+for (const [group, routes] of [['settings', SETTINGS.slice(0, 4)], ['admin', ADMIN]] as const) {
+	test(`${group}: nav does not move when switching pages while scrolled and the API is slow`, async ({ browser }) => {
+		const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 600 } });
+		await page.goto(routes[0]);
+		await settle(page);
+		const navY = async () => (await page.getByTestId('settings-nav-sticky').boundingBox())!.y;
+		const rest = await navY();
+		await page.evaluate(() => window.scrollTo(0, 30));
+		await page.waitForTimeout(100);
+		expect((await measure(page)).scrollY, 'page is scrolled').toBeGreaterThan(0);
+		// admin pages are short, the nav then has no sticky travel and scrolls with the page like any content
+		if (group === 'settings') expect(await navY(), 'nav offset when scrolled').toBe(rest);
+		await page.route('**/api/**', async (route) => {
+			await new Promise((resolve) => setTimeout(resolve, 300));
+			await route.continue();
+		});
+		for (const route of routes.slice(1)) {
+			await page.evaluate(() => window.scrollTo(0, 30));
+			await page.locator(`#settings-nav-list a[href="${route}"]`).click();
+			const seen: number[] = [];
+			for (let i = 0; i < 6; i++) {
+				seen.push(Math.round((await navY()) * 10) / 10);
+				await page.waitForTimeout(120);
+			}
+			await page.waitForURL(`**${route}`);
+			await settle(page);
+			seen.push(await navY());
+			const shifts = seen.filter((y, i) => (i === seen.length - 1 ? Math.abs(y - rest) > 0.5 : group === 'settings' ? Math.abs(y - rest) > 0.5 : y > rest + 0.5 || y < rest - 31));
+			expect(shifts, `${route}: nav y samples ${JSON.stringify(seen)} (rest ${rest})`).toEqual([]);
+		}
 		await context.close();
 	});
 }

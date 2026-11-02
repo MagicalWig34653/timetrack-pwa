@@ -1,3 +1,5 @@
+**UI-FIXES (02.11.2026, Branch ui-fixes):** Einstellungen/Verwaltung springen nicht mehr (Menü sticky bei natürlicher Position, Sitzungsprüfung höchstens alle 20 s, Mindesthöhe der Inhaltsspalte); Urlaub im Kalender deutlicher (Tönung, Pill, Handy-Zelle, Filter-Hinweis). Details: `docs/handoffs/UI-FIXES.md`.
+
 **Stand 01.11.2026:** `main` 4a71c83 (Vertrag 0.39.0 gelesen: Archiv-Orte, `/admin/apns`, Apple-Geräte, Link wieder sichtbar). Offene Punkte und Stolpersteine (jsdom-Reparatur, Mock-Build): `docs/handoffs/SESSION-2026-11-01.md` im Backend-Repo.
 
 **P14e-pwa (30.10.2026):** Admin-Seite `/admin/apns` (Zustand ohne Schlüssel, Live-Prüfung bei Apple je Bundle-ID/Umgebung, Vertrag 0.38.0) und Karte „Apple-Geräte“ in den Benachrichtigungen (Liste, Testmitteilung, Entfernen). 1340 Unit-Tests, Mock-E2E 248 grün; gegen das echte Backend ungeprüft.

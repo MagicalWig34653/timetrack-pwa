@@ -46,6 +46,7 @@ export const deCalendar = {
 	'cal.undone': 'Rückgängig gemacht: {label}',
 	'cal.redone': 'Wiederholt: {label}',
 	'cal.legend_toggle': 'Ein- oder ausblenden',
+	'cal.filter_hidden': '{count} ausgeblendet',
 	'cal.inspector': 'Tagesdetails',
 	'cal.hint': 'Tage mit der Maus aufziehen, mit Umschalt oder Strg/Cmd mehrere wählen, Doppelklick plant genau, Rechtsklick öffnet das Menü. Mit ? siehst du alle Kurzbefehle.',
 	'cal.selected': '{count} Tage ausgewählt',

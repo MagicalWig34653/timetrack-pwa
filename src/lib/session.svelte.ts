@@ -11,6 +11,7 @@ class SessionStore {
 	async refresh(): Promise<Session | null> {
 		try {
 			this.current = await api.currentSession();
+			this.refreshedAt = Date.now();
 			this.reconcileTheme();
 		} catch (error) {
 			if (error instanceof ApiError && error.status === 401) {
@@ -24,8 +25,21 @@ class SessionStore {
 		return this.current;
 	}
 
+	private refreshedAt = 0;
+
+	/**
+	 * Route guard variant of refresh(): within a short window the session read is not repeated on every navigation, so
+	 * switching between sibling pages does not wait for a round trip before anything changes. A revoked session still
+	 * surfaces on the next API call (401) or after the window.
+	 */
+	async ensureFresh(maxAgeMs = 20_000): Promise<Session | null> {
+		if (this.current && Date.now() - this.refreshedAt < maxAgeMs) return this.current;
+		return this.refresh();
+	}
+
 	set(session: Session): void {
 		this.current = session;
+		this.refreshedAt = Date.now();
 		this.loaded = true;
 		setCsrfToken(session.csrfToken);
 		this.reconcileTheme();

@@ -28,7 +28,7 @@ export const PLANNED_STATUSES: AbsenceStatus[] = ['planned', 'requested'];
 
 /** Tailwind classes per absence kind (color is never the only signal: the label text is always shown). */
 export const ABSENCE_CLASSES: Record<AbsenceKind, string> = {
-	vacation: 'bg-sky-500/15 text-sky-900 dark:text-sky-200',
+	vacation: 'bg-sky-500/25 text-sky-900 dark:text-sky-200',
 	sick: 'bg-rose-500/15 text-rose-900 dark:text-rose-200',
 	excused: 'bg-teal-500/15 text-teal-900 dark:text-teal-200',
 	other: 'bg-violet-500/15 text-violet-900 dark:text-violet-200'

@@ -7,7 +7,7 @@ const RECOVERY_PATH = '/recover/passkey';
 
 /** Route guard: runs on every navigation (reads url) and checks GET /api/v1/auth/session. */
 export const load: LayoutLoad = async ({ url }) => {
-	const session = await sessionStore.refresh();
+	const session = await sessionStore.ensureFresh();
 	if (!session) {
 		const next = url.pathname + url.search;
 		redirect(307, `/login?next=${encodeURIComponent(next)}`);

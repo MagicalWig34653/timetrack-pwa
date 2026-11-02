@@ -34,8 +34,8 @@
 </script>
 
 <div class="wide:grid wide:grid-cols-[13.5rem_minmax(0,1fr)] wide:items-start wide:gap-8">
-	<!-- sticky below the 60 px top bar; scrolls on its own when taller than the window, so every entry stays reachable -->
-	<div class="{landing ? 'hidden wide:block' : ''} mb-5 wide:sticky wide:top-[76px] wide:mb-0 wide:max-h-[calc(100vh-92px)] wide:overflow-y-auto wide:overscroll-contain" data-testid="settings-nav-sticky">
+	<!-- sticky at exactly its natural offset (60 px top bar + 36 px page padding), so scrolling or the scroll reset after a page switch never moves it; scrolls on its own when taller than the window, so every entry stays reachable -->
+	<div class="{landing ? 'hidden wide:block' : ''} mb-5 wide:sticky wide:top-24 wide:mb-0 wide:max-h-[calc(100vh-7rem)] wide:overflow-y-auto wide:overscroll-contain" data-testid="settings-nav-sticky">
 		<button
 			type="button"
 			class="flex h-10 w-full items-center justify-between rounded-lg border bg-card px-3 text-sm font-medium wide:hidden"
@@ -71,7 +71,7 @@
 			</div>
 		</nav>
 	</div>
-	<div class="max-w-[820px] min-w-0" data-testid="settings-content">
+	<div class="max-w-[820px] min-w-0 wide:min-h-[calc(100vh-12rem)]" data-testid="settings-content">
 		<!-- the page body is re-created per route (and an error stays confined to it); the nav above stays mounted (J2) -->
 		{#key page.url.pathname}
 			<svelte:boundary onerror={(error) => console.error(error)}>
