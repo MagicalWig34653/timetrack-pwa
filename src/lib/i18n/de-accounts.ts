@@ -97,5 +97,13 @@ export const deAccounts = {
 	'privacy.delete.to_login': 'Zur Anmeldung',
 	'privacy.delete.confirm': 'Konto endgültig löschen',
 
+	'error.weak_password': 'Dieses Passwort ist zu leicht zu erraten (zum Beispiel Wiederholungen, bekannte Wendungen oder Teile deines Namens oder deiner E-Mail-Adresse). Nimm eine lange Passphrase aus mehreren unzusammenhängenden Wörtern oder ein Passwort aus dem Passwortmanager.',
+	'error.export_rate_limited': 'Du hast in der letzten Stunde schon dreimal exportiert. Bitte versuche es später erneut.',
+	'error.session_ended': 'Deine Sitzung wurde beendet, zum Beispiel weil auf einem anderen Gerät ein Passkey angelegt oder widerrufen wurde. Du wirst zur Anmeldung weitergeleitet.',
+	'error.retry_seconds': 'Bitte versuche es in etwa {count} Sekunden erneut.',
+	'error.retry_minutes': 'Bitte versuche es in etwa {count} Minuten erneut.',
+	'error.retry_hours': 'Bitte versuche es in etwa {count} Stunden erneut.',
+	'privacy.export.retrying': 'Du bist wieder angemeldet. Der Export wird jetzt noch einmal gestartet.',
+	'login.session_ended': 'Deine Sitzung wurde beendet, zum Beispiel weil auf einem anderen Gerät ein Passkey angelegt oder widerrufen wurde. Bitte melde dich neu an.',
 	'login.deleted': 'Dein Konto und alle zugehörigen Daten wurden gelöscht. Auf Wiedersehen!'
 } as const;

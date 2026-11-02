@@ -4,10 +4,13 @@ export class ApiError extends Error {
 	readonly code: string;
 	/** Parsed JSON body of the error response, if any (e.g. the conflict list of a refused rollback). */
 	readonly body: unknown;
+	/** Seconds from a Retry-After header (429/503), if the server sent one. */
+	readonly retryAfterSeconds: number | null;
 
-	constructor(status: number, code: string, message = code, body?: unknown) {
+	constructor(status: number, code: string, message = code, body?: unknown, retryAfterSeconds: number | null = null) {
 		super(message);
 		this.body = body;
+		this.retryAfterSeconds = retryAfterSeconds;
 		this.name = 'ApiError';
 		this.status = status;
 		this.code = code;

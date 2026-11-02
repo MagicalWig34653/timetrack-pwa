@@ -48,6 +48,17 @@ export interface MockResponse {
 	sessionCookie?: string | null;
 	/** 302 target (OIDC callback); replaces the body */
 	redirect?: string;
+	/** extra response headers (e.g. Retry-After on 429) */
+	headers?: Record<string, string>;
+}
+
+/** Fallback password rules of contract 0.40.0: at least 16 characters plus a quality check (400 weak_password). */
+function isWeakPassword(password: string, account: { handle: string; displayName: string; email?: string }): boolean {
+	const lower = password.toLowerCase();
+	if (new Set(lower).size < 6) return true;
+	if (/^(.{1,3})\1+$/.test(lower)) return true;
+	if (/(password|passwort|qwerty|123456|letmein)/.test(lower)) return true;
+	return [account.handle, account.displayName, account.email?.split('@')[0]].some((part) => !!part && part.length >= 4 && lower.includes(part.toLowerCase()));
 }
 
 interface MockAccount {
@@ -207,6 +218,15 @@ export function createMockApi(options: MockOptions = {}) {
 	const oidcPending = new Map<string, { sub: string; email: string; inviteToken: string }>();
 	const passkeys: MockPasskey[] = [];
 	const sessions = new Map<string, MockSession>();
+	/** test hook state (POST /api/v1/mock/limits), see the hook for the meaning */
+	const limits = { limited: new Set<string>(), retryAfter: null as number | null, exportLimited: false, quotaFull: false, uploadLimited: false };
+	function tooMany(code = 'too_many_requests'): MockResponse {
+		return { ...error(429, code), ...(limits.retryAfter !== null ? { headers: { 'Retry-After': String(limits.retryAfter) } } : {}) };
+	}
+	/** contract 0.40.0: a new passkey in a recovery session and a passkey revocation end every other session of the account */
+	function endOtherSessions(accountId: string, keep: string | undefined): void {
+		for (const [id, other] of sessions) if (id !== keep && other.accountId === accountId) sessions.delete(id);
+	}
 	const invitations: MockInvitation[] = [];
 	const challenges = new Map<string, { kind: string; data?: any }>();
 	let lastAccountId = '';
@@ -446,12 +466,14 @@ export function createMockApi(options: MockOptions = {}) {
 			return { status: 200, body: sessionBody(opened), sessionCookie: id };
 		}
 		if (path === '/api/v1/auth/recovery/start' && method === 'POST') {
+			if (limits.limited.has(path)) return tooMany();
 			const target = [...accounts.values()].find((a) => a.handle === body.identifier) ?? null;
 			const recoveryId = uuid();
 			recoveries.set(recoveryId, { method: body.method, accountId: target?.id ?? null });
 			return { status: 202, body: { recoveryId } };
 		}
 		if (path === '/api/v1/auth/recovery/complete' && method === 'POST') {
+			if (limits.limited.has(path)) return tooMany();
 			const recovery = recoveries.get(body.recoveryId);
 			const target = recovery?.accountId ? accounts.get(recovery.accountId) : undefined;
 			const proof = String(body.proof ?? '');
@@ -479,6 +501,17 @@ export function createMockApi(options: MockOptions = {}) {
 			if (typeof body.name === 'string') oidc.name = body.name;
 			if (body.staleSessions === true) for (const other of sessions.values()) other.stale = true;
 			return { status: 200, body: { enabled: oidc.enabled, name: oidc.name } };
+		}
+		if (path === '/api/v1/mock/limits' && method === 'POST') {
+			// test hook, not part of the contract (contract 0.40.0/0.41.0 refusals): limited = paths answering 429 too_many_requests,
+			// retryAfter (seconds, optional), exportLimited = 429 export_rate_limited, quotaFull = 413 on uploads, endSessions = drop every session (next call 401)
+			if (Array.isArray(body.limited)) limits.limited = new Set(body.limited);
+			if ('retryAfter' in body) limits.retryAfter = typeof body.retryAfter === 'number' ? body.retryAfter : null;
+			if (typeof body.exportLimited === 'boolean') limits.exportLimited = body.exportLimited;
+			if (typeof body.quotaFull === 'boolean') limits.quotaFull = body.quotaFull;
+			if (typeof body.uploadLimited === 'boolean') limits.uploadLimited = body.uploadLimited;
+			if (body.endSessions === true) sessions.clear();
+			return { status: 204 };
 		}
 		if (path === '/api/v1/mock/mail' && method === 'POST') return mail.hook(body);
 		if (path === '/api/v1/mock/apns' && method === 'POST') return apns.hook(admin.id, body);
@@ -643,7 +676,7 @@ export function createMockApi(options: MockOptions = {}) {
 						revision: '0123456789abcdef0123456789abcdef01234567',
 						revisionShort: '0123456',
 						buildDate: '2026-10-18T08:00:00Z',
-						apiVersion: '0.35.0',
+						apiVersion: '0.41.0',
 						// operator details are admin-only since contract v0.23.0: the keys are absent for members
 						...(account.role === 'admin'
 							? {
@@ -676,7 +709,13 @@ export function createMockApi(options: MockOptions = {}) {
 		const recoveryAllowed = path.startsWith('/api/v1/me/passkeys') && (method === 'POST' || method === 'GET');
 		if (session.recovery && !recoveryAllowed) return error(403, 'recovery_session_restricted');
 
+		if (path === '/api/v1/files' && method === 'POST') {
+			if (limits.uploadLimited) return tooMany();
+			if (limits.quotaFull) return error(413, 'storage_quota_exceeded');
+		}
 		if (path === '/api/v1/me/export' && method === 'GET') {
+			if (session.stale) return error(403, 'reauth_required');
+			if (limits.exportLimited) return tooMany('export_rate_limited');
 			const stamp = new Date().toISOString();
 			const zip = writeZip({
 				'manifest.json': JSON.stringify({ format: 'timetrack-export', version: 1, generatedAt: stamp, accountId: account.id, mock: true }, null, 2),
@@ -700,6 +739,7 @@ export function createMockApi(options: MockOptions = {}) {
 			challenges.delete(body.challengeId);
 			seedPasskey(account.id, body.passkeyName || 'Passkey', body.credential.id);
 			if (session.recovery) session.recovery = false; // assumption: a new passkey lifts the restriction
+			endOtherSessions(account.id, sessionId); // contract 0.40.0: adding the passkey in a recovery session ends all other sessions
 			return { status: 201, body: publicPasskey(passkeys[passkeys.length - 1]) };
 		}
 		if ((m = path.match(/^\/api\/v1\/me\/passkeys\/([^/]+)$/))) {
@@ -714,6 +754,7 @@ export function createMockApi(options: MockOptions = {}) {
 					!!account.recoveryCodes?.length || !!account.fallbackPassword || account.emailRecovery.active;
 				if (ownPasskeys().length === 1 && !hasRecovery && ownIdentities().length === 0) return error(409, 'last_passkey');
 				passkeys.splice(passkeys.indexOf(passkey), 1);
+				endOtherSessions(account.id, sessionId); // contract 0.40.0: revoking a passkey ends the other sessions
 				return { status: 204 };
 			}
 		}
@@ -754,6 +795,7 @@ export function createMockApi(options: MockOptions = {}) {
 		if (path === '/api/v1/me/profile/email') {
 			if (method === 'PUT') {
 				if (session.stale) return error(403, 'reauth_required');
+				if (limits.limited.has(path)) return tooMany();
 				if (!mailAvailable) return error(501, 'not_implemented');
 				const address = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
 				if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) || address.length > 254) return error(400, 'bad_request');
@@ -855,7 +897,8 @@ export function createMockApi(options: MockOptions = {}) {
 		}
 		if (path === '/api/v1/me/recovery/fallback-password') {
 			if (method === 'PUT') {
-				if (typeof body.password !== 'string' || body.password.length < 12) return error(400, 'bad_request');
+				if (typeof body.password !== 'string' || body.password.length < 16 || body.password.length > 256) return error(400, 'bad_request');
+				if (isWeakPassword(body.password, account)) return error(400, 'weak_password');
 				account.fallbackPassword = body.password;
 				return { status: 204 };
 			}
@@ -866,6 +909,7 @@ export function createMockApi(options: MockOptions = {}) {
 		}
 		if (path === '/api/v1/me/recovery/email') {
 			if (method === 'PUT') {
+				if (limits.limited.has(path)) return tooMany();
 				if (!mailAvailable) return error(501, 'not_implemented');
 				// contract 0.36.0: the account e-mail is the recovery address; the call needs no body
 				if (!account.email) return error(409, 'account_email_missing');

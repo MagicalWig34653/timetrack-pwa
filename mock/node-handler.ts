@@ -44,6 +44,7 @@ export async function handleNodeRequest(api: ReturnType<typeof createMockApi>, p
 				: `tt_session=${result.sessionCookie}; Path=/; HttpOnly; SameSite=Lax`
 		);
 	}
+	for (const [name, value] of Object.entries(result.headers ?? {})) res.setHeader(name, value);
 	if (result.redirect) {
 		res.setHeader('Location', result.redirect);
 		res.end();

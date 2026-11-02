@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { api, ApiError } from '#lib/api/client.js';
 	import type { McpScope, OAuthRequest } from '#lib/api/types.js';
-	import { navigateTo } from '#lib/browser.js';
+	import { formatDateTime, navigateTo } from '#lib/browser.js';
 	import AuthShell from '#lib/components/app/AuthShell.svelte';
 	import ScopePicker from '#lib/components/mcp/ScopePicker.svelte';
 	import { Alert } from '#lib/components/ui/alert/index.js';
@@ -101,9 +101,17 @@
 	{:else if request}
 		<p class="text-sm">{t('consent.intro', { client: request.clientName })}</p>
 
-		<div class="rounded-lg border bg-muted/40 px-3 py-2.5" data-testid="redirect-host">
+		{#if !request.clientVerified}
+			<Alert variant="warning" class="flex flex-col gap-1" data-testid="client-unverified">
+				<p class="font-medium">{t('consent.unverified')}</p>
+				<p>{t('consent.unverified_hint', { client: request.clientName })}</p>
+				<p class="text-xs" data-testid="client-registered">{t('consent.registered_at', { date: formatDateTime(request.clientRegisteredAt) })}</p>
+			</Alert>
+		{/if}
+
+		<div class="rounded-lg border-2 border-foreground/40 bg-muted/60 px-3 py-3" data-testid="redirect-host">
 			<p class="text-xs text-muted-foreground">{t('consent.redirect_label')}</p>
-			<p class="flex items-center gap-2 font-medium break-all"><ExternalLinkIcon class="size-4 shrink-0" aria-hidden="true" />{t('consent.redirect', { host: request.redirectHost })}</p>
+			<p class="flex items-center gap-2 text-base font-semibold break-all"><ExternalLinkIcon class="size-4 shrink-0" aria-hidden="true" />{t('consent.redirect', { host: request.redirectHost })}</p>
 		</div>
 
 		<div class="flex flex-wrap items-center justify-between gap-2 text-sm">

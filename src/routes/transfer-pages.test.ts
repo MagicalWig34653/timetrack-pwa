@@ -319,6 +319,27 @@ describe('Storage settings', () => {
 		expect(document.body.innerHTML).not.toContain('geheim"');
 	});
 
+	it('shows and changes the per-account quota (0 = unlimited) and validates it locally', async () => {
+		render(StoragePage);
+		await screen.findByTestId('storage-rules');
+		expect(screen.getByLabelText('Speicherplatz je Konto')).toHaveValue('200');
+		expect(screen.getByLabelText('Einheit des Speicherplatzes je Konto')).toHaveValue('MiB');
+		expect(screen.getByLabelText('Höchstzahl Dateien je Konto')).toHaveValue('500');
+		const u = user();
+		await u.clear(screen.getByLabelText('Höchstzahl Dateien je Konto'));
+		await u.type(screen.getByLabelText('Höchstzahl Dateien je Konto'), 'viele');
+		await u.click(screen.getByRole('button', { name: 'Speichern' }));
+		expect(screen.getByTestId('storage-error')).toBeInTheDocument();
+		expect(mock.calls.some((c) => c.method === 'PUT' && c.path.endsWith('/admin/storage'))).toBe(false);
+		await u.clear(screen.getByLabelText('Höchstzahl Dateien je Konto'));
+		await u.type(screen.getByLabelText('Höchstzahl Dateien je Konto'), '0');
+		await u.clear(screen.getByLabelText('Speicherplatz je Konto'));
+		await u.type(screen.getByLabelText('Speicherplatz je Konto'), '0');
+		await u.click(screen.getByRole('button', { name: 'Speichern' }));
+		await screen.findByTestId('storage-saved');
+		expect(await api.getStorageSettings()).toMatchObject({ quotaBytes: 0, quotaFiles: 0 });
+	});
+
 	it('saves valid rules and sends no secret unless typed', async () => {
 		render(StoragePage);
 		await screen.findByTestId('storage-rules');

@@ -1003,6 +1003,10 @@ export interface StorageS3 {
 export interface StorageSettings {
 	rules: StorageRule[];
 	maxUploadBytes: number;
+	/** per account; 0 = unlimited (contract 0.41.0) */
+	quotaBytes: number;
+	/** per account; 0 = unlimited (contract 0.41.0) */
+	quotaFiles: number;
 	localPath?: string | null;
 	s3?: StorageS3 | null;
 	hasSecret: boolean;
@@ -1011,6 +1015,8 @@ export interface StorageSettings {
 export interface StorageSettingsInput {
 	rules: StorageRule[];
 	maxUploadBytes?: number;
+	quotaBytes?: number;
+	quotaFiles?: number;
 	localPath?: string | null;
 	s3?: (StorageS3 & { secretAccessKey?: string }) | null;
 }
@@ -1134,6 +1140,10 @@ export interface OAuthRequest {
 	redirectHost: string;
 	scopes: McpScope[];
 	expiresAt: string;
+	/** when the (anonymously registered) client was created, contract 0.41.0 */
+	clientRegisteredAt: string;
+	/** always false: clients register openly (RFC 7591), so the consent page marks them as unverified */
+	clientVerified: boolean;
 }
 
 export interface OAuthGrant {

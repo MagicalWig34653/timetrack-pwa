@@ -157,9 +157,24 @@ export function setCsrfToken(token: string | null): void {
 	if (changed) invalidateReadCache();
 }
 
+let sessionEndedHandler: (() => void) | null = null;
+
+/**
+ * Registers the callback for a 401 on a data call while a session was believed to be valid (revoked from another device,
+ * contract 0.40.0: new passkey after recovery, passkey revoked, idle timeout). The app layout signs out quietly and
+ * redirects to the login page, so pages do not flash an error for a session that is simply gone.
+ */
+export function setSessionEndedHandler(handler: (() => void) | null): void {
+	sessionEndedHandler = handler;
+}
+
+const sessionKnown = () => csrfToken !== null;
+/** Login, recovery and session reads answer 401 for ordinary reasons (wrong proof, signed out): never a "session ended". */
+const isAuthPath = (path: string) => path.startsWith('/auth/');
+
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-async function toApiError(response: Response): Promise<ApiError> {
+async function toApiError(response: Response, path = ''): Promise<ApiError> {
 	let code = `http_${response.status}`;
 	let message = response.statusText;
 	let body: unknown;
@@ -172,7 +187,12 @@ async function toApiError(response: Response): Promise<ApiError> {
 		// non-JSON error body (e.g. proxy error page): keep the generic code
 	}
 	if (response.status === 404 && code === 'module_disabled') moduleDisabledHandler?.();
-	return new ApiError(response.status, code, message, body);
+	const retryAfter = parseRetryAfterSeconds(response.headers.get('Retry-After'));
+	if (response.status === 401 && sessionEndedHandler && sessionKnown() && !isAuthPath(path)) {
+		code = 'session_ended';
+		sessionEndedHandler();
+	}
+	return new ApiError(response.status, code, message, body, retryAfter);
 }
 
 /** Extracts the filename from a Content-Disposition header (RFC 6266: filename* wins over filename). */
@@ -272,6 +292,15 @@ export function retryAfterMs(header: string | null, now = Date.now()): number | 
 	return Math.min(Math.max(ms, 0), MAX_RETRY_AFTER_MS);
 }
 
+/** Retry-After in whole seconds (delta-seconds or HTTP date); null if absent or unparsable. Not capped, unlike retryAfterMs. */
+export function parseRetryAfterSeconds(header: string | null, now = Date.now()): number | null {
+	if (!header) return null;
+	const trimmed = header.trim();
+	if (/^\d+$/.test(trimmed)) return Number(trimmed);
+	const date = Date.parse(trimmed);
+	return Number.isNaN(date) ? null : Math.max(0, Math.ceil((date - now) / 1000));
+}
+
 /** Short-lived cache for expensive, rarely changing reads (time account); any successful write clears it. */
 const readCache = new Map<string, { at: number; value: Promise<unknown> }>();
 const READ_CACHE_TTL_MS = 30_000;
@@ -333,7 +362,7 @@ async function requestWithStatus<T>(
 	}
 	if (!response) throw new ApiError(0, 'network_error');
 
-	if (!response.ok) throw await toApiError(response);
+	if (!response.ok) throw await toApiError(response, path);
 	if (method !== 'GET') invalidateReadCache();
 	// 204 and bodyless 202 (e.g. PUT /me/recovery/email) carry no JSON.
 	const text = await response.text();

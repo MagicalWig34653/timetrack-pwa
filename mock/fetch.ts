@@ -51,7 +51,7 @@ export function createMockFetch(options?: MockOptions) {
 		}
 		return new Response(result.body === undefined ? null : JSON.stringify(result.body), {
 			status: result.status,
-			headers: { 'Content-Type': 'application/json' }
+			headers: { 'Content-Type': 'application/json', ...result.headers }
 		});
 	};
 	return { fetch: mockFetch, calls, state: api.state };

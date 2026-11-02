@@ -155,6 +155,36 @@ describe('/settings/privacy', () => {
 		click.mockRestore();
 	});
 
+	it('asks for a fresh passkey sign-in on a stale export session and repeats the export afterwards', async () => {
+		goto.mockResolvedValue(undefined);
+		await signIn();
+		await hook({ staleSessions: true });
+		(URL as unknown as { createObjectURL: unknown }).createObjectURL = () => 'blob:x';
+		(URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = () => undefined;
+		const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+		const view = render(PrivacyPage);
+		await userEvent.click(screen.getByTestId('export-button'));
+		expect(await screen.findByTestId('reauth')).toBeInTheDocument();
+		expect(screen.queryByTestId('export-error')).not.toBeInTheDocument();
+		view.unmount();
+		// back from the login with a fresh session: the page repeats the export on its own
+		await signIn();
+		pageState.url = new URL('http://localhost/settings/privacy?retry=export');
+		render(PrivacyPage);
+		await waitFor(() => expect(screen.getByTestId('export-done')).toHaveTextContent('timetrack-export-admin.zip'));
+		expect(goto).toHaveBeenCalledWith('/settings/privacy', { replaceState: true });
+		expect(click).toHaveBeenCalled();
+		click.mockRestore();
+	});
+
+	it('explains export_rate_limited', async () => {
+		await signIn();
+		await mock.fetch('/api/v1/mock/limits', { method: 'POST', body: JSON.stringify({ exportLimited: true, retryAfter: 1800 }) });
+		render(PrivacyPage);
+		await userEvent.click(screen.getByTestId('export-button'));
+		expect(await screen.findByTestId('export-error')).toHaveTextContent(/dreimal exportiert.*30 Minuten/);
+	});
+
 	it('refuses the last admin and explains it', async () => {
 		await signIn();
 		render(PrivacyPage);

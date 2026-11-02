@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import X from '@lucide/svelte/icons/x';
 	import { focusTrap } from '#lib/a11y/focus-trap.js';
+	import { setCsrfToken, setSessionEndedHandler } from '#lib/api/client.js';
 	import { t } from '#lib/i18n/index.js';
 	import ErrorPage from '#lib/components/app/ErrorPage.svelte';
 	import { newErrorId } from '#lib/errors/describe.js';
@@ -58,6 +59,22 @@
 	function onWindowResize() {
 		if (window.innerWidth >= 760) menuOpen = false;
 	}
+
+	// A 401 on a data call while signed in means the session was ended elsewhere (new passkey after recovery, passkey revoked,
+	// idle timeout): leave quietly for the login page instead of letting every page show its own error.
+	let ending = false;
+	$effect(() => {
+		setSessionEndedHandler(() => {
+			if (ending) return;
+			ending = true;
+			const next = page.url.pathname + page.url.search;
+			sessionStore.current = null;
+			setCsrfToken(null);
+			moduleStore.reset();
+			void goto(`/login?ended=1&next=${encodeURIComponent(next)}`, { replaceState: true }).finally(() => (ending = false));
+		});
+		return () => setSessionEndedHandler(null);
+	});
 
 	async function signOut() {
 		try {

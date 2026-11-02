@@ -117,7 +117,7 @@ export function sanitizeFilename(name: string): string {
 export function createTransferMock(deps: TransferDeps) {
 	const stored = new Map<string, Stored>();
 	const files = new Map<string, StoredFile>();
-	let storage: StorageSettings & { secret?: string } = { rules: [{ maxBytes: null, backend: 'db' }], maxUploadBytes: 10 * 1024 * 1024, localPath: null, s3: null, hasSecret: false };
+	let storage: StorageSettings & { secret?: string } = { rules: [{ maxBytes: null, backend: 'db' }], maxUploadBytes: 10 * 1024 * 1024, quotaBytes: 200 * 1024 * 1024, quotaFiles: 500, localPath: null, s3: null, hasSecret: false };
 
 	const stateOf = (accountId: string): Stored => {
 		let s = stored.get(accountId);
@@ -454,6 +454,10 @@ export function createTransferMock(deps: TransferDeps) {
 		}
 		const maxUploadBytes = input.maxUploadBytes ?? 10 * 1024 * 1024;
 		if (!Number.isInteger(maxUploadBytes) || maxUploadBytes < 1) return fail(400, 'bad_request');
+		const quotaBytes = input.quotaBytes ?? 200 * 1024 * 1024;
+		const quotaFiles = input.quotaFiles ?? 500;
+		if (!Number.isInteger(quotaBytes) || quotaBytes < 0) return fail(400, 'bad_request');
+		if (!Number.isInteger(quotaFiles) || quotaFiles < 0 || quotaFiles > 1_000_000) return fail(400, 'bad_request');
 		const usesS3 = rules.some((r) => r.backend === 's3');
 		const usesLocal = rules.some((r) => r.backend === 'local');
 		if (usesLocal && !input.localPath?.trim()) return fail(400, 'bad_request');
@@ -464,6 +468,8 @@ export function createTransferMock(deps: TransferDeps) {
 		storage = {
 			rules,
 			maxUploadBytes,
+			quotaBytes,
+			quotaFiles,
 			localPath: input.localPath?.trim() || null,
 			s3: s3 ? { endpoint: s3.endpoint, region: s3.region, bucket: s3.bucket, pathStyle: s3.pathStyle ?? true, accessKeyId: s3.accessKeyId } : null,
 			hasSecret: secret !== undefined,
@@ -488,6 +494,10 @@ export function createTransferMock(deps: TransferDeps) {
 		if (route === 'files' && method === 'POST') {
 			if (!req.file) return fail(400, 'bad_request');
 			if (req.file.bytes.length > storage.maxUploadBytes) return fail(413, 'file_too_large');
+			// contract 0.41.0: per-account quota over all stored files (0 = unlimited)
+			const own = [...files.values()].filter((f) => f.ownerId === accountId);
+			const usedBytes = own.reduce((sum, f) => sum + f.meta.size, 0);
+			if ((storage.quotaFiles > 0 && own.length + 1 > storage.quotaFiles) || (storage.quotaBytes > 0 && usedBytes + req.file.bytes.length > storage.quotaBytes)) return fail(413, 'storage_quota_exceeded');
 			const name = sanitizeFilename(req.file.name);
 			const contentType = sniffAttachment(name, req.file.bytes);
 			if (!contentType) return fail(415, 'unsupported_type');

@@ -15,7 +15,7 @@
 	import { sessionStore } from '#lib/session.svelte.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { SIZE_UNITS } from '#lib/transfer/bytes.js';
-	import { backendIssues, emptyForm, formFromSettings, inputFromForm, validateRules, type StorageForm } from '#lib/transfer/storage-rules.js';
+	import { backendIssues, emptyForm, formFromSettings, inputFromForm, quotaIssues, validateRules, type StorageForm } from '#lib/transfer/storage-rules.js';
 	import { onMount } from 'svelte';
 
 	const isAdmin = $derived(sessionStore.current?.account.role === 'admin');
@@ -30,6 +30,7 @@
 
 	const backend = $derived(backendIssues(form));
 	const maxIssue = $derived(validateRules(form).maxUpload);
+	const quota = $derived(quotaIssues(form));
 
 	onMount(async () => {
 		if (!isAdmin) {
@@ -110,6 +111,30 @@
 					{#each SIZE_UNITS as unit (unit)}<option value={unit}>{unit}</option>{/each}
 				</Select>
 				{#if showIssues && maxIssue}<p class="w-full text-xs text-destructive">{t('storage.max_issue')}</p>{/if}
+			</CardContent>
+		</Card>
+
+		<Card>
+			<CardHeader>
+				<CardTitle>{t('storage.quota_title')}</CardTitle>
+				<CardDescription>{t('storage.quota_text')}</CardDescription>
+			</CardHeader>
+			<CardContent class="flex flex-wrap items-end gap-4">
+				<div class="flex flex-wrap items-end gap-2">
+					<div class="flex flex-col gap-1.5">
+						<Label for="quota-bytes">{t('storage.quota_bytes')}</Label>
+						<Input id="quota-bytes" class="w-28" inputmode="decimal" bind:value={form.quotaAmount} aria-invalid={showIssues && quota.bytes ? true : undefined} />
+					</div>
+					<Select class="w-24" aria-label={t('storage.quota_bytes_unit')} bind:value={form.quotaUnit}>
+						{#each SIZE_UNITS as unit (unit)}<option value={unit}>{unit}</option>{/each}
+					</Select>
+				</div>
+				<div class="flex flex-col gap-1.5">
+					<Label for="quota-files">{t('storage.quota_files')}</Label>
+					<Input id="quota-files" class="w-28" inputmode="numeric" bind:value={form.quotaFiles} aria-invalid={showIssues && quota.files ? true : undefined} />
+				</div>
+				{#if showIssues && quota.bytes}<p class="w-full text-xs text-destructive">{t('storage.quota_bytes_issue')}</p>{/if}
+				{#if showIssues && quota.files}<p class="w-full text-xs text-destructive">{t('storage.quota_files_issue')}</p>{/if}
 			</CardContent>
 		</Card>
 

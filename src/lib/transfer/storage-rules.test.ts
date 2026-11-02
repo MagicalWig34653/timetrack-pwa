@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { backendIssues, emptyForm, formFromSettings, inputFromForm, validateRules } from './storage-rules';
+import { backendIssues, emptyForm, formFromSettings, inputFromForm, quotaIssues, validateRules } from './storage-rules';
 
 const settings = {
 	rules: [{ maxBytes: 262144, backend: 'db' as const }, { maxBytes: 5242880, backend: 'local' as const }, { maxBytes: null, backend: 's3' as const }],
 	maxUploadBytes: 10485760,
 	localPath: '/data/files',
 	s3: { endpoint: 'https://s3.example.org', region: 'eu-1', bucket: 'tt', pathStyle: true, accessKeyId: 'AKIA' },
+	quotaBytes: 209715200,
+	quotaFiles: 500,
 	hasSecret: true
 };
 
@@ -52,5 +54,28 @@ describe('storage rules form', () => {
 		form.bucket = 'b';
 		form.accessKeyId = 'k';
 		expect(backendIssues(form)).toEqual([]);
+	});
+});
+
+describe('storage quota fields (contract 0.41.0)', () => {
+	it('shows the quota and sends it back, 0 meaning unlimited', () => {
+		const form = formFromSettings(settings);
+		expect([form.quotaAmount, form.quotaUnit, form.quotaFiles]).toEqual(['200', 'MiB', '500']);
+		expect(inputFromForm(form)).toMatchObject({ quotaBytes: 209715200, quotaFiles: 500 });
+		form.quotaAmount = '0';
+		form.quotaFiles = '0';
+		expect(inputFromForm(form)).toMatchObject({ quotaBytes: 0, quotaFiles: 0 });
+	});
+
+	it('rejects unparsable quota values', () => {
+		const form = formFromSettings(settings);
+		form.quotaAmount = 'abc';
+		expect(quotaIssues(form)).toEqual({ bytes: true, files: false });
+		expect(inputFromForm(form)).toBeNull();
+		form.quotaAmount = '1';
+		form.quotaFiles = '1000001';
+		expect(quotaIssues(form).files).toBe(true);
+		form.quotaFiles = '1,5';
+		expect(quotaIssues(form).files).toBe(true);
 	});
 });

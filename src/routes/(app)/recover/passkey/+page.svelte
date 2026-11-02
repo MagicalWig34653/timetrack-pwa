@@ -41,6 +41,7 @@
 <div class="mx-auto max-w-md">
 	<PageHeader title={t('recover_passkey.title')} description={t('recover_passkey.description')} />
 	<Alert variant="warning" class="mb-4">{t('recover_passkey.restricted')}</Alert>
+	<Alert variant="default" class="mb-4" data-testid="recover-logout-others">{t('recover_passkey.logout_others')}</Alert>
 	{#if !supported}<Alert variant="warning" class="mb-4">{t('webauthn.unsupported')}</Alert>{/if}
 	{#if error}<Alert variant="destructive" class="mb-4">{error}</Alert>{/if}
 	<form class="flex flex-col gap-4" onsubmit={setup}>

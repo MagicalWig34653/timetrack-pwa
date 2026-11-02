@@ -17,6 +17,7 @@
 	let error = $state('');
 	const supported = isWebAuthnSupported() || import.meta.env.VITE_MOCK === '1';
 	const deleted = page.url.searchParams.get('deleted') === '1';
+	const sessionEnded = page.url.searchParams.get('ended') === '1';
 	const recovered = page.url.searchParams.get('recovered') === '1';
 	const oidcErrorCode = page.url.searchParams.get('oidc_error');
 	let oidc = $state<{ enabled: boolean; name?: string }>({ enabled: false });
@@ -63,6 +64,7 @@
 
 <AuthShell title={t('login.title')} description={t('login.description')}>
 	{#if deleted}<Alert variant="success" data-testid="login-deleted">{t('login.deleted')}</Alert>{/if}
+	{#if sessionEnded}<Alert variant="warning" data-testid="login-session-ended">{t('login.session_ended')}</Alert>{/if}
 	{#if recovered}<Alert variant="success">{t('login.recovered')}</Alert>{/if}
 	{#if !supported}<Alert variant="warning">{t('webauthn.unsupported')}</Alert>{/if}
 	{#if error}<Alert variant="destructive">{error}</Alert>{/if}

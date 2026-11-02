@@ -1,3 +1,5 @@
+**SEC-clients (02.11.2026, Branch sec-clients):** PWA liest Vertrag 0.41.0: Rückfallpasswort 16 Zeichen und `weak_password`, 429 mit Retry-After, Export mit Re-Login und automatischer Wiederholung, Speicherkontingent (Admin-Felder, 413), Zustimmungsseite mit „Nicht verifizierter Client“, leise Abmeldung bei beendeter Sitzung. Details: `docs/handoffs/SEC-clients-pwa.md`.
+
 **VB1 (02.11.2026, Branch vacation-bookings):** Buchungen an Urlaub/Krank/Freistellung/Feiertag waren in der PWA nie gesperrt (nur die Planung auf Blocktagen, unverändert); neu: ruhiger Hinweis „Buchung an Urlaubstag: Die gebuchte Zeit zählt als Überstunde.“, Ist-Pille im Monatsraster, Tests. Details: `docs/handoffs/VB1-pwa.md`.
 
 **UI-FIXES (02.11.2026, Branch ui-fixes):** Einstellungen/Verwaltung springen nicht mehr (Menü sticky bei natürlicher Position, Sitzungsprüfung höchstens alle 20 s, Mindesthöhe der Inhaltsspalte); Urlaub im Kalender deutlicher (Tönung, Pill, Handy-Zelle, Filter-Hinweis). Details: `docs/handoffs/UI-FIXES.md`.

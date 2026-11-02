@@ -187,7 +187,32 @@ describe('recovery settings', () => {
 		await userEvent.type(screen.getByLabelText('Passwort wiederholen'), 'short');
 		await userEvent.click(screen.getAllByRole('button', { name: 'Speichern' })[0]);
 		// validated by the component (German message), not by native browser validation
-		expect(await screen.findByText(/mindestens 12 Zeichen lang/)).toBeInTheDocument();
+		expect(await screen.findByText(/mindestens 16 Zeichen lang/)).toBeInTheDocument();
+	});
+
+	it('shows the 16 character minimum in the hint and explains weak_password with a passphrase advice', async () => {
+		await signInAsAdmin();
+		render(RecoveryManager);
+		await screen.findByText('Rückfallpasswort');
+		expect(screen.getByText(/Mindestens 16 Zeichen/)).toBeInTheDocument();
+		// 16 characters, accepted by the length check but refused by the server quality rules
+		const weak = 'aaaaaaaaaaaaaaaa';
+		await userEvent.type(screen.getByLabelText('Neues Rückfallpasswort'), weak);
+		await userEvent.type(screen.getByLabelText('Passwort wiederholen'), weak);
+		await userEvent.click(screen.getAllByRole('button', { name: 'Speichern' })[0]);
+		expect(await screen.findByText(/zu leicht zu erraten.*Passphrase/)).toBeInTheDocument();
+		expect(screen.queryByText('Rückfallpasswort gespeichert.')).not.toBeInTheDocument();
+	});
+
+	it('saves a long passphrase', async () => {
+		await signInAsAdmin();
+		render(RecoveryManager);
+		await screen.findByText('Rückfallpasswort');
+		const good = 'Pferd Lampe Wolke Brunnen 42';
+		await userEvent.type(screen.getByLabelText('Neues Rückfallpasswort'), good);
+		await userEvent.type(screen.getByLabelText('Passwort wiederholen'), good);
+		await userEvent.click(screen.getAllByRole('button', { name: 'Speichern' })[0]);
+		expect(await screen.findByText('Rückfallpasswort gespeichert.')).toBeInTheDocument();
 	});
 });
 

@@ -19,12 +19,14 @@ interface Client {
 	clientId: string;
 	clientName: string;
 	redirectUris: string[];
+	registeredAt: number;
 }
 
 interface ConsentRequest {
 	id: string;
 	clientName: string;
 	redirectUri: string;
+	clientRegisteredAt: number;
 	state: string | null;
 	scopes: Scope[];
 	expiresAt: number;
@@ -79,7 +81,7 @@ export function createMcpMock(options: McpMockOptions) {
 	const tokens: Token[] = [];
 
 	function publicRequest(r: ConsentRequest) {
-		return { id: r.id, clientName: r.clientName, redirectHost: new URL(r.redirectUri).host, scopes: r.scopes, expiresAt: new Date(r.expiresAt).toISOString() };
+		return { id: r.id, clientName: r.clientName, redirectHost: new URL(r.redirectUri).host, scopes: r.scopes, expiresAt: new Date(r.expiresAt).toISOString(), clientRegisteredAt: new Date(r.clientRegisteredAt).toISOString(), clientVerified: false };
 	}
 
 	/** POST /oauth/register (RFC 7591), public clients only. */
@@ -91,7 +93,7 @@ export function createMcpMock(options: McpMockOptions) {
 		if (!uris.every((u) => typeof u === 'string' && isAllowedRedirect(u))) return invalid('redirect_uris must be https or loopback http');
 		if (name.length > 100) return invalid('client_name too long');
 		if (body.token_endpoint_auth_method && body.token_endpoint_auth_method !== 'none') return invalid('public clients only');
-		const client: Client = { clientId: 'mock-' + uuid(), clientName: name || 'Unbenannter Client', redirectUris: uris as string[] };
+		const client: Client = { clientId: 'mock-' + uuid(), clientName: name || 'Unbenannter Client', redirectUris: uris as string[], registeredAt: now() };
 		clients.set(client.clientId, client);
 		return { status: 201, body: { client_id: client.clientId, client_name: client.clientName, redirect_uris: client.redirectUris, token_endpoint_auth_method: 'none' } };
 	}
@@ -117,7 +119,7 @@ export function createMcpMock(options: McpMockOptions) {
 		const asked = (q.get('scope') ?? '').split(/\s+/).filter(Boolean);
 		if (!asked.every(isScope)) return back('invalid_scope');
 		const scopes = (asked.length ? MCP_SCOPES.filter((s) => asked.includes(s)) : MCP_SCOPES.filter((s) => s.endsWith(':read'))) as Scope[];
-		const request: ConsentRequest = { id: uuid(), clientName: client.clientName, redirectUri, state, scopes, expiresAt: now() + REQUEST_TTL_MS, decided: false };
+		const request: ConsentRequest = { id: uuid(), clientName: client.clientName, redirectUri, clientRegisteredAt: client.registeredAt, state, scopes, expiresAt: now() + REQUEST_TTL_MS, decided: false };
 		requests.set(request.id, request);
 		return { status: 302, redirect: `/oauth/consent?request=${request.id}` };
 	}

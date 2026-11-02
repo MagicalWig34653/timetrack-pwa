@@ -10,6 +10,7 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import CopyButton from './CopyButton.svelte';
 	import Field from './Field.svelte';
+	import { FALLBACK_PASSWORD_MIN_LENGTH } from '#lib/recovery.js';
 
 	let { status = $bindable(null) }: { status?: RecoveryStatus | null } = $props();
 
@@ -76,7 +77,7 @@
 	function savePassword(event: Event) {
 		event.preventDefault();
 		passwordError = '';
-		if (password.length < 12) passwordError = t('recovery.password.too_short');
+		if (password.length < FALLBACK_PASSWORD_MIN_LENGTH) passwordError = t('recovery.password.too_short');
 		else if (password !== passwordRepeat) passwordError = t('recovery.password.mismatch');
 		if (passwordError) return;
 		return run(async () => {

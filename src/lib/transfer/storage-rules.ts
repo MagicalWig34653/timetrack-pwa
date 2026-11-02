@@ -1,5 +1,5 @@
 import type { StorageBackend, StorageRule, StorageSettings, StorageSettingsInput } from '../api/types';
-import { DEFAULT_MAX_UPLOAD_BYTES, fromBytes, toBytes, type SizeUnit } from './bytes';
+import { DEFAULT_MAX_UPLOAD_BYTES, DEFAULT_QUOTA_BYTES, DEFAULT_QUOTA_FILES, MAX_QUOTA_FILES, fromBytes, toBytes, toBytesOrZero, toCount, type SizeUnit } from './bytes';
 
 /** Editable row of the rules table. The last row has no limit ("all larger"). */
 export interface RuleRow {
@@ -15,6 +15,10 @@ export interface StorageForm {
 	lastBackend: StorageBackend;
 	maxUploadAmount: string;
 	maxUploadUnit: SizeUnit;
+	/** per-account quota; 0 = unlimited */
+	quotaAmount: string;
+	quotaUnit: SizeUnit;
+	quotaFiles: string;
 	localPath: string;
 	endpoint: string;
 	region: string;
@@ -34,11 +38,15 @@ export function formFromSettings(settings: StorageSettings): StorageForm {
 	const limited = settings.rules.filter((r) => r.maxBytes != null);
 	const last = settings.rules.find((r) => r.maxBytes == null) ?? settings.rules.at(-1);
 	const max = fromBytes(settings.maxUploadBytes);
+	const quota = fromBytes(settings.quotaBytes ?? DEFAULT_QUOTA_BYTES);
 	return {
 		rules: limited.map((r) => ({ key: newRowKey(), ...fromBytes(r.maxBytes as number), backend: r.backend })),
 		lastBackend: last?.backend ?? 'db',
 		maxUploadAmount: max.amount,
 		maxUploadUnit: max.unit,
+		quotaAmount: quota.amount,
+		quotaUnit: quota.unit,
+		quotaFiles: String(settings.quotaFiles ?? DEFAULT_QUOTA_FILES),
 		localPath: settings.localPath ?? '',
 		endpoint: settings.s3?.endpoint ?? '',
 		region: settings.s3?.region ?? '',
@@ -50,7 +58,7 @@ export function formFromSettings(settings: StorageSettings): StorageForm {
 }
 
 export function emptyForm(): StorageForm {
-	return formFromSettings({ rules: [{ backend: 'db' }], maxUploadBytes: DEFAULT_MAX_UPLOAD_BYTES, hasSecret: false });
+	return formFromSettings({ rules: [{ backend: 'db' }], maxUploadBytes: DEFAULT_MAX_UPLOAD_BYTES, quotaBytes: DEFAULT_QUOTA_BYTES, quotaFiles: DEFAULT_QUOTA_FILES, hasSecret: false });
 }
 
 /** Per-row problems (index = row; the catch-all row cannot be wrong) plus a form wide issue. */
@@ -68,6 +76,11 @@ export function validateRules(form: StorageForm): { rows: (RuleIssue | null)[]; 
 	return { rows, maxUpload: maxUpload === null };
 }
 
+/** Quota fields that cannot be parsed (0 is valid and means unlimited). */
+export function quotaIssues(form: StorageForm): { bytes: boolean; files: boolean } {
+	return { bytes: toBytesOrZero(form.quotaAmount, form.quotaUnit) === null, files: toCount(form.quotaFiles, MAX_QUOTA_FILES) === null };
+}
+
 export function backendsInUse(form: StorageForm): Set<StorageBackend> {
 	return new Set([...form.rules.map((r) => r.backend), form.lastBackend]);
 }
@@ -75,7 +88,8 @@ export function backendsInUse(form: StorageForm): Set<StorageBackend> {
 /** Builds the PUT body; returns null when the rules are invalid. The secret is sent only when typed in. */
 export function inputFromForm(form: StorageForm): StorageSettingsInput | null {
 	const check = validateRules(form);
-	if (check.maxUpload || check.rows.some((r) => r !== null)) return null;
+	const quota = quotaIssues(form);
+	if (check.maxUpload || quota.bytes || quota.files || check.rows.some((r) => r !== null)) return null;
 	const rules: StorageRule[] = [
 		...form.rules.map((r) => ({ maxBytes: toBytes(r.amount, r.unit) as number, backend: r.backend })),
 		{ maxBytes: null, backend: form.lastBackend }
@@ -84,6 +98,8 @@ export function inputFromForm(form: StorageForm): StorageSettingsInput | null {
 	const input: StorageSettingsInput = {
 		rules,
 		maxUploadBytes: toBytes(form.maxUploadAmount, form.maxUploadUnit) as number,
+		quotaBytes: toBytesOrZero(form.quotaAmount, form.quotaUnit) as number,
+		quotaFiles: toCount(form.quotaFiles, MAX_QUOTA_FILES) as number,
 		localPath: form.localPath.trim() || null
 	};
 	if (used.has('s3') || form.endpoint.trim() || form.bucket.trim()) {

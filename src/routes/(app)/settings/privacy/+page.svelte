@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { onMount } from 'svelte';
+	import ReauthNotice from '#lib/components/app/ReauthNotice.svelte';
 	import { api } from '#lib/api/client.js';
 	import { ApiError } from '#lib/api/errors.js';
 	import ConfirmDialog from '#lib/components/app/ConfirmDialog.svelte';
@@ -17,6 +20,8 @@
 	let exporting = $state(false);
 	let exportError = $state('');
 	let exportDone = $state('');
+	/** 403 reauth_required: the export waits for a fresh passkey sign-in and then repeats itself (`?retry=export`) */
+	let exportReauth = $state(false);
 
 	let dialogOpen = $state(false);
 	let deleting = $state(false);
@@ -25,21 +30,31 @@
 	/** the server could not remove stored files: the account is disabled and the session revoked */
 	let incomplete = $state(false);
 
-	async function download() {
+	async function download(auto = false) {
 		exporting = true;
 		exportError = '';
 		exportDone = '';
+		exportReauth = false;
+		if (auto) exportDone = t('privacy.export.retrying');
 		try {
 			const file = await api.exportMyData();
 			const name = file.filename ?? 'timetrack-export.zip';
 			saveBlob(file.blob, name);
 			exportDone = t('privacy.export.done', { name });
 		} catch (e) {
-			exportError = e instanceof ApiError && e.status === 403 && e.code !== 'reauth_required' ? t('privacy.export.forbidden') : errorMessage(e);
+			exportDone = '';
+			if (e instanceof ApiError && e.code === 'reauth_required') exportReauth = true;
+			else exportError = e instanceof ApiError && e.status === 403 && e.code !== 'reauth_required' ? t('privacy.export.forbidden') : errorMessage(e);
 		} finally {
 			exporting = false;
 		}
 	}
+
+	onMount(() => {
+		// back from the fresh sign-in: clean the URL and repeat the export once
+		if (page.url.searchParams.get('retry') !== 'export') return;
+		void goto('/settings/privacy', { replaceState: true }).then(() => download(true));
+	});
 
 	function openDialog() {
 		dialogError = '';
@@ -84,10 +99,11 @@
 			<CardDescription>{t('privacy.export.text')}</CardDescription>
 		</CardHeader>
 		<CardContent class="flex flex-col gap-3">
+			{#if exportReauth}<ReauthNotice next="/settings/privacy?retry=export" />{/if}
 			{#if exportError}<Alert variant="destructive" data-testid="export-error">{exportError}</Alert>{/if}
 			{#if exportDone}<Alert variant="success" data-testid="export-done">{exportDone}</Alert>{/if}
 			<div>
-				<Button onclick={download} disabled={exporting} data-testid="export-button">
+				<Button onclick={() => download()} disabled={exporting} data-testid="export-button">
 					{exporting ? t('privacy.export.busy') : t('privacy.export.button')}
 				</Button>
 			</div>
