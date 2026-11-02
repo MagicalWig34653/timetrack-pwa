@@ -1138,7 +1138,12 @@ export interface OAuthRequest {
 	id: string;
 	clientName: string;
 	redirectHost: string;
+	/** preselection: what the client asked for, or only the read scopes when it sent no `scope` (contract 0.44.0) */
 	scopes: McpScope[];
+	/** what the client asked for itself; empty without a `scope` parameter (contract 0.44.0) */
+	requestedScopes: McpScope[];
+	/** everything the person may choose; `decide` refuses anything else with 400 (contract 0.44.0) */
+	availableScopes: McpScope[];
 	expiresAt: string;
 	/** when the (anonymously registered) client was created, contract 0.41.0 */
 	clientRegisteredAt: string;

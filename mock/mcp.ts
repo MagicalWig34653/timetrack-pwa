@@ -28,7 +28,12 @@ interface ConsentRequest {
 	redirectUri: string;
 	clientRegisteredAt: number;
 	state: string | null;
+	/** preselection */
 	scopes: Scope[];
+	/** asked by the client; empty without a scope parameter (contract 0.44.0) */
+	requestedScopes: Scope[];
+	/** selectable; the decision is refused outside of it */
+	availableScopes: Scope[];
 	expiresAt: number;
 	decided: boolean;
 }
@@ -81,7 +86,7 @@ export function createMcpMock(options: McpMockOptions) {
 	const tokens: Token[] = [];
 
 	function publicRequest(r: ConsentRequest) {
-		return { id: r.id, clientName: r.clientName, redirectHost: new URL(r.redirectUri).host, scopes: r.scopes, expiresAt: new Date(r.expiresAt).toISOString(), clientRegisteredAt: new Date(r.clientRegisteredAt).toISOString(), clientVerified: false };
+		return { id: r.id, clientName: r.clientName, redirectHost: new URL(r.redirectUri).host, scopes: r.scopes, requestedScopes: r.requestedScopes, availableScopes: r.availableScopes, expiresAt: new Date(r.expiresAt).toISOString(), clientRegisteredAt: new Date(r.clientRegisteredAt).toISOString(), clientVerified: false };
 	}
 
 	/** POST /oauth/register (RFC 7591), public clients only. */
@@ -118,8 +123,11 @@ export function createMcpMock(options: McpMockOptions) {
 		if (!(q.get('resource') ?? '').endsWith('/mcp')) return back('invalid_target');
 		const asked = (q.get('scope') ?? '').split(/\s+/).filter(Boolean);
 		if (!asked.every(isScope)) return back('invalid_scope');
-		const scopes = (asked.length ? MCP_SCOPES.filter((s) => asked.includes(s)) : MCP_SCOPES.filter((s) => s.endsWith(':read'))) as Scope[];
-		const request: ConsentRequest = { id: uuid(), clientName: client.clientName, redirectUri, clientRegisteredAt: client.registeredAt, state, scopes, expiresAt: now() + REQUEST_TTL_MS, decided: false };
+		// contract 0.44.0: without `scope` only the read scopes are preselected, but every scope can be chosen
+		const requestedScopes = MCP_SCOPES.filter((s) => asked.includes(s)) as Scope[];
+		const availableScopes = (asked.length ? requestedScopes : [...MCP_SCOPES]) as Scope[];
+		const scopes = (asked.length ? requestedScopes : MCP_SCOPES.filter((s) => s.endsWith(':read'))) as Scope[];
+		const request: ConsentRequest = { id: uuid(), clientName: client.clientName, redirectUri, clientRegisteredAt: client.registeredAt, state, scopes, requestedScopes, availableScopes, expiresAt: now() + REQUEST_TTL_MS, decided: false };
 		requests.set(request.id, request);
 		return { status: 302, redirect: `/oauth/consent?request=${request.id}` };
 	}
@@ -149,8 +157,9 @@ export function createMcpMock(options: McpMockOptions) {
 			if (request.decided) return error(409, 'conflict');
 			const target = new URL(request.redirectUri);
 			if (body.approve === true) {
-				const chosen: unknown = body.scopes;
-				if (!Array.isArray(chosen) || chosen.length === 0 || !chosen.every(isScope) || !chosen.every((s) => request.scopes.includes(s))) {
+				// without `scopes` the preselection applies (contract 0.44.0)
+				const chosen: unknown = body.scopes === undefined ? request.scopes : body.scopes;
+				if (!Array.isArray(chosen) || chosen.length === 0 || !chosen.every(isScope) || !chosen.every((s) => request.availableScopes.includes(s))) {
 					return error(400, 'bad_request');
 				}
 				request.decided = true;

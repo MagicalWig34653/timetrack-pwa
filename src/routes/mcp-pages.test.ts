@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockFetch } from '../../mock/fetch.ts';
-import { api, setCsrfToken } from '#lib/api/client.js';
+import { api, ApiError, setCsrfToken } from '#lib/api/client.js';
 import { sessionStore } from '#lib/session.svelte.js';
 
 const goto = vi.hoisted(() => vi.fn());
@@ -29,7 +29,8 @@ async function signInAsAdmin() {
 async function startFlow(scope: string, redirectUri = 'https://claude.ai/api/mcp/auth_callback'): Promise<string> {
 	const registered = await mock.fetch('/oauth/register', { method: 'POST', body: JSON.stringify({ client_name: 'Claude', redirect_uris: [redirectUri] }) });
 	const { client_id } = await registered.json();
-	const params = new URLSearchParams({ response_type: 'code', client_id, redirect_uri: redirectUri, code_challenge: 'c', code_challenge_method: 'S256', scope, state: 's1', resource: 'https://x.example/mcp' });
+	const params = new URLSearchParams({ response_type: 'code', client_id, redirect_uri: redirectUri, code_challenge: 'c', code_challenge_method: 'S256', state: 's1', resource: 'https://x.example/mcp' });
+	if (scope) params.set('scope', scope);
 	const response = await mock.fetch(`/oauth/authorize?${params}`);
 	return new URL(response.headers.get('Location')!, 'http://localhost').searchParams.get('request')!;
 }
@@ -97,6 +98,35 @@ describe('consent page', () => {
 		expect(url.searchParams.get('state')).toBe('s1');
 		expect(decisions()).toHaveLength(1);
 		expect(await api.listOAuthGrants()).toMatchObject([{ scopes: ['time:read'] }]);
+	});
+
+	it('without a scope parameter: notice, only read scopes checked, write scopes offered unchecked and addable', async () => {
+		await open('');
+		expect(screen.getByTestId('no-scopes-requested')).toHaveTextContent('Die Anwendung hat keine bestimmten Rechte angefragt. Es sind nur Leserechte vorausgewählt.');
+		for (const name of ['Zeiten lesen', 'Planung lesen', 'Berichtsheft lesen', 'Dokumente lesen']) expect(screen.getByRole('checkbox', { name: new RegExp(name) })).toBeChecked();
+		for (const name of ['Zeiten schreiben', 'Planung schreiben', 'Berichtsheft schreiben']) expect(screen.getByRole('checkbox', { name: new RegExp(name) })).not.toBeChecked();
+		expect(screen.queryByTestId('write-warning')).not.toBeInTheDocument();
+		await userEvent.click(screen.getByRole('checkbox', { name: /Zeiten schreiben/ }));
+		expect(screen.getByTestId('write-warning')).toBeInTheDocument();
+		await userEvent.click(screen.getByRole('button', { name: 'Zugriff erlauben' }));
+		await waitFor(() => expect(navigateTo).toHaveBeenCalledTimes(1));
+		expect(await api.listOAuthGrants()).toMatchObject([{ scopes: ['time:read', 'time:write', 'schedule:read', 'reports:read', 'documents:read'] }]);
+	});
+
+	it('with a scope parameter: no notice and only the requested scopes are offered', async () => {
+		await open('time:read time:write');
+		expect(screen.queryByTestId('no-scopes-requested')).not.toBeInTheDocument();
+		expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+	});
+
+	it('shows a deviation refused by the server (400) as an error message and stays on the page', async () => {
+		await open('');
+		// the server refuses a choice outside availableScopes with 400
+		vi.spyOn(api, 'decideOAuthRequest').mockRejectedValueOnce(new ApiError(400, 'bad_request'));
+		await userEvent.click(screen.getByRole('button', { name: 'Zugriff erlauben' }));
+		expect(await screen.findByRole('alert')).toBeInTheDocument();
+		expect(navigateTo).not.toHaveBeenCalled();
+		expect(screen.getByRole('button', { name: 'Zugriff erlauben' })).toBeEnabled();
 	});
 
 	it('disables approving without any scope', async () => {

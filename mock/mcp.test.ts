@@ -35,10 +35,10 @@ async function startFlow(scope = 'time:read time:write', state = 'xyz'): Promise
 		redirect_uri: 'https://chatgpt.com/cb',
 		code_challenge: 'abc',
 		code_challenge_method: 'S256',
-		scope,
 		state,
 		resource: 'https://tt.example/mcp'
 	});
+	if (scope) params.set('scope', scope); // '' = a client that sends no scope parameter
 	const response = await mock.fetch(`/oauth/authorize?${params}`);
 	expect(response.status).toBe(302);
 	return new URL(response.headers.get('Location')!, 'http://localhost').searchParams.get('request')!;
@@ -105,6 +105,32 @@ describe('mock consent requests', () => {
 		await expect(api.decideOAuthRequest(id, true, ['time:read', 'reports:write'])).rejects.toMatchObject({ status: 400 });
 		await expect(api.decideOAuthRequest(id, true, [])).rejects.toMatchObject({ status: 400 });
 		expect(await api.listOAuthGrants()).toEqual([]);
+	});
+
+	it('without a scope parameter preselects the read scopes, requests nothing and offers every scope (contract 0.44.0)', async () => {
+		await signIn();
+		const id = await startFlow('');
+		const request = await api.getOAuthRequest(id);
+		expect(request.scopes).toEqual(['time:read', 'schedule:read', 'reports:read', 'documents:read']);
+		expect(request.requestedScopes).toEqual([]);
+		expect(request.availableScopes).toHaveLength(7);
+		// extending beyond the preselection works, everything is available
+		await api.decideOAuthRequest(id, true, ['time:read', 'time:write']);
+		expect(await api.listOAuthGrants()).toMatchObject([{ scopes: ['time:read', 'time:write'] }]);
+	});
+
+	it('with a scope parameter requested, preselected and available are the same; a scope outside is refused with 400', async () => {
+		await signIn();
+		const id = await startFlow('time:read');
+		expect(await api.getOAuthRequest(id)).toMatchObject({ scopes: ['time:read'], requestedScopes: ['time:read'], availableScopes: ['time:read'] });
+		await expect(api.decideOAuthRequest(id, true, ['time:read', 'time:write'])).rejects.toMatchObject({ status: 400 });
+	});
+
+	it('a decision without scopes in the body grants the preselection', async () => {
+		await signIn();
+		const id = await startFlow('');
+		await api.decideOAuthRequest(id, true);
+		expect(await api.listOAuthGrants()).toMatchObject([{ scopes: ['time:read', 'schedule:read', 'reports:read', 'documents:read'] }]);
 	});
 
 	it('denies with error=access_denied, creates no grant, and decides only once (409)', async () => {

@@ -217,3 +217,36 @@ test.describe('screenshots', () => {
 		});
 	}
 });
+
+test('consent without a scope parameter: read scopes preselected, write scopes added by hand, grant has the extended set', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser);
+	await startFromMockClient(page, { name: 'Client ohne Scope', scopes: [] });
+	await expect(page).toHaveURL(/\/oauth\/consent\?request=/);
+	await expect(page.getByTestId('no-scopes-requested')).toHaveText('Die Anwendung hat keine bestimmten Rechte angefragt. Es sind nur Leserechte vorausgewählt.');
+	for (const name of ['Zeiten lesen', 'Planung lesen', 'Berichtsheft lesen', 'Dokumente lesen']) await expect(page.getByRole('checkbox', { name: new RegExp(name) })).toBeChecked();
+	for (const name of ['Zeiten schreiben', 'Planung schreiben', 'Berichtsheft schreiben']) await expect(page.getByRole('checkbox', { name: new RegExp(name) })).not.toBeChecked();
+	await expect(page.getByTestId('write-warning')).toBeHidden();
+
+	await page.getByRole('checkbox', { name: /Zeiten schreiben/ }).check();
+	await expect(page.getByTestId('write-warning')).toBeVisible();
+	await page.getByRole('button', { name: 'Zugriff erlauben' }).click();
+	await expect(page).toHaveURL(/\/mock-oauth\?code=/);
+
+	await page.goto('/settings/connections');
+	const row = page.getByTestId('grant-list').getByRole('listitem').filter({ hasText: 'Client ohne Scope' });
+	await expect(row).toContainText('Zeiten schreiben');
+	await expect(row).toContainText('Zeiten lesen');
+	await expect(row).not.toContainText('Berichtsheft schreiben');
+	await context.close();
+});
+
+test('consent without any scope selected: approving is disabled with a hint, deviation from the request is not offered', async ({ browser }) => {
+	const { page, context } = await loginAsAdmin(browser);
+	await startFromMockClient(page, { name: 'Client mit Scope', scopes: ['Zeiten lesen'] });
+	await expect(page.getByTestId('no-scopes-requested')).toHaveCount(0);
+	await expect(page.getByRole('checkbox')).toHaveCount(1);
+	await page.getByRole('checkbox', { name: /Zeiten lesen/ }).uncheck();
+	await expect(page.getByRole('button', { name: 'Zugriff erlauben' })).toBeDisabled();
+	await expect(page.getByText(/Wähle mindestens einen Zugriff aus/)).toBeVisible();
+	await context.close();
+});

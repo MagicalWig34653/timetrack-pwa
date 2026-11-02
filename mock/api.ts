@@ -676,7 +676,7 @@ export function createMockApi(options: MockOptions = {}) {
 						revision: '0123456789abcdef0123456789abcdef01234567',
 						revisionShort: '0123456',
 						buildDate: '2026-10-18T08:00:00Z',
-						apiVersion: '0.42.0',
+						apiVersion: '0.44.0',
 						// operator details are admin-only since contract v0.23.0: the keys are absent for members
 						...(account.role === 'admin'
 							? {

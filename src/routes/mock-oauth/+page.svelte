@@ -48,10 +48,11 @@
 				redirect_uri: redirectUri,
 				code_challenge: base64url(digest),
 				code_challenge_method: 'S256',
-				scope: scopes.join(' '),
 				state: base64url(crypto.getRandomValues(new Uint8Array(9))),
 				resource: `${page.url.origin}/mcp`
 			});
+			// no checkbox ticked = a client that sends no `scope` parameter at all (consent page offers read scopes)
+			if (scopes.length > 0) params.set('scope', scopes.join(' '));
 			window.location.assign(`/oauth/authorize?${params}`);
 		} catch (e) {
 			failure = e instanceof Error ? e.message : String(e);

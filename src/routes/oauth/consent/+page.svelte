@@ -27,12 +27,15 @@
 
 	const accountName = $derived(sessionStore.current?.account.displayName ?? '');
 	const writes = $derived(hasWriteScope(selected));
+	/** The client sent no `scope` parameter: nothing was asked for, so only read scopes are preselected. */
+	const nothingRequested = $derived(request !== null && request.requestedScopes.length === 0);
 
 	onMount(async () => {
 		if (!requestId || view === 'disabled') return;
 		try {
 			request = await api.getOAuthRequest(requestId);
-			// Everything the client asked for is preselected; the person removes what must not be allowed.
+			// The preselection (what the client asked for, else read scopes only) is checked; the rest of
+			// `availableScopes` is offered unchecked and only added by the person (contract 0.44.0).
 			selected = [...request.scopes];
 			view = 'ready';
 		} catch (e) {
@@ -120,7 +123,16 @@
 		</div>
 		<p class="-mt-2 text-xs text-muted-foreground" data-testid="other-account-hint">{t('consent.other_account_hint')}</p>
 
-		<ScopePicker scopes={request.scopes} bind:selected legend={t('consent.scopes_title', { client: request.clientName })} hint={t('consent.scopes_hint')} disabled={busy !== null} idPrefix="consent-scope" />
+		{#if nothingRequested}<Alert variant="default" data-testid="no-scopes-requested">{t('consent.no_scopes_requested')}</Alert>{/if}
+
+		<ScopePicker
+			scopes={request.availableScopes}
+			bind:selected
+			legend={t('consent.scopes_title', { client: request.clientName })}
+			hint={nothingRequested ? t('consent.scopes_hint_open') : t('consent.scopes_hint')}
+			disabled={busy !== null}
+			idPrefix="consent-scope"
+		/>
 
 		{#if writes}<Alert variant="warning" data-testid="write-warning">{t('consent.write_warning')}</Alert>{/if}
 		{#if selected.length === 0}<p class="text-sm text-destructive" role="status">{t('consent.no_scope')}</p>{/if}
