@@ -130,7 +130,7 @@
 	const allRanges = $derived.by(() => {
 		const list: MinuteRange[] = [];
 		drafts.forEach((draft, i) => {
-			if (days[i]?.blockedBy === null) for (const entry of blocksOf(draft)) list.push(entry.range);
+			if (days[i]) for (const entry of blocksOf(draft)) list.push(entry.range);
 		});
 		if (showActuals) for (const items of Object.values(actuals)) for (const a of items) list.push({ start: a.start, end: a.end });
 		return list;
@@ -374,7 +374,7 @@
 					date: days[i].date,
 					range,
 					mode: brush.kind === 'off' ? 'off' : brush.kind,
-					status: days[i].blockedBy !== null ? 'invalid' : drafts[i].mode !== '' ? 'replace' : 'ok'
+					status: drafts[i].mode !== '' ? 'replace' : 'ok'
 				}));
 				return { ghosts, hidden: [], edges: [range.start, range.end] };
 			}
@@ -583,7 +583,8 @@
 	}
 
 	// ---- presentation helpers ------------------------------------------------------------------------------
-	const dayPlanned = (i: number) => (days[i].blockedBy !== null ? 0 : netSeconds(drafts[i]));
+	// Plan on a vacation/sick/excused/holiday day counts as planned extra time (ADR-0035), so nothing is forced to 0 here.
+	const dayPlanned = (i: number) => netSeconds(drafts[i]);
 	const dayDiff = (i: number) => dayPlanned(i) - days[i].targetSeconds;
 	const sollBand = (i: number) => {
 		const day = days[i];
@@ -619,7 +620,6 @@
 	const compactAt = 40;
 	/** The blocks of a day column, with the live range of a block that is being resized. */
 	const columnBlocks = (i: number) => {
-		if (days[i].blockedBy !== null) return [];
 		return blocksOf(drafts[i])
 			.sort((a, b) => a.range.start - b.range.start)
 			.map((entry) => ({ ...entry, range: resizeOverride?.id === entry.id ? resizeOverride.range : entry.range }));
@@ -639,7 +639,7 @@
 					<div class="wg-dayline">
 						<span class="wg-wd">{weekdayLabel(day.weekday)}</span>
 						<span class="wg-dn" aria-label={formatDateNumeric(day.date)}>{Number(day.date.slice(8))}</span>
-						<button type="button" class="wg-add" data-nodrag onclick={() => onadd(day.date)} aria-label={t('wg.add_day', { day: weekdayLabel(day.weekday) })} data-testid="add-{day.date}" disabled={day.blockedBy !== null}><Plus class="size-3.5" /></button>
+						<button type="button" class="wg-add" data-nodrag onclick={() => onadd(day.date)} aria-label={t('wg.add_day', { day: weekdayLabel(day.weekday) })} data-testid="add-{day.date}"><Plus class="size-3.5" /></button>
 					</div>
 					<div class="wg-sum" aria-label={t('wg.day_sum', { plan: timeDisplay.duration(planned), target: timeDisplay.duration(day.targetSeconds) })}>
 						<span class="wg-plan" data-testid="day-plan-{day.date}">{planned > 0 ? timeDisplay.duration(planned) : '–'}</span>
@@ -1038,7 +1038,6 @@
 		background-size:
 			auto,
 			100% var(--hh);
-		cursor: not-allowed;
 	}
 	/* planned or requested vacation that does not block the day yet: lighter dashed hatching, still editable */
 	.wg-col[data-vacation] {

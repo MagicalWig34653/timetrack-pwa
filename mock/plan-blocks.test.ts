@@ -117,11 +117,12 @@ describe('mock plan blocks: week overview', () => {
 		expect(Array.isArray(week.days[1].planHints)).toBe(true);
 	});
 
-	it('a blocked day keeps the stored blocks but has no difference', async () => {
-		await api.putPlanDay('2026-10-27', { mode: 'office', blocks: [block('08:00', '12:00')] }); // approved vacation
-		const week = await api.getTimeWeek('2026-W44');
-		expect(week.days[1]).toMatchObject({ plannedSeconds: 0, planActualDifferenceSeconds: null });
-		expect(week.days[1].planBlocks).toHaveLength(1);
+	it('a marked day counts the plan as planned extra time (contract 0.42.0)', async () => {
+		await api.putPlanDay('2026-09-28', { mode: 'office', blocks: [block('08:00', '12:00')] }); // sick day in the past
+		const week = await api.getTimeWeek('2026-W40');
+		expect(week.days[0]).toMatchObject({ plannedSeconds: 4 * 3600 });
+		expect(week.days[0].planActualDifferenceSeconds).toBe(week.days[0].workSeconds + week.days[0].creditSeconds - 4 * 3600);
+		expect(week.days[0].planBlocks).toHaveLength(1);
 	});
 });
 

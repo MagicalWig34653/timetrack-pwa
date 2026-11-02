@@ -84,7 +84,7 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	await page.goto('/plan?week=2032-W12&view=list');
 	await expect(page.getByTestId('week-planner')).toBeVisible();
 	await expect(page.getByTestId('plan-blocked-2032-03-17')).toContainText('Urlaub eingetragen.');
-	await expect(page.locator('#plan-mode-2032-03-17')).toBeDisabled();
+	await expect(page.locator('#plan-mode-2032-03-17')).toBeEnabled(); // ADR-0035: marked days can be planned
 	// the target depends on the work model another spec may have changed: read it instead of assuming 4 x 7:42
 	const initial = (await page.getByTestId('plan-total-text').textContent()) ?? '';
 	const target = /von (\d+):(\d\d) Soll/.exec(initial)!;
@@ -129,12 +129,12 @@ test('planner: standard week, same for all workdays, blocked day, save, reload, 
 	await expect(page.getByTestId('week-plan-card')).toContainText('Geplant 32:00');
 	await expect(page.getByTestId('week-day-2032-03-15').getByTestId('bar-planned')).toBeVisible();
 
-	// copy last week into the week with the holiday: Karfreitag stays blocked and empty
+	// copy last week into the week with the holiday: Karfreitag takes the plan of last Friday like any other day (ADR-0035)
 	await page.goto('/plan?week=2032-W13&view=list');
 	await expect(page.getByTestId('plan-blocked-2032-03-26')).toContainText('Feiertag');
 	await page.getByTestId('plan-copy').click();
 	await expect(page.locator('#plan-mode-2032-03-22')).toHaveValue('home');
-	await expect(page.locator('#plan-mode-2032-03-26')).toHaveValue('');
+	await expect(page.locator('#plan-mode-2032-03-26')).toHaveValue('home');
 
 	// leave guard: dismissing keeps the page, accepting leaves
 	const dialogs: string[] = [];

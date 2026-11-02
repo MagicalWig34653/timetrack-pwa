@@ -1,3 +1,5 @@
+**PLAN-OFFDAY (02.11.2026, Branch plan-offday):** Wochenplaner (Raster und Liste) erlaubt Planblöcke auch an Urlaubs-, Krank-, Freistellungs- und Feiertagen (Vertrag 0.42.0, ADR-0035-Vorschlag): Sperre über `blockedBy` entfernt, Server-Plandauer zählt als geplante Mehrzeit, ruhiger Hinweis. Details: `docs/handoffs/PLAN-OFFDAY-pwa.md`.
+
 **SEC-clients (02.11.2026, Branch sec-clients):** PWA liest Vertrag 0.41.0: Rückfallpasswort 16 Zeichen und `weak_password`, 429 mit Retry-After, Export mit Re-Login und automatischer Wiederholung, Speicherkontingent (Admin-Felder, 413), Zustimmungsseite mit „Nicht verifizierter Client“, leise Abmeldung bei beendeter Sitzung. Details: `docs/handoffs/SEC-clients-pwa.md`.
 
 **VB1 (02.11.2026, Branch vacation-bookings):** Buchungen an Urlaub/Krank/Freistellung/Feiertag waren in der PWA nie gesperrt (nur die Planung auf Blocktagen, unverändert); neu: ruhiger Hinweis „Buchung an Urlaubstag: Die gebuchte Zeit zählt als Überstunde.“, Ist-Pille im Monatsraster, Tests. Details: `docs/handoffs/VB1-pwa.md`.

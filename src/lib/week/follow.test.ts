@@ -25,10 +25,10 @@ describe('followEntries', () => {
 		expect(r.entries[0]).toMatchObject({ date: date(0), blocks: [{ start: '08:00', end: '12:00', kind: 'school' }, { start: '13:00', end: '16:30', kind: 'work' }] });
 		expect(r.entries[0]).not.toHaveProperty('plannedStart');
 	});
-	it('skips blocked target days', () => {
+	it('also plans days with a holiday/vacation mark (ADR-0035)', () => {
 		const r = followEntries(source, target({ 1: { blockedBy: 'holiday' } }), true);
-		expect(r.entries.map((e) => e.date)).toEqual([date(0), date(2)]);
-		expect(r.skippedBlocked).toBe(1);
+		expect(r.entries.map((e) => e.date)).toEqual([date(0), date(1), date(2)]);
+		expect(r.skippedExisting).toBe(0);
 	});
 	it('keeps existing plans unless overwrite is set', () => {
 		const existing = { date: date(0), mode: 'home' as const };

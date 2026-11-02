@@ -41,9 +41,10 @@
 		showProblems?: boolean;
 	} = $props();
 
-	const blocked = $derived(day.blockedBy !== null);
-	// On phones an unplanned or blocked day shows only its mode; the rest would be disabled noise.
-	const hideOnPhone = $derived(blocked || draft.mode === '' ? 'max-lg:hidden' : '');
+	// A vacation/sick/excused/holiday mark is only information; the day can be planned (ADR-0035).
+	const marked = $derived(day.blockedBy !== null);
+	// On phones an unplanned day shows only its mode; the rest would be disabled noise.
+	const hideOnPhone = $derived(draft.mode === '' ? 'max-lg:hidden' : '');
 	const times = $derived(draft.mode !== '' && draft.mode !== 'off');
 	// legacy: the single window is the first block
 	const first = $derived(draft.blocks[0]);
@@ -64,16 +65,16 @@
 		const kind: PlanBlockKind = draft.mode === '' || draft.mode === 'off' ? 'office' : draft.mode;
 		onchange({ ...draft, blocks: [...draft.blocks, newBlock(start, Math.min(start + 240, 23 * 60 + 59), kind)] });
 	}
-	const hints = $derived(multi && !blocked ? planHintsOfDay(draft) : []);
-	const problem = $derived(blocked ? null : draftProblem(draft));
-	const planned = $derived(blocked ? 0 : plannedSecondsOf(draft));
+	const hints = $derived(multi ? planHintsOfDay(draft) : []);
+	const problem = $derived(draftProblem(draft));
+	const planned = $derived(plannedSecondsOf(draft));
 	const id = (name: string) => `plan-${name}-${day.date}`;
 	const label = 'text-xs text-muted-foreground lg:sr-only';
 	const markFor = (block: NonNullable<PlanWeekDay['blockedBy']>) => (block === 'holiday' ? 'holiday' : block);
 </script>
 
 <li
-	class="rounded-[10px] border bg-card p-3 shadow-[var(--shadow-card)] {blocked ? 'bg-muted/40' : ''}"
+	class="rounded-[10px] border bg-card p-3 shadow-[var(--shadow-card)]"
 	data-testid="plan-row-{day.date}"
 	data-blocked={day.blockedBy ?? undefined}
 	aria-label={t('weekplan.row_label', { date: `${weekdayLabel(day.weekday)} ${formatDateNumeric(day.date)}` })}
@@ -86,7 +87,7 @@
 
 		<div class="col-span-2 flex flex-col gap-1 lg:col-span-1">
 			<label class={label} for={id('mode')}>{multi ? t('wg.dialog_day_mode') : t('weekplan.mode')}</label>
-			<Select id={id('mode')} value={draft.mode} disabled={blocked} onchange={(e) => onmode(e.currentTarget.value as DraftMode)}>
+			<Select id={id('mode')} value={draft.mode} onchange={(e) => onmode(e.currentTarget.value as DraftMode)}>
 				<option value="">{t('weekplan.mode_none')}</option>
 				{#each PLAN_MODES as option (option)}<option value={option}>{planModeLabel(option as PlanMode)}</option>{/each}
 			</Select>
@@ -100,7 +101,7 @@
 				type="time"
 				step={STEP_MINUTES * 60}
 				value={first?.start ?? ''}
-				disabled={blocked || !times}
+				disabled={!times}
 				aria-invalid={problem !== null && showProblems ? 'true' : undefined}
 				oninput={(e) => setWindow({ start: e.currentTarget.value })}
 			/>
@@ -112,7 +113,7 @@
 				type="time"
 				step={STEP_MINUTES * 60}
 				value={first?.end ?? ''}
-				disabled={blocked || !times}
+				disabled={!times}
 				aria-invalid={problem !== null && showProblems ? 'true' : undefined}
 				oninput={(e) => setWindow({ end: e.currentTarget.value })}
 			/>
@@ -127,7 +128,7 @@
 				step="5"
 				inputmode="numeric"
 				value={draft.breakMinutes}
-				disabled={blocked || !times}
+				disabled={!times}
 				oninput={(e) => onchange({ ...draft, breakMinutes: e.currentTarget.value === '' ? 0 : Math.round(Number(e.currentTarget.value)) })}
 			/>
 		</div>
@@ -143,11 +144,11 @@
 
 		<div class="{hideOnPhone} col-span-2 flex flex-col gap-1 lg:col-span-1">
 			<label class={label} for={id('note')}>{t('weekplan.note')}</label>
-			<Input id={id('note')} value={draft.note} maxlength={200} placeholder={t('weekplan.note')} disabled={blocked || draft.mode === ''} oninput={(e) => onchange({ ...draft, note: e.currentTarget.value })} />
+			<Input id={id('note')} value={draft.note} maxlength={200} placeholder={t('weekplan.note')} disabled={draft.mode === ''} oninput={(e) => onchange({ ...draft, note: e.currentTarget.value })} />
 		</div>
 	</div>
 
-	{#if multi && times && !blocked}
+	{#if multi && times}
 		<div class="mt-3 flex flex-col gap-2" data-testid="plan-blocks-{day.date}">
 			{#each draft.blocks as block, n (n)}
 				<div class="grid grid-cols-2 items-end gap-2 rounded-lg bg-muted/40 p-2 sm:grid-cols-[9rem_8.5rem_8.5rem_minmax(0,1fr)_minmax(0,1.2fr)_auto]" data-testid="plan-block-{day.date}-{n}" data-kind={block.kind}>
@@ -191,10 +192,10 @@
 		{/if}
 	{/if}
 
-	{#if blocked && day.blockedBy}
+	{#if marked && day.blockedBy}
 		<p class="mt-2 flex flex-wrap items-center gap-2 text-sm" data-testid="plan-blocked-{day.date}">
 			{#if day.blockedBy === 'holiday' && holiday}<HolidayBadge name={holiday.name} treatment={holiday.treatment} testid="plan-holiday-{day.date}" />{:else}<span class="inline-flex h-5 items-center gap-1 rounded-full px-2 text-xs font-medium {MARK_CLASSES[markFor(day.blockedBy)]}"><MarkIcon mark={markFor(day.blockedBy)} class="size-3" />{t(`weekview.mark.${markFor(day.blockedBy)}`)}</span>{/if}
-			<span class="text-muted-foreground">{t(`weekplan.blocked.${day.blockedBy}`)}{#if day.plan} {t('weekplan.blocked_plan_kept')}{/if}</span>
+			<span class="text-muted-foreground">{t(`weekplan.blocked.${day.blockedBy}`)}{#if draft.mode !== ''} {t(`weekplan.offday_hint.${day.blockedBy}`)}{/if}</span>
 		</p>
 	{:else if holiday}
 		<p class="mt-2 flex flex-wrap items-center gap-2 text-sm"><HolidayBadge name={holiday.name} treatment={holiday.treatment} testid="plan-holiday-{day.date}" /></p>

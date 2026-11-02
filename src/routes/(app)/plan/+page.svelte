@@ -125,7 +125,7 @@
 	const dirty = $derived(week !== null && !draftsEqual(drafts, baseline));
 	const days = $derived(week?.days ?? []);
 	const totals = $derived(weekTotals(days, drafts));
-	const hasProblem = $derived(drafts.some((draft, index) => days[index]?.blockedBy === null && draftProblem(draft) !== null));
+	const hasProblem = $derived(drafts.some((draft, index) => draftProblem(draft) !== null));
 	const isPast = $derived(addDays(monday, 6) < today);
 	const progress = $derived(totals.targetSeconds > 0 ? Math.min(100, Math.round((totals.plannedSeconds / totals.targetSeconds) * 100)) : totals.plannedSeconds > 0 ? 100 : 0);
 
@@ -254,7 +254,7 @@
 		followOpen = true;
 	}
 
-	/** Writes the shown plan onto the next weeks; blocked days and (unless asked) existing plans stay as they are. */
+	/** Writes the shown plan onto the next weeks; (unless asked) existing plans stay as they are. */
 	async function applyFollow(input: { weeks: number; overwrite: boolean }) {
 		followBusy = true;
 		followError = '';
@@ -265,7 +265,7 @@
 				const label = isoWeekLabel(addDays(monday, 7 * n));
 				const target = await api.getPlanWeek(label);
 				const plan = followEntries(drafts, target, input.overwrite, multi);
-				skipped += plan.skippedBlocked + plan.skippedExisting;
+				skipped += plan.skippedExisting;
 				if (plan.entries.length === 0) continue;
 				await api.putPlanWeek(label, { replace: false, days: plan.entries });
 				written += plan.entries.length;

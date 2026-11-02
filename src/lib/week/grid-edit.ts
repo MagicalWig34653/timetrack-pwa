@@ -96,7 +96,8 @@ export function neighbourBounds(drafts: DayDraft[], id: BlockId): MinuteRange {
 export const defaultBreak = (range: MinuteRange): number => (range.end - range.start > 360 ? 30 : 0);
 
 const indexOf = (drafts: DayDraft[], date: string) => drafts.findIndex((d) => d.date === date);
-const isBlockedAt = (days: PlanWeekDay[], index: number) => index < 0 || index >= days.length || days[index].blockedBy !== null;
+// Only days outside the week reject a change; a vacation/sick/excused/holiday mark does not (ADR-0035).
+const isBlockedAt = (days: PlanWeekDay[], index: number) => index < 0 || index >= days.length;
 const unchanged = (drafts: DayDraft[]): EditResult => ({ drafts, touched: [], skipped: [], replaced: [], selection: [] });
 export const hasPlan = (draft: DayDraft) => draft.mode !== '';
 
@@ -188,8 +189,7 @@ export function eraseBlocks(drafts: DayDraft[], ctx: EditCtx, ids: BlockId[]): E
 	for (const [date, indexes] of byDate) {
 		const index = indexOf(drafts, date);
 		if (index < 0) continue;
-		// A blocked day's stored plan is not shown in the grid, so it is not erased either.
-		if (isBlockedAt(ctx.days, index)) {
+				if (isBlockedAt(ctx.days, index)) {
 			result.skipped.push(date);
 			continue;
 		}
@@ -507,5 +507,3 @@ export function pasteClip(drafts: DayDraft[], ctx: EditCtx, clip: Clip, targetDa
 	return result;
 }
 
-/** Day index of the first day that is not blocked, for default targets. */
-export const firstFreeIndex = (days: PlanWeekDay[]) => Math.max(0, days.findIndex((d) => d.blockedBy === null));

@@ -296,10 +296,9 @@ export function standardWeek(days: PlanWeekDay[], current: DayDraft[], suggestio
 	});
 }
 
-/** Copies the plan of another week day by day (Monday to Monday); blocked days keep their draft. */
-export function copyWeek(source: PlanWeek, days: PlanWeekDay[], current: DayDraft[]): DayDraft[] {
+/** Copies the plan of another week day by day (Monday to Monday), including days with a vacation/sick/holiday mark (ADR-0035). */
+export function copyWeek(source: PlanWeek, _days: PlanWeekDay[], current: DayDraft[]): DayDraft[] {
 	return current.map((draft, index) => {
-		if (isBlocked(days[index])) return draft;
 		const from = source.days[index];
 		return from ? { ...draftFromDay(from), date: draft.date } : emptyDraft(draft.date);
 	});
@@ -316,22 +315,22 @@ export function sameForWorkdays(days: PlanWeekDay[], current: DayDraft[]): DayDr
 	});
 }
 
-export function clearWeek(days: PlanWeekDay[], current: DayDraft[]): DayDraft[] {
-	return current.map((draft, index) => (isBlocked(days[index]) ? draft : emptyDraft(draft.date)));
+export function clearWeek(_days: PlanWeekDay[], current: DayDraft[]): DayDraft[] {
+	return current.map((draft) => emptyDraft(draft.date));
 }
 
-/** Live totals: blocked days count 0 planned; the target comes from the server. */
+/** Live totals: every planned day counts, also on marked days (planned extra time, ADR-0035); the target comes from the server. */
 export function weekTotals(days: PlanWeekDay[], drafts: DayDraft[]): { plannedSeconds: number; targetSeconds: number; differenceSeconds: number } {
 	let planned = 0;
 	let target = 0;
 	drafts.forEach((draft, index) => {
 		target += days[index].targetSeconds;
-		if (!isBlocked(days[index])) planned += plannedSecondsOf(draft) ?? 0;
+		planned += plannedSecondsOf(draft) ?? 0;
 	});
 	return { plannedSeconds: planned, targetSeconds: target, differenceSeconds: planned - target };
 }
 
-/** The PUT body: every planned row, including the stored plan of blocked days (replace=true would delete it otherwise). */
+/** The PUT body: every planned row, including days with a vacation/sick/holiday mark. */
 export function weekRequest(drafts: DayDraft[], multi = true): { replace: true; days: PlanWeekEntry[] } {
 	return { replace: true, days: drafts.map((draft) => entryFromDraft(draft, multi)).filter((entry): entry is PlanWeekEntry => entry !== null) };
 }

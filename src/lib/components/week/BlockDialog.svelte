@@ -121,7 +121,7 @@
 				<Label for="bd-day">{t('wg.dialog_day_label')}</Label>
 				<Select id="bd-day" bind:value={form.date} disabled={dayOnly} data-testid="bd-day">
 					{#each days as day (day.date)}
-						<option value={day.date} disabled={day.blockedBy !== null && day.date !== form.date}>{weekdayLabel(day.weekday)} {formatDateNumeric(day.date).slice(0, 6)}{day.blockedBy ? ` (${t(`weekview.mark.${day.blockedBy}`)})` : ''}</option>
+						<option value={day.date}>{weekdayLabel(day.weekday)} {formatDateNumeric(day.date).slice(0, 6)}{day.blockedBy ? ` (${t(`weekview.mark.${day.blockedBy}`)})` : ''}</option>
 					{/each}
 				</Select>
 			</div>

@@ -44,9 +44,10 @@ describe('weekIssues', () => {
 		const issues = weekIssues(days(), week({ 0: block('12:00', '22:00', 30), 1: block('07:00', '11:00', 0), 3: block('07:00', '11:00', 0) }));
 		expect(issues.filter((i) => i.kind === 'rest_short')).toEqual([{ date: date(1), kind: 'rest_short', severity: 'warn', value: 9 * 60 }]);
 	});
-	it('ignores blocked days and notes work on a non-working day', () => {
+	it('checks planned work on marked days like any other day and notes work on a non-working day', () => {
 		const issues = weekIssues(days({ 0: 'holiday' }), week({ 0: block('00:00', '23:00', 0), 5: block('08:00', '10:00', 0) }));
-		expect(issues).toEqual([{ date: date(5), kind: 'non_working', severity: 'info' }]);
+		expect(issues.some((i) => i.date === date(0) && i.kind === 'daily_max')).toBe(true);
+		expect(issues).toContainEqual({ date: date(5), kind: 'non_working', severity: 'info' });
 	});
 });
 

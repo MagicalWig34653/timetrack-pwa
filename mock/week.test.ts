@@ -104,11 +104,11 @@ describe('mock plan weeks', () => {
 		expect(week.totals.plannedSeconds).toBe(4 * 8 * 3600);
 	});
 
-	it('blocks holidays and absences but keeps a stored plan', async () => {
+	it('marks holidays and absences and counts a stored plan with its duration', async () => {
 		await api.putPlanDay('2026-10-27', { mode: 'office', plannedStart: '08:00', plannedEnd: '16:00', plannedBreakMinutes: 30 });
 		const week = await api.getPlanWeek('2026-W44');
 		expect(week.days[0]).toMatchObject({ blockedBy: 'vacation', targetSeconds: 0, plannedSeconds: null });
-		expect(week.days[1]).toMatchObject({ blockedBy: 'vacation', plannedSeconds: 0 });
+		expect(week.days[1]).toMatchObject({ blockedBy: 'vacation', plannedSeconds: 7.5 * 3600 });
 		expect(week.days[1].plan?.plannedSeconds).toBe(7.5 * 3600);
 		const holiday = await api.getPlanWeek('2026-W53'); // 31.12.2026 is no holiday; New Year 2027 is outside
 		expect(holiday.days.every((d) => d.blockedBy === null || d.blockedBy === 'holiday')).toBe(true);

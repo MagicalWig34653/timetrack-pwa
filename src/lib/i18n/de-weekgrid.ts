@@ -76,7 +76,7 @@ export const deWeekGrid = {
 	'wg.follow_busy': 'Kopiert …',
 	'wg.follow_done': '{days} Tage in die Folgewochen geschrieben, {skipped} übersprungen.',
 
-	'wg.say_blocked': '{count} Tag(e) konnten keinen Plan aufnehmen (Feiertag, Urlaub, Krank, Freistellung oder außerhalb der Woche).',
+	'wg.say_blocked': '{count} Tag(e) liegen außerhalb der Woche.',
 	'wg.say_replaced': '{count} vorhandene(r) Plan/Pläne ersetzt.',
 	'wg.did_paint': 'Block gemalt: {mode}.',
 	'wg.did_copy': 'Block kopiert.',

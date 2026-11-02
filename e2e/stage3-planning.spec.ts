@@ -653,10 +653,10 @@ test('K1 API: week plan with times, blocked day, validation in German, all or no
 	const saved = await api(page, 'PUT', `/api/v1/plan/weeks/${K1_WEEK}`, { replace: true, days: [day('2026-11-16'), day('2026-11-17', { note: 'Geheime-K1-Notiz' }), day('2026-11-18'), day('2026-11-19', { mode: 'home' }), day('2026-11-20', { mode: 'off' })] });
 	expect(saved.status).toBe(200);
 	expect(saved.body.days).toHaveLength(7);
-	expect(saved.body.days[2]).toMatchObject({ blockedBy: 'vacation', targetSeconds: 0, plannedSeconds: 0 });
+	expect(saved.body.days[2]).toMatchObject({ blockedBy: 'vacation', targetSeconds: 0, plannedSeconds: 6 * 3600 });
 	expect(saved.body.days[2].plan.plannedSeconds).toBe(6 * 3600);
 	expect(saved.body.days[0]).toMatchObject({ blockedBy: null, targetSeconds: 21600, plannedSeconds: 21600 });
-	expect(saved.body.totals).toEqual({ targetSeconds: 4 * 21600, plannedSeconds: 3 * 21600, differenceSeconds: -21600 });
+	expect(saved.body.totals).toEqual({ targetSeconds: 4 * 21600, plannedSeconds: 4 * 21600, differenceSeconds: 0 }); // contract 0.42.0: the plan of the vacation day counts as planned extra time
 	// German validation message, nothing stored for an invalid week
 	const bad = await api(page, 'PUT', `/api/v1/plan/weeks/${K1_WEEK}`, { replace: true, days: [day('2026-11-16'), day('2026-11-17', { plannedEnd: '07:00' })] });
 	expect(bad.status).toBe(400);
@@ -711,7 +711,7 @@ test('K1 API: time week equals the sum of the day evaluations and the account ba
 	expect(foreign.summary.workSeconds).toBe(0);
 });
 
-test('K1 UI: overview numbers match the API, the planner saves a week, blocked day is disabled', async () => {
+test('K1 UI: overview numbers match the API, the planner saves a week, marked day stays editable', async () => {
 	const { page } = alice;
 	const week = (await api(page, 'GET', `/api/v1/time/weeks/${K1_WEEK}`)).body;
 	const clock = (seconds: number) => `${seconds < 0 ? '-' : ''}${Math.floor(Math.abs(seconds) / 3600)}:${String(Math.floor((Math.abs(seconds) % 3600) / 60)).padStart(2, '0')}`;
@@ -723,11 +723,11 @@ test('K1 UI: overview numbers match the API, the planner saves a week, blocked d
 	await expect(page.getByTestId('week-day-2026-11-18')).toHaveAttribute('data-mark', 'vacation');
 	await expect(page.getByTestId('week-day-2026-11-16').getByTestId('bar-planned')).toBeVisible();
 	await expect(page.getByTestId('week-day-2026-11-16')).toHaveAttribute('aria-label', /geplant 6:00 Stunden/);
-	await expect(page.getByTestId('week-plan-card')).toContainText('Geplant 18:00');
+	await expect(page.getByTestId('week-plan-card')).toContainText('Geplant 24:00');
 
 	await page.getByTestId('tab-plan').click();
 	await expect(page.getByTestId('week-planner')).toBeVisible();
-	await expect(page.locator('#plan-mode-2026-11-18')).toBeDisabled();
+	await expect(page.locator('#plan-mode-2026-11-18')).toBeEnabled(); // ADR-0035
 	await expect(page.getByTestId('plan-blocked-2026-11-18')).toContainText('Urlaub eingetragen.');
 	await page.getByTestId('plan-clear').click();
 	await page.locator('#plan-mode-2026-11-16').selectOption('customer');
@@ -739,8 +739,8 @@ test('K1 UI: overview numbers match the API, the planner saves a week, blocked d
 	await expect(page.getByTestId('toast')).toHaveText('Woche gespeichert.');
 	const stored = (await api(page, 'GET', `/api/v1/plan/weeks/${K1_WEEK}`)).body;
 	expect(stored.days[0].plan).toMatchObject({ mode: 'customer', plannedStart: '09:00', plannedEnd: '15:30', plannedBreakMinutes: 30, plannedSeconds: 21600 });
-	expect(stored.days[2].plan.mode).toBe('office'); // the plan of the blocked day survives a replacing save
-	expect(stored.days.filter((d: any) => d.plan).length).toBe(2);
+	expect(stored.days[2].plan).toBeNull(); // clear also empties the marked day
+	expect(stored.days.filter((d: any) => d.plan).length).toBe(1);
 	await page.reload();
 	await expect(page.locator('#plan-mode-2026-11-16')).toHaveValue('customer');
 });

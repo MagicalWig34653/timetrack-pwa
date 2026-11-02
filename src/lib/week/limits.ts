@@ -36,7 +36,7 @@ export function weekIssues(days: PlanWeekDay[], drafts: DayDraft[], profileForDa
 	drafts.forEach((draft, index) => {
 		const day = days[index];
 		const profile = profileForDate(draft.date);
-		const span = day.blockedBy === null ? spanOf(draft) : null;
+		const span = spanOf(draft);
 		if (!span) {
 			previousEnd = null;
 			return;

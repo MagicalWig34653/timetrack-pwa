@@ -186,20 +186,20 @@ describe('quick actions', () => {
 		expect(drafts[1].mode).toBe('');
 		expect(drafts[2]).toEqual(emptyDraft(date(2)));
 	});
-	it('clears everything except blocked days', () => {
+	it('clears everything, also the plan of a marked day', () => {
 		const filled = standardWeek(days, days.map(draftFromDay), fallback);
 		const cleared = clearWeek(days, filled);
-		expect(cleared.filter((d) => d.mode !== '').map((d) => d.date)).toEqual([date(2)]);
+		expect(cleared.filter((d) => d.mode !== '')).toEqual([]);
 	});
 });
 
 describe('totals and request', () => {
 	const days = week({ 2: { blockedBy: 'holiday', targetSeconds: 0 } });
-	it('sums planned hours of unblocked days against the server target', () => {
+	it('sums planned hours of all days (also marked ones, planned extra time) against the server target', () => {
 		const drafts = standardWeek(week(), empty(days), fallbackWindow(27_720), false);
 		const totals = weekTotals(days, drafts);
 		expect(totals.targetSeconds).toBe(4 * 27_720);
-		expect(totals.plannedSeconds).toBe(4 * 27_900); // 08:00-16:15 minus 30 min = 7:45 per day, blocked day does not count
+		expect(totals.plannedSeconds).toBe(5 * 27_900); // 08:00-16:15 minus 30 min = 7:45 per day, the holiday's plan counts too (ADR-0035)
 		expect(totals.differenceSeconds).toBe(totals.plannedSeconds - totals.targetSeconds);
 	});
 	it('builds a replacing request with planned rows only, times only for working modes', () => {

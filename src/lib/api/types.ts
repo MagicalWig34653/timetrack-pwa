@@ -692,7 +692,7 @@ export interface PlanWeekDay {
 	date: string;
 	weekday: number;
 	targetSeconds: number;
-	/** Effective: 0 for a blocked day, null without a plan or times. */
+	/** Effective plan duration, also on marked days (planned extra time, contract 0.42.0; older servers send 0 there); null without a plan or times. */
 	plannedSeconds: number | null;
 	blockedBy: PlanBlock | null;
 	plan: PlanDay | null;
@@ -736,7 +736,7 @@ export interface TimeWeekDay {
 	/** Contract 0.35.0: the plan blocks of the day (null without a plan); absent on older servers. */
 	planBlocks?: PlanTimeBlock[] | null;
 	planHints?: PlanHint[];
-	/** Contract 0.35.0: evaluated work + credit - effective planned seconds; null for future or blocked days or without a planned duration. */
+	/** Contract 0.35.0: evaluated work + credit - effective planned seconds; null for future days or without a planned duration (also set on marked days since contract 0.42.0). */
 	planActualDifferenceSeconds?: number | null;
 	workSeconds: number;
 	creditSeconds: number;

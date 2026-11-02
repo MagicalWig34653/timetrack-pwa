@@ -86,11 +86,12 @@ describe('paintDays with block lists', () => {
 		expect(r.drafts[0]).toMatchObject({ mode: 'office' });
 		expect(r.drafts[0].blocks[0].kind).toBe('travel');
 	});
-	it('skips blocked days and never mutates the input', () => {
+	it('paints marked days too (ADR-0035) and never mutates the input', () => {
 		const start = week();
-		const r = paintDays(start, multi({ 2: 'holiday' }), [date(1), date(2)], range(480, 540), brush);
-		expect(r.skipped).toEqual([date(2)]);
-		expect(r.drafts[2].mode).toBe('');
+		const r = paintDays(start, multi({ 2: 'holiday', 1: 'vacation' }), [date(1), date(2)], range(480, 540), brush);
+		expect(r.skipped).toEqual([]);
+		expect(r.touched).toEqual([date(1), date(2)]);
+		expect(r.drafts[2].mode).not.toBe('');
 		expect(start[1].mode).toBe('');
 	});
 	it('paints an off day without blocks', () => {
@@ -128,11 +129,10 @@ describe('eraseBlocks and eraseDays', () => {
 		const all = eraseBlocks(start, multi(), [id(0, 0), id(0, 1)]);
 		expect(all.drafts[0]).toEqual(emptyDraft(date(0)));
 	});
-	it('skips blocked days', () => {
+	it('erases on marked days too', () => {
 		const r = eraseBlocks(start, multi({ 2: 'vacation' }), [id(0, 1), id(2, 0)]);
-		expect(r.touched).toEqual([date(0)]);
-		expect(r.skipped).toEqual([date(2)]);
-		expect(r.drafts[2].mode).toBe('office');
+		expect(r.touched).toEqual([date(0), date(2)]);
+		expect(r.skipped).toEqual([]);
 	});
 	it('erases whole days, rough plans included', () => {
 		const rough = week({ 1: day('home', []) });
@@ -177,8 +177,9 @@ describe('moveBlocks', () => {
 		expect(r.drafts[1].mode).toBe('home');
 		expect(r.drafts[0]).toEqual(emptyDraft(date(0)));
 	});
-	it('is all-or-nothing when a target is blocked or outside the week', () => {
-		expect(moveBlocks(start, multi({ 1: 'holiday' }), [id(0, 0)], 1, 0, false)).toMatchObject({ ok: false, skipped: [date(0)] });
+	it('moves onto a marked day, but stays all-or-nothing outside the week', () => {
+		expect(moveBlocks(start, multi({ 1: 'vacation' }), [id(0, 0)], 1, 0, false).ok).toBe(true);
+		expect(moveBlocks(start, multi({ 1: 'holiday' }), [id(0, 0)], 1, 0, true).ok).toBe(true);
 		expect(moveBlocks(start, multi(), [id(0, 0)], -1, 0, false).ok).toBe(false);
 		expect(moveBlocks(start, multi(), [id(0, 0)], 7, 0, false).ok).toBe(false);
 	});
@@ -283,8 +284,10 @@ describe('the dialog result', () => {
 		const r = replaceBlock(week(), legacy(), null, date(0), blk('08:00', '12:00', 'home', { note: 'N' }), { mode: 'home', breakMinutes: 15, dayNote: 'N' });
 		expect(r.drafts[0]).toMatchObject({ mode: 'home', breakMinutes: 15, note: 'N' });
 	});
-	it('refuses a blocked day', () => {
-		expect(replaceBlock(s, multi({ 2: 'sick' }), null, date(2), blk('08:00', '09:00')).skipped).toEqual([date(2)]);
+	it('accepts a marked day', () => {
+		const r = replaceBlock(s, multi({ 2: 'sick' }), null, date(2), blk('08:00', '09:00'));
+		expect(r.skipped).toEqual([]);
+		expect(r.touched).toEqual([date(2)]);
 	});
 });
 
@@ -292,9 +295,9 @@ describe('copying a whole day', () => {
 	const s = week({ 0: day('office', [blk('08:00', '12:00', 'school'), blk('13:00', '17:00', 'work')], { note: 'x' }), 1: day('home', [blk('09:00', '13:00', 'home')]) });
 	it('copies every block to other days', () => {
 		const r = copyToDates(s, multi({ 3: 'sick' }), date(0), [date(1), date(2), date(3)]);
-		expect(r.touched).toEqual([date(1), date(2)]);
+		expect(r.touched).toEqual([date(1), date(2), date(3)]);
 		expect(r.replaced).toEqual([date(1)]);
-		expect(r.skipped).toEqual([date(3)]);
+		expect(r.skipped).toEqual([]);
 		expect(times(r.drafts[2])).toEqual(['08:00-12:00 school', '13:00-17:00 work']);
 		expect(r.drafts[2].date).toBe(date(2));
 	});
@@ -310,11 +313,14 @@ describe('clipboard', () => {
 		expect(times(r.drafts[2])).toEqual(['09:00-12:00 home']);
 		expect(r.drafts[2].date).toBe(date(2));
 	});
-	it('skips blocked and out-of-week targets', () => {
+	it('pastes onto marked days and skips out-of-week targets', () => {
 		const clip = copyClip(s, [id(1, 0), id(3, 0)]);
-		const r = pasteClip(week(), multi({ 6: 'holiday' }), clip, date(5));
-		expect(r.touched).toEqual([date(5)]);
-		expect(r.skipped.length).toBe(1);
+		const r = pasteClip(week(), multi({ 6: 'holiday' }), clip, date(4));
+		expect(r.touched).toEqual([date(4), date(6)]);
+		expect(r.skipped.length).toBe(0);
+		const out = pasteClip(week(), multi(), clip, date(5));
+		expect(out.touched).toEqual([date(5)]);
+		expect(out.skipped.length).toBe(1);
 	});
 	it('an empty selection copies nothing', () => {
 		expect(copyClip(s, [id(0, 0)])).toEqual([]);

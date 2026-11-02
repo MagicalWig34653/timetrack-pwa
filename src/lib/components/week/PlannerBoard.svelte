@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { contextMenu, type MenuEntry } from '#lib/a11y/context-menu.svelte.js';
 	import { api } from '#lib/api/client.js';
-	import type { AbsenceStatus, LegalProfile, Place, PlanMode, PlanWeek, WorkModel } from '#lib/api/types.js';
+	import type { AbsenceStatus, LegalProfile, Place, PlanMode, PlanWeek, PlanWeekDay, WorkModel } from '#lib/api/types.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { t } from '#lib/i18n/index.js';
 	import { blockKindLabel, planModeLabel } from '#lib/planning/labels.js';
@@ -276,12 +276,21 @@
 	const issues = $derived(weekIssues(days, drafts, profileForDate, multi));
 	/** Non-binding planning hints per day (contract 0.35.0 `planHints`, mirrored live for the draft). */
 	const planHints = $derived(
-		drafts.flatMap((draft, index) => (days[index].blockedBy === null ? planHintsOfDay(draft).map((hint) => ({ date: draft.date, hint })) : []))
+		drafts.flatMap((draft) => planHintsOfDay(draft).map((hint) => ({ date: draft.date, hint })))
 	);
 	function hintText(item: { date: string; hint: string }): string {
 		const day = days.find((d) => d.date === item.date)!;
 		return t(`plan.hint.${item.hint}` as 'plan.hint.planned_break_short', { day: `${weekdayLabel(day.weekday)} ${formatDateNumeric(day.date).slice(0, 6)}` });
 	}
+	/** Marks (vacation/sick/excused/holiday) of days that carry a plan: the plan counts as planned extra time (ADR-0035). */
+	const offDayMarks = $derived.by(() => {
+		const marks: NonNullable<PlanWeekDay['blockedBy']>[] = [];
+		drafts.forEach((draft, i) => {
+			const mark = days[i]?.blockedBy;
+			if (mark && draft.mode !== '' && draft.mode !== 'off' && !marks.includes(mark)) marks.push(mark);
+		});
+		return marks;
+	});
 	const issueMap = $derived(issuesByDate(issues));
 	function issueText(issue: DayIssue): string {
 		const day = days.find((d) => d.date === issue.date)!;
@@ -297,7 +306,7 @@
 		clearTimeout(noticeTimer);
 		noticeTimer = setTimeout(() => (notice = ''), 6000);
 	}
-	const blockIds = $derived(drafts.flatMap((d, i) => (days[i].blockedBy === null ? blocksOf(d).map((b) => b.id) : [])));
+	const blockIds = $derived(drafts.flatMap((d) => blocksOf(d).map((b) => b.id)));
 	$effect(() => {
 		const keep = selected.filter((id) => blockIds.includes(id));
 		if (keep.length !== selected.length) selected = keep;
@@ -406,7 +415,7 @@
 		};
 	}
 	function openAdd(date?: string, minute?: number) {
-		const index = date ? days.findIndex((d) => d.date === date) : days.findIndex((d, i) => d.blockedBy === null && visible.includes(i));
+		const index = date ? days.findIndex((d) => d.date === date) : days.findIndex((d, i) => d.blockedBy === null && visible.includes(i)) >= 0 ? days.findIndex((d, i) => d.blockedBy === null && visible.includes(i)) : days.findIndex((d, i) => visible.includes(i));
 		const target = days[index >= 0 ? index : 0];
 		const draft = drafts.find((d) => d.date === target.date) ?? emptyDraft(target.date);
 		// a new block starts after the last block of the day (or at the suggested start) unless a minute was clicked
@@ -643,6 +652,12 @@
 			</ul>
 			<p class="mt-2 text-xs text-muted-foreground">{t('work_model.legal_disclaimer')}</p>
 		</section>
+	{/if}
+
+	{#if offDayMarks.length > 0}
+		<div class="flex flex-col gap-0.5 text-xs text-muted-foreground" data-testid="plan-offday-hint">
+			{#each offDayMarks as mark (mark)}<p data-mark={mark}>{t(`weekplan.offday_hint.${mark}`)}</p>{/each}
+		</div>
 	{/if}
 
 	{#if planHints.length > 0}

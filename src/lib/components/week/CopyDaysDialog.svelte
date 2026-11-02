@@ -20,7 +20,7 @@
 	let chosen = $state<string[]>([]);
 	const candidates = $derived(days.filter((d) => d.date !== sourceDate));
 	const toggle = (date: string, on: boolean) => (chosen = on ? [...chosen, date] : chosen.filter((d) => d !== date));
-	const workdays = () => (chosen = candidates.filter((d) => d.blockedBy === null && d.targetSeconds > 0).map((d) => d.date));
+	const workdays = () => (chosen = candidates.filter((d) => d.targetSeconds > 0).map((d) => d.date));
 </script>
 
 <FloatingPanel titleId="cd-title" {anchor} {returnFocus} {onclose} width={360} data-testid="copy-days-dialog">
@@ -40,7 +40,7 @@
 			{#each candidates as day (day.date)}
 				<li>
 					<label class="flex items-center gap-2 text-sm {day.blockedBy ? 'text-muted-foreground' : ''}">
-						<Checkbox checked={chosen.includes(day.date)} disabled={day.blockedBy !== null} onchange={(e) => toggle(day.date, e.currentTarget.checked)} data-testid="copy-day-{day.date}" />
+						<Checkbox checked={chosen.includes(day.date)} onchange={(e) => toggle(day.date, e.currentTarget.checked)} data-testid="copy-day-{day.date}" />
 						{weekdayLabel(day.weekday)} {formatDateNumeric(day.date).slice(0, 6)}{day.blockedBy ? ` (${t(`weekview.mark.${day.blockedBy}`)})` : ''}
 					</label>
 				</li>

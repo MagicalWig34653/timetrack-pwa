@@ -34,7 +34,8 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 				date: ev.date,
 				weekday: isoWeekday(ev.date),
 				targetSeconds: ev.targetSeconds,
-				plannedSeconds: blockedBy && plan ? 0 : (plan?.plannedSeconds ?? null),
+				// contract 0.42.0: a plan on a marked day counts with its duration (planned extra time)
+				plannedSeconds: plan?.plannedSeconds ?? null,
 				blockedBy,
 				plan
 			};
@@ -114,7 +115,6 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 			}
 			const plan = plans.get(ev.date) ?? null;
 			const half = ev.mark === 'vacation' && ev.targetOverrideSeconds != null;
-			const blocked = BLOCKING.includes(ev.mark ?? 'none') && !half;
 			const future = ev.date > today;
 			const mark = markOf(ev, school);
 			return {
@@ -129,12 +129,12 @@ export function createWeekMock(deps: { clock: () => number; time: Caller; planni
 				schoolLessonCount: ev.schoolLessonCount,
 				markSource: ev.markSource ?? 'none',
 				targetSeconds: ev.targetSeconds,
-				plannedSeconds: blocked ? (plan ? 0 : null) : (plan?.plannedSeconds ?? null),
+				plannedSeconds: plan?.plannedSeconds ?? null,
 				planMode: plan?.mode ?? null,
 				planBlocks: plan ? (plan.blocks ?? []) : null,
 				planHints: plan?.planHints ?? [],
-				// evaluated work + credit - effective planned seconds; null on future or blocked days and without a planned duration
-				planActualDifferenceSeconds: future || blocked || plan?.plannedSeconds == null ? null : ev.evaluatedWorkSeconds + ev.creditSeconds - plan.plannedSeconds,
+				// evaluated work + credit - effective planned seconds; null on future days and without a planned duration
+				planActualDifferenceSeconds: future || plan?.plannedSeconds == null ? null : ev.evaluatedWorkSeconds + ev.creditSeconds - plan.plannedSeconds,
 				workSeconds: ev.evaluatedWorkSeconds,
 				creditSeconds: ev.creditSeconds,
 				rawWorkSeconds: ev.rawWorkSeconds,
