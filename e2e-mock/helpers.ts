@@ -60,3 +60,33 @@ export function seededWorkDays(): string[] {
 	}
 	return days;
 }
+
+/**
+ * Pins the browser clock and the mock's clock to the same instant: 12:00 UTC (13:00 or 14:00 Berlin) of the current Berlin
+ * date, so "N minutes ago" stays on the same calendar day whatever time the suite really runs. The clock keeps ticking
+ * from there. Call it right after login, before the first `page.goto` of the test; `unpinClock` (or the next
+ * `/__test/reset`) restores the mock. Returns the pinned instant in epoch ms.
+ */
+export async function pinClock(page: Page): Promise<number> {
+	const berlinToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+	const instant = Date.parse(`${berlinToday}T12:00:00Z`);
+	await page.clock.install({ time: instant });
+	const response = await page.request.post('/__test/clock', { data: { now: new Date(instant).toISOString() } });
+	expect(response.status()).toBe(204);
+	pinned.set(page, { instant, started: Date.now() });
+	return instant;
+}
+
+const pinned = new WeakMap<Page, { instant: number; started: number }>();
+
+/** The pinned "now" of `pinClock` in epoch ms, the node-side stand-in for `Date.now()` (real time if not pinned). */
+export function pinnedNow(page: Page): number {
+	const pin = pinned.get(page);
+	return pin ? pin.instant + (Date.now() - pin.started) : Date.now();
+}
+
+/** Restores the mock's real-time clock after `pinClock`. */
+export async function unpinClock(page: Page): Promise<void> {
+	const response = await page.request.post('/__test/clock', { data: { now: null } });
+	expect(response.status()).toBe(204);
+}

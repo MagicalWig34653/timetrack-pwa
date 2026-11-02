@@ -2,6 +2,8 @@
 // mock API (MOCK=1). Used by the production-build and service-worker E2E specs. Node >= 22 runs the .ts mock natively.
 //   node scripts/serve-build.mjs [dir] [port]      env: MOCK=1, HOST=127.0.0.1
 // Test control (only with TEST_HOOKS=1): POST /__test/bump makes /service-worker.js differ byte-wise, i.e. a "new version".
+// POST /__test/clock {"now": "<ISO instant>"} moves the mock's clock to that instant (it keeps ticking); {"now": null}
+// restores real time, and /__test/reset does too. Pair it with Playwright's page.clock for the browser side.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,12 +32,14 @@ let handleNodeRequest;
 let api;
 let prefixes = [];
 let resetMock = () => {};
+let clockOffsetMs = 0;
 if (withMock) {
 	const { createMockApi } = await import('../mock/api.ts');
 	({ handleNodeRequest } = await import('../mock/node-handler.ts'));
 	({ MOCK_PREFIXES: prefixes } = await import('../mock/node-handler.ts'));
 	const { resolveBuildInfo } = await import('./build-info.ts');
 	const mockOptions = {
+		now: () => Date.now() + clockOffsetMs,
 		seedAttachments: true,
 		pwaBuild: resolveBuildInfo(),
 		modulesDisabled: (process.env.MOCK_MODULES_DISABLED ?? '').split(',').map((value) => value.trim()).filter(Boolean),
@@ -43,7 +47,7 @@ if (withMock) {
 	};
 	const freshMock = () => createMockApi(mockOptions);
 	api = freshMock();
-	resetMock = () => { api = freshMock(); };
+	resetMock = () => { clockOffsetMs = 0; api = freshMock(); };
 }
 
 http
@@ -56,6 +60,14 @@ http
 		}
 		if (hooks && withMock && url.pathname === '/__test/reset' && req.method === 'POST') {
 			resetMock();
+			res.statusCode = 204;
+			return res.end();
+		}
+		if (hooks && withMock && url.pathname === '/__test/clock' && req.method === 'POST') {
+			let raw = '';
+			for await (const chunk of req) raw += chunk;
+			const { now } = JSON.parse(raw || '{}');
+			clockOffsetMs = typeof now === 'string' ? Date.parse(now) - Date.now() : 0;
 			res.statusCode = 204;
 			return res.end();
 		}

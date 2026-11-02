@@ -1,6 +1,6 @@
-import { type Page } from '@playwright/test';
+import { type Browser, type Page } from '@playwright/test';
 import { expect, test } from './test';
-import { loginAsAdmin } from './helpers';
+import { loginAsAdmin, pinClock, pinnedNow, unpinClock } from './helpers';
 
 // "Fortführen" (package W2, backend contract 0.27.0) against the in-repo mock. Screenshots only with SCREENSHOT_DIR.
 const dir = process.env.SCREENSHOT_DIR;
@@ -8,8 +8,8 @@ test.describe.configure({ mode: 'serial' });
 
 // The mock state is shared by all specs of the run: leave today empty for the specs that follow.
 test.afterAll(async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser);
-	await clearToday(page);
+	const { page, context } = await start(browser);
+	await unpinClock(page);
 	await context.close();
 });
 
@@ -28,11 +28,20 @@ async function clearToday(page: Page) {
 	for (const s of list) await api(page, 'DELETE', `/time/segments/${s.id}?reason=Test`);
 }
 
-const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+// Every test pins browser and mock to midday (see `pinClock`): "90 minutes ago" would otherwise fall on the previous day
+// when the suite runs shortly after midnight. `pinnedNow` is the node-side stand-in for `Date.now()`.
+let currentPage: Page;
+const minutesAgo = (m: number) => new Date(pinnedNow(currentPage) - m * 60_000).toISOString();
+async function start(browser: Browser, options?: Parameters<typeof loginAsAdmin>[1]) {
+	const actor = await loginAsAdmin(browser, options);
+	currentPage = actor.page;
+	await pinClock(actor.page);
+	await clearToday(actor.page);
+	return actor;
+}
 
 test('short gap: one button, reopens the same segment, stopping works as usual', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser);
-	await clearToday(page);
+	const { page, context } = await start(browser);
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Start' }).click();
 	await expect(page.getByRole('button', { name: 'Stopp' })).toBeVisible();
@@ -52,8 +61,7 @@ test('short gap: one button, reopens the same segment, stopping works as usual',
 });
 
 test('long gap: two choices; "Fortführen" keeps the segment, "Neu starten" adds one', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 390, height: 900 } });
-	await clearToday(page);
+	const { page, context } = await start(browser, { viewport: { width: 390, height: 900 } });
 	const created = await api(page, 'POST', '/time/segments', { kind: 'work', startedAt: minutesAgo(90), endedAt: minutesAgo(40) });
 	expect(created.status()).toBe(201);
 	await page.goto('/');
@@ -76,8 +84,7 @@ test('long gap: two choices; "Fortführen" keeps the segment, "Neu starten" adds
 });
 
 test('long gap: "Fortführen (Lücke zählt mit)" reopens the old segment', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser);
-	await clearToday(page);
+	const { page, context } = await start(browser);
 	await api(page, 'POST', '/time/segments', { kind: 'work', startedAt: minutesAgo(90), endedAt: minutesAgo(40) });
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Fortführen (Lücke zählt mit)' }).click();
@@ -88,8 +95,7 @@ test('long gap: "Fortführen (Lücke zählt mit)" reopens the old segment', asyn
 });
 
 test('guards: a timer started elsewhere shows the message and the page recovers', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser);
-	await clearToday(page);
+	const { page, context } = await start(browser);
 	await api(page, 'POST', '/time/segments', { kind: 'work', startedAt: minutesAgo(30), endedAt: minutesAgo(10) });
 	await page.goto('/');
 	await expect(page.getByTestId('continue-reopen')).toBeVisible();
@@ -102,10 +108,9 @@ test('guards: a timer started elsewhere shows the message and the page recovers'
 });
 
 test('day detail: context menu entry Fortführen on the latest segment of today', async ({ browser }) => {
-	const { page, context } = await loginAsAdmin(browser);
-	await clearToday(page);
+	const { page, context } = await start(browser);
 	await api(page, 'POST', '/time/segments', { kind: 'work', startedAt: minutesAgo(30), endedAt: minutesAgo(10) });
-	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date(pinnedNow(page)));
 	await page.goto(`/time/${today}`);
 	// voided rows of earlier tests stay in the list; the new segment is the last active row
 	const row = page.getByTestId('segment-row').filter({ hasNotText: 'Storniert' }).last();
