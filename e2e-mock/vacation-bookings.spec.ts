@@ -97,7 +97,10 @@ test('timer start on today works on a vacation day and shows the hint', async ({
 test('past vacation day shows plan and actual difference alongside the booking and vacation mark', async ({ browser }) => {
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 1000 } });
 	const date = '2025-03-04';
+	const [model] = await api(page, 'GET', '/work-models');
 	try {
+		// The demo model starts only 60 days before today; absence effects require a workday in an effective model.
+		await api(page, 'PUT', `/work-models/${model.id}`, { ...model, validFrom: '2025-01-01' });
 		await api(page, 'POST', '/absences', { kind: 'vacation', startDate: date, endDate: date, status: 'approved' });
 		await api(page, 'PUT', `/plan/days/${date}`, { mode: 'office', blocks: [{ start: '08:00', end: '10:00', kind: 'office' }] });
 		await addManual(page, date, '08:00', '11:00');
@@ -109,11 +112,16 @@ test('past vacation day shows plan and actual difference alongside the booking a
 		await expect(card).toContainText('Büro');
 		const week = await api(page, 'GET', '/time/weeks/2025-W10');
 		const day = week.days.find((item: { date: string }) => item.date === date);
+		expect(day.mark).toBe('vacation');
 		expect(day.plannedSeconds).toBe(7200);
 		expect(day.planActualDifferenceSeconds).toBe(3600);
 		expect(day.targetSeconds).toBe(0);
 		expect(day.balanceSeconds).toBe(10800);
 	} finally {
-		await context.close();
+		try {
+			await api(page, 'PUT', `/work-models/${model.id}`, model);
+		} finally {
+			await context.close();
+		}
 	}
 });

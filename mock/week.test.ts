@@ -19,6 +19,20 @@ afterEach(() => vi.unstubAllGlobals());
 const code = (promise: Promise<unknown>) => promise.then(() => 'ok', (e: ApiError) => `${e.status}:${e.code}`);
 
 describe('mock GET /time/weeks/{isoWeek}', () => {
+	it('keeps vacation, work and plan difference together with a model covering the past fixture date', async () => {
+		const date = '2025-03-04';
+		const [model] = await api.listWorkModels();
+		await api.correctWorkModel(model.id, { ...model, validFrom: '2025-01-01' });
+		await api.createAbsence({ kind: 'vacation', startDate: date, endDate: date, status: 'approved' });
+		await api.putPlanDay(date, { mode: 'office', blocks: [{ start: '08:00', end: '10:00', kind: 'office' }] });
+		await api.createSegment({ kind: 'work', startedAt: `${date}T08:00:00Z`, endedAt: `${date}T11:00:00Z` });
+		const week = await api.getTimeWeek('2025-W10');
+		expect(week.days.find((day) => day.date === date)).toMatchObject({
+			mark: 'vacation', targetSeconds: 0, workSeconds: 10800, balanceSeconds: 10800,
+			plannedSeconds: 7200, planActualDifferenceSeconds: 3600, segmentsCount: 1
+		});
+	});
+
 	it('agrees with /time/days and /time/account for the running week', async () => {
 		const week = await api.getTimeWeek('2026-W42');
 		const days = await api.listDays('2026-10-12', '2026-10-18');
