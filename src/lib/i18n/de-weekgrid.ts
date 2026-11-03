@@ -71,7 +71,7 @@ export const deWeekGrid = {
 	'wg.follow_hint': 'Der angezeigte Plan dieser Woche wird Wochentag für Wochentag in die nächsten Wochen geschrieben.',
 	'wg.follow_weeks': 'Anzahl der Folgewochen (1 bis {max})',
 	'wg.follow_overwrite': 'Vorhandene Pläne in den Folgewochen ersetzen',
-	'wg.follow_note': 'Feiertage, Urlaub und Krankheit der Zielwochen bleiben unberührt. Das wird sofort gespeichert und lässt sich hier nicht rückgängig machen.',
+	'wg.follow_note': 'Feiertage, Urlaub, Krankheit und Freistellung der Zielwochen bleiben unberührt. Das wird sofort gespeichert und lässt sich hier nicht rückgängig machen.',
 	'wg.follow_submit': 'Kopieren',
 	'wg.follow_busy': 'Kopiert …',
 	'wg.follow_done': '{days} Tage in die Folgewochen geschrieben, {skipped} übersprungen.',

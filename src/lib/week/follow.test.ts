@@ -25,11 +25,23 @@ describe('followEntries', () => {
 		expect(r.entries[0]).toMatchObject({ date: date(0), blocks: [{ start: '08:00', end: '12:00', kind: 'school' }, { start: '13:00', end: '16:30', kind: 'work' }] });
 		expect(r.entries[0]).not.toHaveProperty('plannedStart');
 	});
-	it('also plans days with a holiday/vacation mark (ADR-0035)', () => {
-		const r = followEntries(source, target({ 1: { blockedBy: 'holiday' } }), true);
-		expect(r.entries.map((e) => e.date)).toEqual([date(0), date(1), date(2)]);
-		expect(r.skippedExisting).toBe(0);
-	});
+	for (const blockedBy of ['vacation', 'sick', 'excused', 'holiday'] as const) {
+		for (const overwrite of [false, true]) {
+			for (const multi of [false, true]) {
+				it(`preserves ${blockedBy} targets with and without a plan (overwrite=${overwrite}, multi=${multi})`, () => {
+					const week = target({
+						0: { blockedBy },
+						1: { blockedBy, plan: { date: date(1), mode: 'home', note: 'Keep this plan' } }
+					});
+					const before = structuredClone(week);
+					const r = followEntries(source, week, overwrite, multi);
+					expect(r.entries.map((e) => e.date)).toEqual([date(2)]);
+					expect(r.skippedExisting).toBe(0);
+					expect(week).toEqual(before);
+				});
+			}
+		}
+	}
 	it('keeps existing plans unless overwrite is set', () => {
 		const existing = { date: date(0), mode: 'home' as const };
 		const keep = followEntries(source, target({ 0: { plan: existing } }), false);
