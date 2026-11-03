@@ -3,7 +3,7 @@ import { expect, test } from './test';
 import { loginAsAdmin } from './helpers';
 
 // PLAN-OFFDAY (ADR-0035, contract 0.42.0): plan blocks on vacation, sick, excused and holiday days are allowed and count as
-// planned extra time. 2036-W20 = 12.-18.05.2036: Tuesday vacation, Wednesday sick, Thursday holiday, Friday half vacation.
+// planned extra time. 2036-W20 = 12.-18.05.2036: Tuesday vacation, Wednesday sick, Thursday holiday, Friday half vacation, Monday excused.
 test.describe.configure({ mode: 'serial' });
 
 const WEEK = '2036-W20';
@@ -46,12 +46,15 @@ test('grid: paint, move, copy and sum on vacation, sick, holiday and half-day co
 	await call(page, 'POST', '/absences', { kind: 'sick', startDate: day(2), endDate: day(2), status: 'recorded' });
 	await call(page, 'POST', '/calendar/custom-days', { kind: 'holiday', startDate: day(3), endDate: day(3), name: 'Brückentag' });
 	await call(page, 'POST', '/absences', { kind: 'vacation', startDate: day(4), endDate: day(4), status: 'approved', halfDayStart: true });
+	await call(page, 'POST', '/absences', { kind: 'excused', startDate: day(0), endDate: day(0), status: 'recorded' });
 	await page.goto(`/plan?week=${WEEK}&view=grid`);
 	await expect(page.getByTestId('week-grid')).toBeVisible();
 	await page.getByTestId('week-grid-scroll').evaluate((el) => (el.scrollTop = 0));
-	for (const n of [1, 2, 3]) {
+	for (const n of [0, 1, 2, 3]) {
 		await expect(page.getByTestId(`col-${day(n)}`)).toHaveAttribute('data-blocked', /.+/);
 		await expect(page.getByTestId(`add-${day(n)}`)).toBeEnabled();
+		await expect(page.getByTestId(`col-${day(n)}`)).toHaveCSS('cursor', 'crosshair');
+		await expect(page.getByTestId(`col-${day(n)}`)).not.toHaveCSS('background-image', /repeating-linear-gradient/);
 	}
 
 	// paint on the vacation, sick and holiday columns and on the half day
@@ -70,7 +73,7 @@ test('grid: paint, move, copy and sum on vacation, sick, holiday and half-day co
 	await expect(page.getByTestId('plan-offday-hint')).toContainText('Plan an einem Urlaubstag zählt als geplante Mehrzeit.');
 	await expect(page.getByTestId('plan-offday-hint')).toContainText('Plan an einem Krankheitstag zählt als geplante Mehrzeit.');
 
-	// move the vacation block onto Monday (ordinary day) and back to a holiday column
+	// move the vacation block onto Monday (excused day) and back to the vacation column
 	await drag(page, await point(page, day(1), 10 * 60), await point(page, day(0), 10 * 60));
 	await expect(page.getByTestId(`block-time-${day(0)}-0`)).toHaveText('08:00–12:00');
 	await expect(page.getByTestId(`block-${day(1)}-0`)).toHaveCount(0);
@@ -83,6 +86,11 @@ test('grid: paint, move, copy and sum on vacation, sick, holiday and half-day co
 	await expect(page.getByTestId(`block-time-${day(2)}-0`)).toHaveText('09:00–11:00');
 	await expect(page.getByTestId(`block-${day(3)}-1`)).toBeVisible();
 
+	// The excused day also accepts painting and keeps its mark.
+	await paint(page, day(0), 8 * 60, 9 * 60);
+	await expect(page.getByTestId(`block-time-${day(0)}-0`)).toHaveText('08:00–09:00');
+	await expect(page.getByTestId('plan-offday-hint')).toContainText('Plan an einem Freistellungstag zählt als geplante Mehrzeit.');
+
 	// save, reload: the blocks and the sums survive
 	await page.getByTestId('plan-save').click();
 	await expect(page.getByTestId('plan-dirty')).toHaveAttribute('data-dirty', 'false');
@@ -91,7 +99,7 @@ test('grid: paint, move, copy and sum on vacation, sick, holiday and half-day co
 	await expect(page.getByTestId(`block-time-${day(1)}-0`)).toHaveText('09:00–13:00');
 	await expect(page.getByTestId(`day-plan-${day(1)}`)).toHaveText('4:00');
 	await expect(page.getByTestId(`block-time-${day(4)}-0`)).toHaveText('08:00–12:00');
-	await expect(page.getByTestId('plan-total-text')).toContainText('Plan 14:00');
+	await expect(page.getByTestId('plan-total-text')).toContainText('Plan 15:00');
 	await context.close();
 });
 

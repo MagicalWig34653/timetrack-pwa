@@ -6,8 +6,8 @@ import { clampGroupDelta, LAST_MINUTE, type MinuteRange } from './grid.js';
  * Pure edit operations of the week grid on the draft list (index = weekday, Monday first). Since contract 0.35.0 a day
  * holds several blocks (P13, ADR-0031); a block is addressed by `date#index` into the day's block list. On an older server
  * (`multi` false) a day holds one block, so every placement replaces the day's plan, like before P13. Painting over
- * existing blocks carves them (the new block wins, the rest is trimmed or split). Blocked days (holiday, vacation, sick,
- * excused) take no plan; operations skip them and report it. Nothing here mutates.
+ * existing blocks carves them (the new block wins, the rest is trimmed or split). Day marks (holiday, vacation, sick,
+ * excused) are informational and do not restrict editing. Nothing here mutates.
  */
 export type BrushKind = BlockKind | 'off';
 
@@ -36,7 +36,7 @@ export interface EditResult {
 	drafts: DayDraft[];
 	/** Dates that changed. */
 	touched: string[];
-	/** Dates that could not take the change (blocked, outside the week, too many blocks). */
+	/** Dates that could not take the change (outside the week or too many blocks). */
 	skipped: string[];
 	/** Dates where existing plan content was overwritten or trimmed. */
 	replaced: string[];
@@ -97,7 +97,7 @@ export const defaultBreak = (range: MinuteRange): number => (range.end - range.s
 
 const indexOf = (drafts: DayDraft[], date: string) => drafts.findIndex((d) => d.date === date);
 // Only days outside the week reject a change; a vacation/sick/excused/holiday mark does not (ADR-0035).
-const isBlockedAt = (days: PlanWeekDay[], index: number) => index < 0 || index >= days.length;
+const isOutsideWeek = (days: PlanWeekDay[], index: number) => index < 0 || index >= days.length;
 const unchanged = (drafts: DayDraft[]): EditResult => ({ drafts, touched: [], skipped: [], replaced: [], selection: [] });
 export const hasPlan = (draft: DayDraft) => draft.mode !== '';
 
@@ -141,13 +141,13 @@ function place(ctx: EditCtx, target: DayDraft, block: DraftBlock, source?: Pick<
 	return { draft: { ...target, mode, blocks, breakMinutes: 0 }, replaced, ok: true };
 }
 
-/** Paints one block per date (the same time range); an `off` brush marks the days as free instead. Skips blocked days. */
+/** Paints one block per date (the same time range); an `off` brush marks the days as free instead. */
 export function paintDays(drafts: DayDraft[], ctx: EditCtx, dates: string[], range: MinuteRange, brush: Brush): EditResult {
 	const next = drafts.slice();
 	const result = unchanged(next);
 	for (const date of dates) {
 		const index = indexOf(drafts, date);
-		if (isBlockedAt(ctx.days, index)) {
+		if (isOutsideWeek(ctx.days, index)) {
 			result.skipped.push(date);
 			continue;
 		}
@@ -177,7 +177,7 @@ export function paintDays(drafts: DayDraft[], ctx: EditCtx, dates: string[], ran
 	return result;
 }
 
-/** Removes blocks; a day without blocks afterwards has no plan any more. Blocked days are skipped. */
+/** Removes blocks; a day without blocks afterwards has no plan any more. */
 export function eraseBlocks(drafts: DayDraft[], ctx: EditCtx, ids: BlockId[]): EditResult {
 	const next = drafts.slice();
 	const result = unchanged(next);
@@ -189,7 +189,7 @@ export function eraseBlocks(drafts: DayDraft[], ctx: EditCtx, ids: BlockId[]): E
 	for (const [date, indexes] of byDate) {
 		const index = indexOf(drafts, date);
 		if (index < 0) continue;
-				if (isBlockedAt(ctx.days, index)) {
+		if (isOutsideWeek(ctx.days, index)) {
 			result.skipped.push(date);
 			continue;
 		}
@@ -209,7 +209,7 @@ export function eraseDays(drafts: DayDraft[], ctx: EditCtx, dates: string[]): Ed
 	for (const date of dates) {
 		const index = indexOf(drafts, date);
 		if (index < 0) continue;
-		if (isBlockedAt(ctx.days, index)) {
+		if (isOutsideWeek(ctx.days, index)) {
 			result.skipped.push(date);
 			continue;
 		}
@@ -223,7 +223,7 @@ export function eraseDays(drafts: DayDraft[], ctx: EditCtx, dates: string[]): Ed
 /** Replaces the plan of one day with the given draft (list edit, paste of a whole day). */
 export function putDraft(drafts: DayDraft[], ctx: EditCtx, draft: DayDraft): EditResult {
 	const index = indexOf(drafts, draft.date);
-	if (isBlockedAt(ctx.days, index)) return { ...unchanged(drafts), skipped: [draft.date] };
+	if (isOutsideWeek(ctx.days, index)) return { ...unchanged(drafts), skipped: [draft.date] };
 	const next = drafts.slice();
 	next[index] = { ...draft, blocks: sorted(draft.blocks) };
 	return { drafts: next, touched: [draft.date], skipped: [], replaced: [], selection: [] };
@@ -235,7 +235,7 @@ export function putDraft(drafts: DayDraft[], ctx: EditCtx, draft: DayDraft): Edi
  */
 export function replaceBlock(drafts: DayDraft[], ctx: EditCtx, from: BlockId | null, date: string, block: DraftBlock, options: { mode?: PlanMode; breakMinutes?: number; dayNote?: string } = {}): EditResult {
 	const targetIndex = indexOf(drafts, date);
-	if (isBlockedAt(ctx.days, targetIndex)) return { ...unchanged(drafts), skipped: [date] };
+	if (isOutsideWeek(ctx.days, targetIndex)) return { ...unchanged(drafts), skipped: [date] };
 	let working = drafts.slice();
 	const touched: string[] = [];
 	if (from) {
@@ -273,7 +273,7 @@ export function resizeBlock(drafts: DayDraft[], id: BlockId, range: MinuteRange)
 }
 
 /**
- * Moves (or copies) blocks by whole days and minutes. All-or-nothing: when one target day is blocked or outside the
+ * Moves (or copies) blocks by whole days and minutes. All-or-nothing: when one target day is outside the
  * week, nothing changes. Blocks that are not moved but overlap the new place are trimmed.
  */
 export function moveBlocks(drafts: DayDraft[], ctx: EditCtx, ids: BlockId[], deltaDays: number, deltaMinutes: number, copy: boolean): EditResult & { ok: boolean } {
@@ -286,7 +286,7 @@ export function moveBlocks(drafts: DayDraft[], ctx: EditCtx, ids: BlockId[], del
 		if (entry) moving.push({ id, date, dayIndex, index, range: entry.range, block: entry.block });
 	}
 	if (moving.length === 0) return { ...unchanged(drafts), ok: true };
-	const skipped = [...new Set(moving.filter((m) => isBlockedAt(ctx.days, m.dayIndex + deltaDays)).map((m) => m.date))];
+	const skipped = [...new Set(moving.filter((m) => isOutsideWeek(ctx.days, m.dayIndex + deltaDays)).map((m) => m.date))];
 	if (skipped.length > 0) return { ...unchanged(drafts), skipped, ok: false };
 	const shift = clampGroupDelta(moving.map((m) => m.range), deltaMinutes);
 
@@ -325,7 +325,7 @@ export function setModeOn(drafts: DayDraft[], ctx: EditCtx, dates: string[], mod
 	const result = unchanged(next);
 	for (const date of dates) {
 		const index = indexOf(drafts, date);
-		if (isBlockedAt(ctx.days, index)) {
+		if (isOutsideWeek(ctx.days, index)) {
 			result.skipped.push(date);
 			continue;
 		}
@@ -348,7 +348,7 @@ export function setKindOn(drafts: DayDraft[], ctx: EditCtx, ids: BlockId[], kind
 	for (const id of ids) {
 		const { date, index } = parseBlockId(id);
 		const dayIndex = indexOf(next, date);
-		if (isBlockedAt(ctx.days, dayIndex)) {
+		if (isOutsideWeek(ctx.days, dayIndex)) {
 			result.skipped.push(date);
 			continue;
 		}
@@ -385,7 +385,7 @@ export function splitBlock(drafts: DayDraft[], ctx: EditCtx, id: BlockId, at: nu
 	if (!ctx.multi) return unchanged(drafts);
 	const { date, index } = parseBlockId(id);
 	const dayIndex = indexOf(drafts, date);
-	if (isBlockedAt(ctx.days, dayIndex)) return { ...unchanged(drafts), skipped: [date] };
+	if (isOutsideWeek(ctx.days, dayIndex)) return { ...unchanged(drafts), skipped: [date] };
 	const entry = blocksOf(drafts[dayIndex]).find((b) => b.index === index);
 	if (!entry) return unchanged(drafts);
 	const { start, end } = entry.range;
@@ -430,7 +430,7 @@ export function mergeWithNext(drafts: DayDraft[], ctx: EditCtx, id: BlockId): Ed
 	if (!ctx.multi) return unchanged(drafts);
 	const { date } = parseBlockId(id);
 	const dayIndex = indexOf(drafts, date);
-	if (isBlockedAt(ctx.days, dayIndex)) return { ...unchanged(drafts), skipped: [date] };
+	if (isOutsideWeek(ctx.days, dayIndex)) return { ...unchanged(drafts), skipped: [date] };
 	const pair = mergeable(drafts, id);
 	if (!pair) return unchanged(drafts);
 	const { current, following } = pair;
@@ -441,7 +441,7 @@ export function mergeWithNext(drafts: DayDraft[], ctx: EditCtx, id: BlockId): Ed
 	return { drafts: next, touched: [date], skipped: [], replaced: [], selection: [findId(next[dayIndex], joined)].filter((x): x is BlockId => x !== null) };
 }
 
-/** Copies the whole plan of one day (all blocks, break, notes) to the given days; blocked days are skipped. */
+/** Copies the whole plan of one day (all blocks, break, notes) to the given days; days outside the week are skipped. */
 export function copyToDates(drafts: DayDraft[], ctx: EditCtx, fromDate: string, targets: string[]): EditResult {
 	const source = drafts[indexOf(drafts, fromDate)];
 	const next = drafts.slice();
@@ -450,7 +450,7 @@ export function copyToDates(drafts: DayDraft[], ctx: EditCtx, fromDate: string, 
 	for (const date of targets) {
 		if (date === fromDate) continue;
 		const index = indexOf(drafts, date);
-		if (isBlockedAt(ctx.days, index)) {
+		if (isOutsideWeek(ctx.days, index)) {
 			result.skipped.push(date);
 			continue;
 		}
@@ -481,7 +481,7 @@ export function copyClip(drafts: DayDraft[], ids: BlockId[]): Clip {
 	}));
 }
 
-/** Pastes a clip so that its first day lands on `targetDate`; days outside the week or blocked are skipped. */
+/** Pastes a clip so that its first day lands on `targetDate`; days outside the week are skipped. */
 export function pasteClip(drafts: DayDraft[], ctx: EditCtx, clip: Clip, targetDate: string): EditResult {
 	const base = indexOf(drafts, targetDate);
 	const next = drafts.slice();
@@ -489,7 +489,7 @@ export function pasteClip(drafts: DayDraft[], ctx: EditCtx, clip: Clip, targetDa
 	if (base < 0) return result;
 	for (const item of clip) {
 		const index = base + item.offset;
-		if (isBlockedAt(ctx.days, index)) {
+		if (isOutsideWeek(ctx.days, index)) {
 			result.skipped.push(drafts[index]?.date ?? targetDate);
 			continue;
 		}

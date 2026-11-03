@@ -326,3 +326,30 @@ describe('clipboard', () => {
 		expect(copyClip(s, [id(0, 0)])).toEqual([]);
 	});
 });
+
+// Day marks must never become edit locks again, including on older server contracts.
+describe.each(['vacation', 'sick', 'excused', 'holiday'] as const)('editing a %s day', (mark) => {
+	it.each([true, false])('supports the full edit lifecycle (multi=%s)', (multi) => {
+		const ctx = { days: week7({ 1: mark }), multi };
+		ctx.days[1].targetSeconds = 0;
+		const original = week();
+		const painted = paintDays(original, ctx, [date(1)], range(480, 600), brush);
+		expect(painted.skipped).toEqual([]);
+		expect(times(painted.drafts[1])).toEqual(['08:00-10:00 home']);
+		const edited = replaceBlock(painted.drafts, ctx, id(1), date(1), blk('09:00', '11:00', 'home'));
+		expect(edited.skipped).toEqual([]);
+		const resized = resizeBlock(edited.drafts, id(1), range(540, 720));
+		expect(times(resized.drafts[1])).toEqual(['09:00-12:00 home']);
+		const copied = copyToDates(resized.drafts, ctx, date(1), [date(0)]);
+		const moved = moveBlocks(copied.drafts, ctx, [id(0)], 1, 60, false);
+		expect(moved.ok).toBe(true);
+		expect(times(moved.drafts[1])).toContain('10:00-13:00 home');
+		const pasted = pasteClip(week(), ctx, copyClip(resized.drafts, [id(1)]), date(1));
+		expect(pasted.skipped).toEqual([]);
+		expect(times(pasted.drafts[1])).toEqual(['09:00-12:00 home']);
+		expect(eraseBlocks(pasted.drafts, ctx, [id(1)]).drafts[1]).toEqual(emptyDraft(date(1)));
+		expect(eraseDays(moved.drafts, ctx, [date(1)]).drafts[1]).toEqual(emptyDraft(date(1)));
+		expect(ctx.days[1].blockedBy).toBe(mark);
+		expect(original).toEqual(week());
+	});
+});

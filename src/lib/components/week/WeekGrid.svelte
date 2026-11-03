@@ -1030,16 +1030,7 @@
 	.wg-col[data-off] {
 		background-color: color-mix(in srgb, var(--muted) 55%, transparent);
 	}
-	.wg-col[data-blocked] {
-		background-color: color-mix(in srgb, var(--muted) 40%, transparent);
-		background-image:
-			repeating-linear-gradient(135deg, color-mix(in srgb, var(--foreground) 6%, transparent) 0 6px, transparent 6px 14px),
-			linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
-		background-size:
-			auto,
-			100% var(--hh);
-	}
-	/* planned or requested vacation that does not block the day yet: lighter dashed hatching, still editable */
+	/* Planned or requested vacation: lighter dashed hatching, still editable */
 	.wg-col[data-vacation] {
 		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, #0ea5e9 14%, transparent) 0 6px, transparent 6px 14px);
 		box-shadow: inset 0 0 0 1px color-mix(in srgb, #0ea5e9 35%, transparent);

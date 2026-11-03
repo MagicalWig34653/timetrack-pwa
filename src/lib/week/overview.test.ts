@@ -59,3 +59,18 @@ describe('summary sentence', () => {
 		expect(noteworthyDays(summary({ vacationDays: 2.5, sickDays: 1, schoolDays: 2, holidayDays: 0 }))).toEqual(['2,5 Urlaubstage', '1 Krankheitstag', '2 Schultage']);
 	});
 });
+
+
+describe.each(['vacation', 'sick', 'excused', 'holiday'] as const)('plan and actual on a %s day', (mark) => {
+	it('keeps the plan details and server difference accessible next to the actual time', () => {
+		const value = day({ mark, targetSeconds: 0, plannedSeconds: 7200, planMode: 'office', workSeconds: 10800,
+			balanceSeconds: 10800, planActualDifferenceSeconds: 3600,
+			planBlocks: [{ start: '08:00', end: '09:00', kind: 'office' }, { start: '09:00', end: '10:00', kind: 'school' }] });
+		const label = dayAriaLabel(value);
+		expect(label).toContain('3:00 Stunden');
+		expect(label).toContain('Büro');
+		expect(label).toContain('08:00');
+		expect(label).toContain('plus 1:00');
+		expect(barShares(value)).toEqual({ actual: 100, planned: 66.7, target: 0 });
+	});
+});

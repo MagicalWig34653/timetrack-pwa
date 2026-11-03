@@ -36,7 +36,7 @@
 	const hideMark = $derived((day.mark === 'vacation' && (vacation?.length ?? 0) > 0) || (day.mark === 'holiday' && holidayChip));
 	const halfDay = $derived(day.mark === 'vacation' && day.absences.some((a) => a.kind === 'vacation' && a.halfDay));
 	const showHours = $derived(hours > 0 || day.isToday || (!day.isFuture && day.mark === 'work' && day.targetSeconds > 0));
-	const showMode = $derived(!!day.planMode && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark));
+	const showMode = $derived(!!day.planMode);
 	/** The plan blocks of a day, only when the plan has more than the one window the card already summarizes. */
 	const planBlocks = $derived(listsBlocks(day.planBlocks) ? [...(day.planBlocks ?? [])].sort((a, b) => a.start.localeCompare(b.start)) : []);
 	const dim = $derived(day.mark === 'off' && hours === 0 && day.plannedSeconds === null);

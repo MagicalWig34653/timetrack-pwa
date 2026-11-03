@@ -63,8 +63,8 @@ export function dayAriaLabel(day: TimeWeekDay, vacation: VacationEntry[] | null 
 			parts.push(t('weekview.aria_balance', { balance: sign + formatDuration(Math.abs(day.balanceSeconds)) }));
 		}
 	}
-	if (day.planMode && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark)) parts.push(planModeShort(day.planMode));
-	if (listsBlocks(day.planBlocks) && !['vacation', 'sick', 'holiday', 'excused'].includes(day.mark)) parts.push(blocksText(day.planBlocks ?? []));
+	if (day.planMode) parts.push(planModeShort(day.planMode));
+	if (listsBlocks(day.planBlocks)) parts.push(blocksText(day.planBlocks ?? []));
 	if (day.planActualDifferenceSeconds !== null && day.planActualDifferenceSeconds !== undefined) {
 		const sign = day.planActualDifferenceSeconds > 0 ? 'plus ' : day.planActualDifferenceSeconds < 0 ? 'minus ' : '';
 		parts.push(t('weekview.aria_plan_diff', { delta: day.planActualDifferenceSeconds === 0 ? 'genau im Plan' : sign + formatDuration(Math.abs(day.planActualDifferenceSeconds)) }));
