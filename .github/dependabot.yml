@@ -4,10 +4,12 @@ updates:
     directory: /
     schedule: { interval: weekly }
     groups:
-      actions: { patterns: ["*"] }
+      actions:
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
     groups:
       minor-and-patch:
+        patterns: ["*"]
         update-types: [minor, patch]
