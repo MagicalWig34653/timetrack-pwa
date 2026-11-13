@@ -601,13 +601,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ========================================================================
 Package: tailwind-variants
-Version: 3.3.1
+Version: 4.0.1
 SPDX: MIT
 License file: LICENSE
 
 MIT License
 
-Copyright (c) 2020 Tailwid Variants
+Copyright (c) 2020 Tailwind Variants
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
