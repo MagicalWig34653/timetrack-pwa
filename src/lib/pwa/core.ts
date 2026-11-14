@@ -136,3 +136,30 @@ export function isUsableAssetResponse(pathname: string, ok: boolean, contentType
 	if (isDocumentPath(pathname)) return true;
 	return !/text\/html/i.test(contentType ?? '');
 }
+
+/**
+ * Attempts per hashed asset (PWA-UPDATE-MIX). Behind a load balancer an old and a new replica can answer side by side;
+ * the one without this build's files answers 404 (or, for very old backends, the SPA shell). Hashed file names are
+ * content addressed, so any replica that has the file returns the right bytes: asking again is safe and usually hits
+ * the other replica.
+ */
+export const ASSET_ATTEMPTS = 10;
+
+/**
+ * Loads an asset and repeats the request while the answer is unusable (error status or HTML for a non-document path),
+ * at most ASSET_ATTEMPTS times with short pauses. Network errors (offline) are not retried. Returns the last answer.
+ */
+export async function fetchUsableAsset(
+	pathname: string,
+	load: () => Promise<Response>,
+	wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+): Promise<Response> {
+	let response = await load();
+	for (let attempt = 1; attempt < ASSET_ATTEMPTS && !isUsableAssetResponse(pathname, response.ok, response.headers.get('content-type')); attempt++) {
+		// release the discarded answer: an unread body keeps its connection busy (HTTP/1.1 allows only six per host)
+		await response.body?.cancel().catch(() => {});
+		await wait(Math.min(20 * attempt, 100));
+		response = await load();
+	}
+	return response;
+}

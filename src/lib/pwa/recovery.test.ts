@@ -106,4 +106,17 @@ describe('recovery bootstrap: event handling', () => {
 		expect(unregister).toHaveBeenCalledTimes(2);
 		expect(document.getElementById('tt-recovery-fallback')).toBeNull();
 	});
+
+	it('registers a fresh service worker before reloading, so the reload is served through it (retries on mixed replicas)', async () => {
+		const register = vi.fn().mockResolvedValue({});
+		Object.defineProperty(navigator, 'serviceWorker', {
+			configurable: true,
+			value: { getRegistrations: () => Promise.resolve([]), register, controller: {}, addEventListener: vi.fn(), removeEventListener: vi.fn() }
+		});
+		Object.defineProperty(window, 'caches', { configurable: true, value: { keys: () => Promise.resolve([]), delete: vi.fn() } });
+		load();
+		window.dispatchEvent(rejection('Failed to fetch dynamically imported module: /_app/immutable/nodes/1.js'));
+		await vi.waitFor(() => expect(register).toHaveBeenCalledWith('/service-worker.js'));
+		expect(document.getElementById('tt-recovery-fallback')).toBeNull();
+	});
 });

@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+	ASSET_ATTEMPTS,
 	base64urlToBytes,
+	fetchUsableAsset,
 	bytesToBase64url,
 	cacheNameFor,
 	isBypassPath,
@@ -146,5 +148,50 @@ describe('environment helpers', () => {
 		expect(isIosDevice('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5)).toBe(true);
 		expect(isIosDevice('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 0)).toBe(false);
 		expect(isIosDevice('Mozilla/5.0 (Linux; Android 14)', 5)).toBe(false);
+	});
+});
+
+describe('fetchUsableAsset (mixed replicas, PWA-UPDATE-MIX)', () => {
+	const js = (status = 200) => new Response('x', { status, headers: { 'content-type': 'text/javascript' } });
+	const html = () => new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } });
+	const noWait = async () => {};
+
+	it('retries a 404 or an HTML answer for a hashed asset until a replica has the file', async () => {
+		const answers = [js(404), html(), js(502), js()];
+		let calls = 0;
+		const response = await fetchUsableAsset('/_app/immutable/entry/app.1.js', async () => answers[calls++], noWait);
+		expect(response.status).toBe(200);
+		expect(calls).toBe(4);
+	});
+
+	it('releases the body of a discarded answer', async () => {
+		const first = js(404);
+		const cancel = vi.spyOn(first.body!, 'cancel');
+		const answers = [first, js()];
+		let calls = 0;
+		await fetchUsableAsset('/_app/immutable/chunks/a.js', async () => answers[calls++], noWait);
+		expect(cancel).toHaveBeenCalled();
+	});
+
+	it('does not retry a usable answer', async () => {
+		let calls = 0;
+		await fetchUsableAsset('/_app/immutable/chunks/a.js', async () => (calls++, js()), noWait);
+		expect(calls).toBe(1);
+	});
+
+	it('gives up after ASSET_ATTEMPTS and returns the last answer', async () => {
+		let calls = 0;
+		const waits: number[] = [];
+		const response = await fetchUsableAsset('/_app/immutable/chunks/a.js', async () => (calls++, js(404)), async (ms) => void waits.push(ms));
+		expect(response.status).toBe(404);
+		expect(calls).toBe(ASSET_ATTEMPTS);
+		expect(waits).toHaveLength(ASSET_ATTEMPTS - 1);
+		expect(Math.max(...waits)).toBeLessThanOrEqual(100);
+	});
+
+	it('does not retry network errors (offline)', async () => {
+		let calls = 0;
+		await expect(fetchUsableAsset('/_app/immutable/chunks/a.js', async () => { calls++; throw new TypeError('Failed to fetch'); }, noWait)).rejects.toThrow('Failed to fetch');
+		expect(calls).toBe(1);
 	});
 });

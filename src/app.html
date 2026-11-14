@@ -22,7 +22,7 @@
 		<script id="tt-recovery">
 			// Self-healing bootstrap (W2). A document and the assets it references can come from different builds (rolling update,
 			// stale service worker or browser cache); the server then answers a missing hashed asset and the app never starts.
-			// Recover once per 5 minutes (unregister service workers, drop caches, reload); if that fails again show a static
+			// Recover once per 5 minutes (unregister service workers, drop caches, register a fresh worker, reload); if that fails again show a static
 			// message instead of a white page. The same code is unit-tested by src/lib/pwa/recovery.test.ts.
 			(function () {
 				var KEY = "tt.recovery";
@@ -75,6 +75,25 @@
 					} catch (e) {}
 					return withTimeout(Promise.all(jobs.map(function (j) { return j.catch(function () {}); })), 3000);
 				}
+				// A fresh worker (PWA-UPDATE-MIX) serves the reload and asks again for hashed files a replica of another version
+				// does not have. Waits until it controls this page (clients.claim on activate), at most 10 s, then reloads anyway.
+				function reinstall() {
+					try {
+						var sw = navigator.serviceWorker;
+						if (!sw || !sw.register) return Promise.resolve();
+						return withTimeout(sw.register("/service-worker.js").then(function (reg) {
+							if (sw.controller) return;
+							return new Promise(function (resolve) {
+								sw.addEventListener("controllerchange", resolve);
+								// a failed install (no usable files even after retries) ends the wait at once
+								var worker = reg && reg.installing;
+								if (worker) worker.addEventListener("statechange", function () { if (worker.state === "redundant") resolve(); });
+							});
+						}).catch(function () {}), 10000);
+					} catch (e) {
+						return Promise.resolve();
+					}
+				}
 				function showFallback() {
 					if (document.getElementById("tt-recovery-fallback")) return;
 					var box = document.createElement("div");
@@ -103,7 +122,8 @@
 					// Without any storage a reload loop could not be bounded, so go straight to the message.
 					if (!s || decide(Date.now(), last) === "fallback") return showFallback();
 					try { s.setItem(KEY, String(Date.now())); } catch (e) { return showFallback(); }
-					clean().then(function () { location.reload(); }, function () { location.reload(); });
+					function reload() { location.reload(); }
+					clean().then(reinstall, function () {}).then(reload, reload);
 				}
 				window.addEventListener("unhandledrejection", function (e) {
 					var r = e && e.reason;

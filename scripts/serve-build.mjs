@@ -2,6 +2,7 @@
 // mock API (MOCK=1). Used by the production-build and service-worker E2E specs. Node >= 22 runs the .ts mock natively.
 //   node scripts/serve-build.mjs [dir] [port]      env: MOCK=1, HOST=127.0.0.1
 // Test control (only with TEST_HOOKS=1): POST /__test/bump makes /service-worker.js differ byte-wise, i.e. a "new version".
+// POST /__test/flaky {"every": n} answers every n-th /_app/immutable/ request with 404 (mixed replicas; 0 = off).
 // POST /__test/clock {"now": "<ISO instant>"} moves the mock's clock to that instant (it keeps ticking); {"now": null}
 // restores real time, and /__test/reset does too. Pair it with Playwright's page.clock for the browser side.
 import http from 'node:http';
@@ -27,6 +28,8 @@ const types = {
 };
 const passthrough = ['/api', '/health', '/ready', '/.well-known', '/oauth/authorize', '/mcp'];
 let bump = 0;
+let flakyEvery = 0;
+let flakyCount = 0;
 
 let handleNodeRequest;
 let api;
@@ -58,7 +61,17 @@ http
 			res.statusCode = 204;
 			return res.end();
 		}
+		if (hooks && url.pathname === '/__test/flaky' && req.method === 'POST') {
+			let raw = '';
+			for await (const chunk of req) raw += chunk;
+			const { every } = JSON.parse(raw || '{}');
+			flakyEvery = Number.isInteger(every) && every > 1 ? every : 0;
+			flakyCount = 0;
+			res.statusCode = 204;
+			return res.end();
+		}
 		if (hooks && withMock && url.pathname === '/__test/reset' && req.method === 'POST') {
+			flakyEvery = 0;
 			resetMock();
 			res.statusCode = 204;
 			return res.end();
@@ -82,6 +95,13 @@ http
 		if (req.method !== 'GET' || passthrough.some((p) => url.pathname === p || url.pathname.startsWith(p + '/'))) {
 			res.statusCode = 404;
 			return res.end();
+		}
+		// Mixed versions behind a load balancer: one replica does not have this build's hashed files and answers 404.
+		if (flakyEvery && url.pathname.startsWith('/_app/immutable/') && ++flakyCount % flakyEvery === 0) {
+			res.statusCode = 404;
+			res.setHeader('Cache-Control', 'no-store');
+			res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+			return res.end('Not found\n');
 		}
 		let file = path.join(root, decodeURIComponent(url.pathname));
 		if (!file.startsWith(root + path.sep) && file !== root) {

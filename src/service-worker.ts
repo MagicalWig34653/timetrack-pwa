@@ -4,7 +4,7 @@
 /// <reference lib="webworker" />
 import { version } from '$app/env';
 import { assets, immutable } from '$app/manifest';
-import { base64urlToBytes, cacheNameFor, isGroupPagePath, isInterceptable, isOldCache, isUsableAssetResponse, offlineUrlFor, parsePushPayload, safeRelativeUrl } from './lib/pwa/core';
+import { base64urlToBytes, cacheNameFor, fetchUsableAsset, isGroupPagePath, isInterceptable, isOldCache, isUsableAssetResponse, offlineUrlFor, parsePushPayload, safeRelativeUrl } from './lib/pwa/core';
 import { handleSubscriptionChange, type SubscriptionLike } from './lib/pwa/subscription-change';
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
@@ -31,7 +31,8 @@ sw.addEventListener('install', (event) => {
 			// Any unusable response fails the install, so the previous worker and its caches stay in charge.
 			await Promise.all(
 				PRECACHE.map(async (path) => {
-					const response = await fetch(new Request(sw.location.origin + path, { cache: 'reload' }));
+					// a replica of another version may answer 404 for this build's files: ask again (fetchUsableAsset)
+					const response = await fetchUsableAsset(path, () => fetch(new Request(sw.location.origin + path, { cache: 'reload' })));
 					if (!isUsableAssetResponse(path, response.ok, response.headers.get('content-type'))) throw new Error(`precache: unusable response for ${path}`);
 					await cache.put(path, response);
 				})
@@ -91,7 +92,7 @@ async function cacheFirst(request: Request): Promise<Response> {
 	const hit = await cache.match(request, { ignoreSearch: PRECACHED.has(pathname) });
 	if (hit && isUsableAssetResponse(pathname, hit.ok, hit.headers.get('content-type'))) return hit;
 	if (hit) await cache.delete(request);
-	const response = await fetch(request);
+	const response = await fetchUsableAsset(pathname, () => fetch(request));
 	if (isUsableAssetResponse(pathname, response.ok, response.headers.get('content-type'))) {
 		if (response.type === 'basic') void cache.put(request, response.clone());
 		return response;

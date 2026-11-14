@@ -13,7 +13,9 @@ test('recovers once from an HTML answer for the entry script (stale document, ot
 	await page.route(entryScript, (route) => (served++ === 0 ? route.fulfill(htmlAnswer) : route.continue()));
 	await page.goto('/login');
 	await expect(page.getByRole('button', { name: 'Mit Passkey anmelden' })).toBeVisible({ timeout: 15_000 });
-	expect(served).toBeGreaterThanOrEqual(2);
+	// the recovery registers a fresh service worker; the reload is served through it (page.route no longer sees it)
+	expect(served).toBeGreaterThanOrEqual(1);
+	expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
 	expect(await page.locator('#tt-recovery-fallback').count()).toBe(0);
 	await context.close();
 });
@@ -22,8 +24,9 @@ test('shows the German fallback instead of a white page when the failure persist
 	const context = await browser.newContext();
 	const page = await context.newPage();
 	let served = 0;
-	await page.route(entryScript, (route) => {
-		served++;
+	// context.route also answers the service worker's requests (its precache and its retries)
+	await context.route(entryScript, (route) => {
+		if (!route.request().serviceWorker()) served++;
 		return route.fulfill(htmlAnswer);
 	});
 	await page.goto('/login');
@@ -31,11 +34,11 @@ test('shows the German fallback instead of a white page when the failure persist
 	await expect(box).toBeVisible({ timeout: 15_000 });
 	await expect(box).toContainText('Die Anwendung konnte nicht geladen werden. Es läuft gerade ein Update. Bitte in einigen Sekunden neu laden.');
 	await expect(box.getByRole('button', { name: 'Neu laden' })).toBeVisible();
-	// exactly one automatic recovery (one reload) within the five-minute window, no reload loop
+	// exactly one automatic recovery (one reload of the page) within the five-minute window, no reload loop
 	await page.waitForTimeout(1500);
 	expect(served).toBe(2);
 	// once the server is healthy again the button brings the app back
-	await page.unroute(entryScript);
+	await context.unroute(entryScript);
 	await box.getByRole('button', { name: 'Neu laden' }).click();
 	await expect(page.getByRole('button', { name: 'Mit Passkey anmelden' })).toBeVisible({ timeout: 15_000 });
 	await expect(page.locator('#tt-recovery-fallback')).toHaveCount(0);

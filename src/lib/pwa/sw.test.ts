@@ -77,6 +77,25 @@ describe('lifecycle', () => {
 		expect(skipWaiting).not.toHaveBeenCalled();
 	});
 
+	it('installs although some precache requests hit a replica without the files (retries)', async () => {
+		cachePut.mockClear();
+		const attempts = new Map<string, number>();
+		vi.stubGlobal('fetch', vi.fn(async (req: Request) => {
+			const path = new URL(req.url).pathname;
+			const n = (attempts.get(path) ?? 0) + 1;
+			attempts.set(path, n);
+			if (n === 1) return new Response('Not found', { status: 404, headers: { 'content-type': 'text/plain' } });
+			return new Response('x', { status: 200, headers: { 'content-type': path === '/index.html' ? 'text/html' : 'text/javascript' } });
+		}));
+		const waits: Promise<unknown>[] = [];
+		listeners.install({ waitUntil: (p: Promise<unknown>) => waits.push(p) });
+		await Promise.all(waits);
+		for (const path of ['/_app/immutable/entry/app.abc.js', '/manifest.webmanifest', '/icons/icon-192.png', '/index.html']) {
+			expect(attempts.get(path), path).toBe(2);
+			expect(cacheStore.get(path)?.status, path).toBe(200);
+		}
+	});
+
 	it('fails the install instead of caching HTML for a script URL', async () => {
 		cachePut.mockClear();
 		vi.stubGlobal('fetch', vi.fn(async () => new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } })));
