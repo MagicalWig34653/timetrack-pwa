@@ -72,6 +72,10 @@ test('week and month keep the booked time visible next to the vacation mark', as
 });
 
 test('timer start on today works on a vacation day and shows the hint', async ({ browser }) => {
+	// Vacation only marks working days (mock/planning.ts dayContext, like the backend): on Saturday/Sunday "today" has no
+	// mark, so there is correctly no hint. The weekday runs cover the behaviour.
+	const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', weekday: 'short' }).format(new Date());
+	test.skip(weekday === 'Sat' || weekday === 'Sun', 'today is not a working day in the mock work model');
 	const { page, context } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 1000 } });
 	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
 	const absence = await api(page, 'POST', '/absences', { kind: 'vacation', startDate: today, endDate: today, status: 'approved' });
