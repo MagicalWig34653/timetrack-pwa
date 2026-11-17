@@ -59,11 +59,11 @@
 	const monday = $derived(mondayOfIsoWeek(requested) ?? addDays(currentMonday, 7));
 	const isoWeek = $derived(isoWeekLabel(monday));
 
+	let load = $state<LoadState>({ status: 'loading' });
+	let week = $state<PlanWeek | null>(null);
 	// Block lists per day need API 0.35.0; older servers keep the single window with a break (P13, ADR-0031).
 	// A week answered with block lists proves block support even when /system/info failed (no lossy legacy save).
 	const multi = $derived(capabilities.planBlocks || weekListsBlocks(week?.days ?? []));
-	let load = $state<LoadState>({ status: 'loading' });
-	let week = $state<PlanWeek | null>(null);
 	let drafts = $state<DayDraft[]>([]);
 	let baseline = $state<DayDraft[]>([]);
 	let suggestion = $state<WindowSuggestion>(fallbackWindow(27_720));
