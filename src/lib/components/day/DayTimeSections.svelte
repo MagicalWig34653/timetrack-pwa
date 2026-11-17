@@ -62,15 +62,21 @@
 	const revisionCount = $derived(segments.reduce((sum, s) => sum + (s.revisions ?? 0), 0));
 	const activeSegments = $derived(segments.filter((s) => !s.voided));
 
+	/** Only the latest load may take over the state: a late answer for a previous date must not land under the new one. */
+	let loadSeq = 0;
+
 	async function refresh() {
+		const seq = ++loadSeq;
+		const target = date;
 		try {
 			const zone = await zoneStore.ensure();
-			const { start, end } = dayBounds(date, zone);
+			const { start, end } = dayBounds(target, zone);
 			const [evaluation, list, placeList] = await Promise.all([
-				api.getDay(date),
+				api.getDay(target),
 				api.listSegments(start.toISOString(), end.toISOString(), true),
 				api.listPlaces()
 			]);
+			if (seq !== loadSeq) return;
 			day = evaluation;
 			segments = list;
 			places = placeList;
@@ -82,13 +88,15 @@
 			if (!creditText.trim()) creditText = evaluation.markCreditSeconds != null ? formatDuration(evaluation.markCreditSeconds) : '';
 			load = { status: 'ready' };
 		} catch (error) {
-			load = toLoadState(error);
+			if (seq === loadSeq) load = toLoadState(error);
 		}
 	}
 
 	// Reload whenever the route parameter changes.
 	$effect(() => {
 		void date;
+		// the forms of the previous date stay hidden until this date has loaded
+		load = { status: 'loading' };
 		adding = false;
 		editingId = null;
 		voidingId = null;
