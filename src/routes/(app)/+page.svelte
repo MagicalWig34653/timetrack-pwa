@@ -64,7 +64,11 @@
 	 * refreshes what changes by itself (running timer, today's evaluation and segments). A failure of a
 	 * non-critical part never blocks or replaces the page.
 	 */
+	// Only the latest load may take over the state: a slow poll must not undo a timer action that happened meanwhile.
+	let loadSeq = 0;
+
 	async function refresh(full = true) {
+		const seq = ++loadSeq;
 		try {
 			const zone = await zoneStore.ensure();
 			const date = todayLocal(zone);
@@ -82,11 +86,13 @@
 				api.getDay(date),
 				api.listSegments(start.toISOString(), end.toISOString())
 			]);
+			if (seq !== loadSeq) return;
 			running = timer;
 			day = evaluation;
 			segments = daySegments;
 			load = { status: 'ready' };
 		} catch (error) {
+			if (seq !== loadSeq) return;
 			// A background poll that fails keeps the last good data instead of replacing the page by an error.
 			if (full || load.status !== 'ready') load = toLoadState(error);
 		}

@@ -86,6 +86,42 @@ describe('dashboard "Heute"', () => {
 	});
 });
 
+describe('dashboard poll after a timer action (review finding 9)', () => {
+	it('a late background poll does not bring back a stopped timer', async () => {
+		const polls: (() => void)[] = [];
+		const realSetInterval = globalThis.setInterval;
+		vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: () => void, ms?: number) => {
+			if (ms === 60_000) polls.push(fn);
+			return realSetInterval(fn, ms === 60_000 ? 1e9 : ms);
+		}) as typeof setInterval);
+		render(Dashboard);
+		await userEvent.click(await screen.findByRole('button', { name: 'Start' }));
+		expect(await screen.findByRole('button', { name: 'Stopp' })).toBeInTheDocument();
+		await waitFor(() => expect(polls).toHaveLength(1));
+		let release: () => void = () => undefined;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		let hold = true;
+		let held = false;
+		vi.stubGlobal('fetch', async (input: RequestInfo | URL, init: RequestInit = {}) => {
+			if (hold && (init.method ?? 'GET').toUpperCase() === 'GET' && String(input).includes('/time/days/')) {
+				hold = false;
+				held = true;
+				await gate;
+			}
+			return mock.fetch(input, init);
+		});
+		polls[0]();
+		await waitFor(() => expect(held).toBe(true));
+		await userEvent.click(screen.getByRole('button', { name: 'Stopp' }));
+		await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument());
+		release();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Stopp' })).toBeNull();
+		vi.mocked(globalThis.setInterval).mockRestore();
+	});
+});
+
 describe('/time redirect (merged into the week page)', () => {
 	const redirectOf = (search: string) => {
 		try {
