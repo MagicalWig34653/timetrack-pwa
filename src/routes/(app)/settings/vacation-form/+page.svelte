@@ -150,9 +150,11 @@
 		problem = '';
 		notice = '';
 		try {
+			// the baseline is what was sent: edits made while the request runs stay marked as unsaved
+			const sent = serializeMapping(mapping);
 			await store.saveMapping(mapping);
 			storage = store.storage;
-			savedJson = serializeMapping(mapping);
+			savedJson = sent;
 			notice = t('vform.saved');
 		} catch (error) {
 			problem = pdfProblem(error);
