@@ -21,7 +21,7 @@
 	import { previewRange, type DragOp } from '#lib/planning/drag.js';
 	import { defaultStatusFor, quickStatusesFor } from '#lib/planning/absence-status.js';
 	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel, HOLIDAY_CLASS, PLAN_CLASSES, planModeLabel, SCHOOL_HOLIDAY_CLASS, WORK_STATE_CLASSES, WORK_STATE_ORDER, workStateLabel } from '#lib/planning/labels.js';
-	import { absenceInputOf, createAbsenceOp, deleteAbsenceOp, deletePlanOp, moveAbsenceInput, pasteTargets, putPlanOp, updateAbsenceOp, type Operation } from '#lib/planning/operations.js';
+	import { absenceInputOf, createAbsenceOp, deleteAbsencesOp, deletePlanOp, moveAbsenceInput, pasteTargets, putPlanOp, updateAbsenceOp, type Operation } from '#lib/planning/operations.js';
 	import { addRange, emptySelection, rangeDates, selectionRuns, selectOne, selectRangeTo, shiftRange, toggleDate, type DateRange, type Selection } from '#lib/planning/range-select.js';
 	import { combine, UndoStack } from '#lib/planning/undo.js';
 	import { weekBalance } from '#lib/planning/week-balance.js';
@@ -285,6 +285,8 @@
 		} catch (e) {
 			error = errorMessage(e);
 			notice = '';
+			// a failed step may have been rolled back or partly applied: show what the server holds now
+			reloadToken++;
 			return false;
 		} finally {
 			busy = false;
@@ -400,11 +402,7 @@
 
 	function removeAbsences(list: Absence[]) {
 		const label = t('cal.op_delete_absence');
-		void run(async () => {
-			const ops: Operation[] = [];
-			for (const a of list) ops.push(await deleteAbsenceOp(api, a, label));
-			return { command: combine(label, ops.map((o) => o.command)) };
-		}, label);
+		void run(() => deleteAbsencesOp(api, list, label), label);
 	}
 
 	function removePlans(dates: string[]) {

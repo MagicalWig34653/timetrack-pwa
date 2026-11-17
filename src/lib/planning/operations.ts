@@ -1,7 +1,7 @@
 import type { Absence, AbsenceInput, PlanDay, PlanDayInput } from '#lib/api/types.js';
 import type { DateRange } from './range-select.js';
 import { shiftRange } from './range-select.js';
-import type { UndoCommand } from './undo.js';
+import { combine, type UndoCommand } from './undo.js';
 
 /** The slice of the API client the calendar writes through (injected so the operations are unit-testable). */
 export interface PlanningApi {
@@ -120,6 +120,20 @@ export async function deleteAbsenceOp(api: PlanningApi, absence: Absence, label:
 	};
 }
 
+/** Deletes several absences as one step; when one delete fails the already deleted ones are restored first. */
+export async function deleteAbsencesOp(api: PlanningApi, absences: Absence[], label: string): Promise<Operation> {
+	const done: Operation[] = [];
+	try {
+		for (const absence of absences) done.push(await deleteAbsenceOp(api, absence, label));
+	} catch (error) {
+		await combine(label, done.map((o) => o.command))
+			.undo()
+			.catch(() => undefined);
+		throw error;
+	}
+	return { command: combine(label, done.map((o) => o.command)) };
+}
+
 /** Writes the same plan to many days; undo restores each day's previous plan (or removes the new one). */
 export async function putPlanOp(api: PlanningApi, dates: string[], input: PlanDayInput, previous: PlanDay[], label: string): Promise<Operation> {
 	const before = new Map(previous.map((p) => [p.date, p]));
@@ -150,7 +164,17 @@ export async function putPlanOp(api: PlanningApi, dates: string[], input: PlanDa
 
 /** Removes the plan of many days; undo puts the removed plans back. */
 export async function deletePlanOp(api: PlanningApi, plans: PlanDay[], label: string): Promise<Operation> {
-	await runLimited(plans, 4, (p) => api.deletePlanDay(p.date));
+	const done: PlanDay[] = [];
+	try {
+		await runLimited(plans, 4, async (p) => {
+			await api.deletePlanDay(p.date);
+			done.push(p);
+		});
+	} catch (error) {
+		// Do not leave a half-deleted selection behind.
+		await runLimited(done, 4, async (p) => void (await api.putPlanDay(p.date, planInputOf(p)))).catch(() => undefined);
+		throw error;
+	}
 	return {
 		command: {
 			label,

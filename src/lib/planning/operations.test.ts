@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Absence, AbsenceInput, PlanDay, PlanDayInput } from '#lib/api/types.js';
-import { absenceInputOf, createAbsenceOp, deleteAbsenceOp, deletePlanOp, moveAbsenceInput, pasteTargets, putPlanOp, runLimited, updateAbsenceOp, type PlanningApi } from './operations.js';
+import { absenceInputOf, createAbsenceOp, deleteAbsenceOp, deleteAbsencesOp, deletePlanOp, moveAbsenceInput, pasteTargets, putPlanOp, runLimited, updateAbsenceOp, type PlanningApi } from './operations.js';
 
-function fakeApi(initial: { absences?: Absence[]; plan?: PlanDay[]; failPutOn?: string } = {}) {
+function fakeApi(initial: { absences?: Absence[]; plan?: PlanDay[]; failPutOn?: string; failDeleteOn?: string; files?: Record<string, string[]> } = {}) {
 	const absences = new Map((initial.absences ?? []).map((a) => [a.id, a]));
 	const plan = new Map((initial.plan ?? []).map((p) => [p.date, p]));
+	const files = new Map(Object.entries(initial.files ?? {}));
 	let counter = 0;
 	const api: PlanningApi = {
+
 		async createAbsence(input: AbsenceInput) {
 			const absence = { ...input, id: `n${++counter}`, version: 1, countedHalfDays: 0 } as Absence;
 			absences.set(absence.id, absence);
@@ -20,7 +22,9 @@ function fakeApi(initial: { absences?: Absence[]; plan?: PlanDay[]; failPutOn?: 
 			return next;
 		},
 		async deleteAbsence(id) {
+			if (id === initial.failDeleteOn) throw new Error('fail');
 			absences.delete(id);
+			files.delete(id);
 		},
 		async putPlanDay(date, input: PlanDayInput) {
 			if (date === initial.failPutOn) throw new Error('fail');
@@ -29,10 +33,11 @@ function fakeApi(initial: { absences?: Absence[]; plan?: PlanDay[]; failPutOn?: 
 			return day;
 		},
 		async deletePlanDay(date) {
+			if (date === initial.failDeleteOn) throw new Error('fail');
 			plan.delete(date);
 		}
 	};
-	return { api, absences, plan };
+	return { api, absences, plan, files };
 }
 
 const vacation: Absence = { id: 'a1', version: 3, kind: 'vacation', startDate: '2031-03-11', endDate: '2031-03-13', status: 'planned', note: 'x', countedHalfDays: 6, halfDayEnd: true };
@@ -72,6 +77,31 @@ describe('absence operations', () => {
 		expect([...absences.values()][0]).toMatchObject({ kind: 'vacation', startDate: '2031-03-11', halfDayEnd: true });
 		await command.redo();
 		expect(absences.size).toBe(0);
+	});
+});
+
+describe('partial failures and attachments (review findings 4 and 5)', () => {
+	const sick: Absence = { ...vacation, id: 'a2', kind: 'sick', startDate: '2031-03-20', endDate: '2031-03-20' };
+	it('restores the already deleted absences when a later delete fails', async () => {
+		const { api, absences } = fakeApi({ absences: [vacation, sick], failDeleteOn: 'a2' });
+		await expect(deleteAbsencesOp(api, [vacation, sick], 'delete')).rejects.toThrow('fail');
+		expect([...absences.values()].map((a) => a.kind).sort()).toEqual(['sick', 'vacation']);
+	});
+	it('deletes several absences as one undoable step', async () => {
+		const { api, absences } = fakeApi({ absences: [vacation, sick] });
+		const { command } = await deleteAbsencesOp(api, [vacation, sick], 'delete');
+		expect(absences.size).toBe(0);
+		await command.undo();
+		expect(absences.size).toBe(2);
+		await command.redo();
+		expect(absences.size).toBe(0);
+	});
+	it('restores the already deleted plans when a later delete fails', async () => {
+		const a: PlanDay = { date: '2031-03-10', mode: 'office' };
+		const b: PlanDay = { date: '2031-03-11', mode: 'home' };
+		const { api, plan } = fakeApi({ plan: [a, b], failDeleteOn: '2031-03-11' });
+		await expect(deletePlanOp(api, [a, b], 'delete')).rejects.toThrow('fail');
+		expect([...plan.keys()].sort()).toEqual(['2031-03-10', '2031-03-11']);
 	});
 });
 
