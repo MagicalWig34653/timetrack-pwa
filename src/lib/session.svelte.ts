@@ -51,15 +51,21 @@ class SessionStore {
 		if (session) theme.reconcile(session.account.id, session.account.preferences, !session.recovery);
 	}
 
+	/**
+	 * Ends the session on the server first. Only a confirmed end (or a session that is already gone, 401) clears the local
+	 * state; any other failure propagates and keeps the session, because the HttpOnly cookie would still sign the next
+	 * person at this browser back in.
+	 */
 	async signOut(): Promise<void> {
 		try {
 			await api.logout();
-		} finally {
-			this.current = null;
-			setCsrfToken(null);
-			moduleStore.reset();
-			theme.detach();
+		} catch (error) {
+			if (!(error instanceof ApiError && error.status === 401)) throw error;
 		}
+		this.current = null;
+		setCsrfToken(null);
+		moduleStore.reset();
+		theme.detach();
 	}
 }
 

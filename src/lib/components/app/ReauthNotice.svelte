@@ -9,7 +9,8 @@
 	let { next }: { next: string } = $props();
 
 	async function signInAgain() {
-		await sessionStore.signOut();
+		// the new sign-in replaces the session anyway, so a failed sign-out does not block it
+		await sessionStore.signOut().catch(() => undefined);
 		await goto('/login?next=' + encodeURIComponent(next));
 	}
 </script>

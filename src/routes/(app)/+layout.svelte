@@ -4,7 +4,9 @@
 	import X from '@lucide/svelte/icons/x';
 	import { focusTrap } from '#lib/a11y/focus-trap.js';
 	import { setCsrfToken, setSessionEndedHandler } from '#lib/api/client.js';
-	import { t } from '#lib/i18n/index.js';
+	import { errorMessage, t } from '#lib/i18n/index.js';
+	import { Alert } from '#lib/components/ui/alert/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import ErrorPage from '#lib/components/app/ErrorPage.svelte';
 	import { newErrorId } from '#lib/errors/describe.js';
 	import ModuleDisabled from '#lib/components/app/ModuleDisabled.svelte';
@@ -76,12 +78,17 @@
 		return () => setSessionEndedHandler(null);
 	});
 
+	// Signing out is only done once the server ended the session; otherwise the user sees why and can try again.
+	let signOutError = $state('');
 	async function signOut() {
+		signOutError = '';
 		try {
 			await sessionStore.signOut();
-		} finally {
-			await goto('/login', { replaceState: true, invalidateAll: true });
+		} catch (error) {
+			signOutError = t('nav.sign_out_failed', { reason: errorMessage(error) });
+			return;
 		}
+		await goto('/login', { replaceState: true, invalidateAll: true });
 	}
 </script>
 
@@ -125,6 +132,12 @@
 		<TopBar {polling} {menuOpen} onmenu={() => (menuOpen = true)} onsignout={signOut} />
 		<!-- U6: the planner uses the full width and less padding on landscape desktops, the grid needs every pixel. -->
 		<main class="app-sheet mx-auto w-full max-w-[1240px] px-4 py-[22px] menu:px-6 menu:py-6 wide:px-10 wide:py-9 {planRoute ? 'fit:max-w-none! fit:px-5! fit:py-4!' : ''}">
+			{#if signOutError}
+				<Alert variant="destructive" class="mb-4 flex flex-wrap items-center gap-3" data-testid="sign-out-error">
+					<span>{signOutError}</span>
+					<Button size="sm" variant="outline" onclick={signOut}>{t('nav.sign_out_retry')}</Button>
+				</Alert>
+			{/if}
 			{#if blockedBy}
 				<ModuleDisabled module={blockedBy} />
 			{:else}

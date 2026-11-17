@@ -79,6 +79,8 @@ export const de = {
 	'nav.sessions': 'Sitzungen',
 	'nav.invitations': 'Einladungen',
 	'nav.sign_out': 'Abmelden',
+	'nav.sign_out_failed': 'Abmelden fehlgeschlagen, du bist noch angemeldet: {reason}',
+	'nav.sign_out_retry': 'Erneut abmelden',
 
 	'home.title': 'Hallo, {name}',
 	'home.description': 'Dein Arbeitstag auf einen Blick.',
