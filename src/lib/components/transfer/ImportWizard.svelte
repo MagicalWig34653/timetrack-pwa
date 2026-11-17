@@ -82,9 +82,13 @@
 	let analysisFailed = $state(false);
 	let customizeOpen = $state(false);
 	let templateBusy = $state(false);
-	/** serialised options of the preview that was requested last; differs while an option change is not yet reflected */
+	/** serialised options of the preview shown last; differs while an option change is not yet reflected */
 	let previewedKey = $state('');
 	let previewSeq = 0;
+	/** mapping writes still on their way; the import stays locked until the shown preview matches the stored mapping */
+	let previewsPending = $state(0);
+	/** mapping writes run one after another, so the server keeps the mapping that was requested last */
+	let mappingQueue: Promise<unknown> = Promise.resolve();
 
 	const isWorktime = $derived(profile === 'worktime_workbook');
 	/** the recognised table: the work-time flow has three steps (file, preview, result) */
@@ -94,7 +98,7 @@
 	const optionsKey = $derived(JSON.stringify(worktimeFromForm(wtForm)));
 	const wtIssues = $derived(worktimeIssues(wtForm));
 	const stale = $derived(isWorktime && optionsKey !== previewedKey);
-	const refreshing = $derived(stale || analysing);
+	const refreshing = $derived(stale || analysing || previewsPending > 0);
 	const recommended = $derived(isRecommended(wtForm, defaultRules));
 	const facts = $derived(job && preview?.worktime ? worktimeFacts(preview.worktime, job.sheets.length) : null);
 	const created = $derived(preview?.valid ?? 0);
@@ -251,12 +255,18 @@
 		if (!job) return false;
 		const seq = ++previewSeq;
 		const key = optionsKey;
-		previewedKey = key;
+		const jobId = job.id;
+		const mapping = worktimeMapping(job.sheets[0] ?? '', wtForm);
 		error = '';
+		previewsPending++;
+		const write = mappingQueue.then(() => api.putImportMapping(jobId, mapping));
+		mappingQueue = write.catch(() => undefined);
 		try {
-			const result = await api.putImportMapping(job.id, worktimeMapping(job.sheets[0] ?? '', wtForm));
+			const result = await write;
 			if (seq !== previewSeq) return true;
 			preview = result;
+			// only now the shown preview matches these options
+			previewedKey = key;
 			if (!models) models = await api.listWorkModels().catch(() => null);
 			return true;
 		} catch (e) {
@@ -266,6 +276,8 @@
 				previewedKey = '';
 			}
 			return false;
+		} finally {
+			previewsPending--;
 		}
 	}
 
@@ -457,7 +469,7 @@
 
 	// ---- commit
 	async function commit() {
-		if (!job || (!isWorktime && !confirmChecked) || (errorCount > 0 && !ignoreErrors) || (isWorktime && stale)) return;
+		if (!job || (!isWorktime && !confirmChecked) || (errorCount > 0 && !ignoreErrors) || (isWorktime && (stale || previewsPending > 0))) return;
 		busy = true;
 		error = '';
 		try {

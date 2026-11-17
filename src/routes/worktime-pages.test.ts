@@ -198,6 +198,27 @@ describe('worktime import wizard: recognition, template and preview', () => {
 		expect(screen.getByTestId('wt-reset')).toBeDisabled();
 	});
 
+	it('keeps the import locked while a preview refresh is still on its way (review finding 2)', async () => {
+		render(ImportWizard);
+		const u = await openPreview(c23Workbook());
+		expect(screen.getByTestId('commit')).toBeEnabled();
+		let release: () => void = () => undefined;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		let held = 0;
+		vi.stubGlobal('fetch', async (input: RequestInfo | URL, init: RequestInit = {}) => {
+			if ((init.method ?? 'GET').toUpperCase() === 'PUT' && String(input).includes('/mapping')) {
+				held++;
+				await gate;
+			}
+			return mock.fetch(input, init);
+		});
+		await u.click(screen.getByTestId('wt-holiday-keep'));
+		await waitFor(() => expect(held).toBe(1));
+		expect(screen.getByTestId('commit')).toBeDisabled();
+		release();
+		await waitFor(() => expect(screen.queryByTestId('wt-warnings')?.querySelector('[data-code="school_on_holiday"]') ?? null).toBeNull());
+		await waitFor(() => expect(screen.getByTestId('commit')).toBeEnabled());
+	});
 	it('edits the remark table (add, reorder, remove, reset), blocks the import on a faulty entry and shows the problem', async () => {
 		render(ImportWizard);
 		const u = await openPreview();
