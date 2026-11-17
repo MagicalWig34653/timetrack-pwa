@@ -22,6 +22,7 @@ import {
 	standardWeek,
 	suggestWindow,
 	weekRequest,
+	weekListsBlocks,
 	weekTotals,
 	withMode
 } from './plan-draft.js';
@@ -247,5 +248,20 @@ describe('totals and request', () => {
 		expect(draftFromDay(legacy)).toMatchObject({ mode: 'home', breakMinutes: 30, blocks: [{ start: '08:00', end: '16:00', kind: 'home', placeId: 'q' }] });
 		const off = day(0, { plan: { date: date(0), mode: 'off', plannedStart: null, plannedEnd: null } });
 		expect(draftFromDay(off).blocks).toEqual([]);
+	});
+});
+
+describe('block lists without a known API version', () => {
+	it('treats a week the server answered with block lists as block-capable, so saving keeps the blocks', () => {
+		const withBlocks = week({ 0: { plan: { date: date(0), mode: 'office', blocks: [{ start: '08:00', end: '12:00', kind: 'office' }, { start: '13:00', end: '17:00', kind: 'office', note: 'Kunde' }], plannedStart: '08:00', plannedEnd: '17:00', plannedBreakMinutes: 60 } } });
+		expect(weekListsBlocks(withBlocks)).toBe(true);
+		const multi = false || weekListsBlocks(withBlocks);
+		const request = weekRequest(withBlocks.map(draftFromDay), multi);
+		expect(request.days[0].blocks).toHaveLength(2);
+		expect(request.days[0].plannedBreakMinutes).toBeUndefined();
+	});
+	it('stays on the old contract for a legacy or empty week', () => {
+		expect(weekListsBlocks(week())).toBe(false);
+		expect(weekListsBlocks(week({ 0: { plan: { date: date(0), mode: 'home', plannedStart: '08:00', plannedEnd: '16:00', plannedBreakMinutes: 30 } } }))).toBe(false);
 	});
 });

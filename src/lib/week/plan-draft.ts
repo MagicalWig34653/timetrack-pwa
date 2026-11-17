@@ -189,6 +189,13 @@ export function entryFromDraft(draft: DayDraft, multi = true): PlanWeekEntry | n
 	return entry;
 }
 
+/**
+ * True when the server answered with block lists (contract 0.35.0). This is proof of block support even when
+ * /system/info failed: saving such a week with the old single-window fields would merge the blocks and drop breaks,
+ * kinds and block notes.
+ */
+export const weekListsBlocks = (days: PlanWeekDay[]): boolean => days.some((day) => Array.isArray(day.plan?.blocks));
+
 export const isBlocked = (day: PlanWeekDay) => day.blockedBy !== null;
 
 /**

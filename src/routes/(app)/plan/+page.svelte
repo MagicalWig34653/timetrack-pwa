@@ -37,6 +37,7 @@
 		standardWeek,
 		suggestWindow,
 		weekRequest,
+		weekListsBlocks,
 		weekTotals,
 		withMode,
 		type WindowSuggestion
@@ -59,7 +60,8 @@
 	const isoWeek = $derived(isoWeekLabel(monday));
 
 	// Block lists per day need API 0.35.0; older servers keep the single window with a break (P13, ADR-0031).
-	const multi = $derived(capabilities.planBlocks);
+	// A week answered with block lists proves block support even when /system/info failed (no lossy legacy save).
+	const multi = $derived(capabilities.planBlocks || weekListsBlocks(week?.days ?? []));
 	let load = $state<LoadState>({ status: 'loading' });
 	let week = $state<PlanWeek | null>(null);
 	let drafts = $state<DayDraft[]>([]);
