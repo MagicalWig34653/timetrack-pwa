@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Absence, AbsenceInput, PlanDay, PlanDayInput } from '#lib/api/types.js';
+import type { Absence, AbsenceInput, FileMeta, PlanDay, PlanDayInput } from '#lib/api/types.js';
 import { absenceInputOf, createAbsenceOp, deleteAbsenceOp, deleteAbsencesOp, deletePlanOp, moveAbsenceInput, pasteTargets, putPlanOp, runLimited, updateAbsenceOp, type PlanningApi } from './operations.js';
 
 function fakeApi(initial: { absences?: Absence[]; plan?: PlanDay[]; failPutOn?: string; failDeleteOn?: string; files?: Record<string, string[]> } = {}) {
@@ -8,7 +8,13 @@ function fakeApi(initial: { absences?: Absence[]; plan?: PlanDay[]; failPutOn?: 
 	const files = new Map(Object.entries(initial.files ?? {}));
 	let counter = 0;
 	const api: PlanningApi = {
-
+		async listAbsenceAttachments(id) {
+			return (files.get(id) ?? []).map((fileId) => ({ id: fileId }) as FileMeta);
+		},
+		async attachFile(id, fileId) {
+			files.set(id, [...(files.get(id) ?? []), fileId]);
+			return { id: fileId } as FileMeta;
+		},
 		async createAbsence(input: AbsenceInput) {
 			const absence = { ...input, id: `n${++counter}`, version: 1, countedHalfDays: 0 } as Absence;
 			absences.set(absence.id, absence);
@@ -102,6 +108,13 @@ describe('partial failures and attachments (review findings 4 and 5)', () => {
 		const { api, plan } = fakeApi({ plan: [a, b], failDeleteOn: '2031-03-11' });
 		await expect(deletePlanOp(api, [a, b], 'delete')).rejects.toThrow('fail');
 		expect([...plan.keys()].sort()).toEqual(['2031-03-10', '2031-03-11']);
+	});
+	it('undoing a deletion attaches the documents again to the restored absence', async () => {
+		const { api, absences, files } = fakeApi({ absences: [vacation], files: { a1: ['f1', 'f2'] } });
+		const { command } = await deleteAbsenceOp(api, vacation, 'delete');
+		await command.undo();
+		const restored = [...absences.values()][0];
+		expect(files.get(restored.id)).toEqual(['f1', 'f2']);
 	});
 });
 

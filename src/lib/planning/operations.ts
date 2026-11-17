@@ -1,4 +1,4 @@
-import type { Absence, AbsenceInput, PlanDay, PlanDayInput } from '#lib/api/types.js';
+import type { Absence, AbsenceInput, FileMeta, PlanDay, PlanDayInput } from '#lib/api/types.js';
 import type { DateRange } from './range-select.js';
 import { shiftRange } from './range-select.js';
 import { combine, type UndoCommand } from './undo.js';
@@ -10,6 +10,9 @@ export interface PlanningApi {
 	deleteAbsence(id: string): Promise<void>;
 	putPlanDay(date: string, input: PlanDayInput): Promise<PlanDay>;
 	deletePlanDay(date: string): Promise<void>;
+	/** Attachment links (contract 0.24.0): kept across delete and undo, so a restored absence keeps its documents. */
+	listAbsenceAttachments?(absenceId: string): Promise<FileMeta[]>;
+	attachFile?(absenceId: string, fileId: string): Promise<FileMeta>;
 }
 
 /** Operation result: the command goes onto the undo stack, `message` is the German confirmation text key payload. */
@@ -105,15 +108,19 @@ export async function updateAbsenceOp(api: PlanningApi, before: Absence, input: 
 
 export const moveAbsenceInput = (absence: Absence, range: DateRange): AbsenceInput => ({ ...absenceInputOf(absence), startDate: range.start, endDate: range.end });
 
+/** Deletes an absence; undo creates it again (new id) and re-attaches its stored documents. */
 export async function deleteAbsenceOp(api: PlanningApi, absence: Absence, label: string): Promise<Operation> {
 	const input = absenceInputOf(absence);
 	let current = absence;
+	// the files stay stored after the delete, only the links go; an older server without attachments has none to keep
+	const fileIds = absence.attachmentCount === 0 || !api.listAbsenceAttachments ? [] : (await api.listAbsenceAttachments(absence.id).catch(() => [])).map((f) => f.id);
 	await api.deleteAbsence(absence.id);
 	return {
 		command: {
 			label,
 			undo: async () => {
 				current = await api.createAbsence(input);
+				for (const fileId of fileIds) await api.attachFile?.(current.id, fileId);
 			},
 			redo: () => api.deleteAbsence(current.id)
 		}
