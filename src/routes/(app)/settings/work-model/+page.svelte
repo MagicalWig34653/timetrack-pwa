@@ -168,6 +168,7 @@
 			} else {
 				await api.createWorkModel(result.input);
 			}
+			zoneStore.invalidate();
 			closeForm();
 			announce(correct ? t('work_model.corrected') : t('work_model.created'));
 			await refresh();
@@ -189,6 +190,7 @@
 		pending = true;
 		try {
 			await api.endWorkModel(model.id, endDate);
+			zoneStore.invalidate();
 			endingId = null;
 			notice = t('work_model.ended');
 			await refresh();

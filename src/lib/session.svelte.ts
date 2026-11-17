@@ -2,6 +2,7 @@ import { api, ApiError, setCsrfToken } from '#lib/api/client.js';
 import type { Session } from '#lib/api/types.js';
 import { moduleStore } from '#lib/modules/store.svelte.js';
 import { theme } from '#lib/theme/theme.svelte.js';
+import { zoneStore } from '#lib/time/zone.svelte.js';
 
 class SessionStore {
 	current = $state<Session | null>(null);
@@ -18,6 +19,7 @@ class SessionStore {
 				this.current = null;
 				setCsrfToken(null);
 				moduleStore.reset();
+				zoneStore.reset();
 				theme.detach();
 			} else throw error;
 		}
@@ -38,6 +40,8 @@ class SessionStore {
 	}
 
 	set(session: Session): void {
+		// a new sign-in may be another account with another work model zone
+		zoneStore.reset();
 		this.current = session;
 		this.refreshedAt = Date.now();
 		this.loaded = true;
@@ -65,6 +69,7 @@ class SessionStore {
 		this.current = null;
 		setCsrfToken(null);
 		moduleStore.reset();
+		zoneStore.reset();
 		theme.detach();
 	}
 }

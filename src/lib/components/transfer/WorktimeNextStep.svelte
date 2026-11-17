@@ -73,6 +73,7 @@
 		status = 'creating';
 		try {
 			await api.createWorkModel(built.input);
+			zoneStore.invalidate();
 			models = await api.listWorkModels();
 			account = null;
 			status = 'done';

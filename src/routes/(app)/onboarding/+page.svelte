@@ -136,6 +136,7 @@
 				const plan = buildModelPlan(draft.model);
 				if ('errors' in plan) throw new Error('invalid');
 				await api.createWorkModel(plan.input);
+				zoneStore.invalidate();
 				stored = new Set([...stored, 'model']);
 			}
 			if (steps.includes('vacation') && !draft.skipped.vacation) {
