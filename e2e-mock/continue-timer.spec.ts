@@ -40,8 +40,31 @@ async function start(browser: Browser, options?: Parameters<typeof loginAsAdmin>
 	return actor;
 }
 
+/**
+ * Plans today as office for the duration of `run`, then restores the seed plan. The seed plans every Thursday as school,
+ * and since the timer follows a school plan (kind "Schule"), a test that starts the timer as "Arbeit" must fix the plan.
+ */
+async function withOfficePlanToday(page: Page, run: () => Promise<void>) {
+	const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date(pinnedNow(page)));
+	const [original] = await (await api(page, 'GET', `/plan/days?from=${today}&to=${today}`)).json();
+	expect((await api(page, 'PUT', `/plan/days/${today}`, { mode: 'office', plannedStart: '08:00', plannedEnd: '16:30', plannedBreakMinutes: 30 })).status()).toBe(200);
+	try {
+		await run();
+	} finally {
+		if (original) {
+			const { date: _date, ...body } = original;
+			await api(page, 'PUT', `/plan/days/${today}`, body);
+		} else await api(page, 'DELETE', `/plan/days/${today}`);
+	}
+}
+
 test('short gap: one button, reopens the same segment, stopping works as usual', async ({ browser }) => {
 	const { page, context } = await start(browser);
+	await withOfficePlanToday(page, () => shortGap(page));
+	await context.close();
+});
+
+async function shortGap(page: Page) {
 	await page.goto('/');
 	await page.getByRole('button', { name: 'Start' }).click();
 	await expect(page.getByRole('button', { name: 'Stopp' })).toBeVisible();
@@ -57,8 +80,7 @@ test('short gap: one button, reopens the same segment, stopping works as usual',
 	await expect(page.getByTestId('continue-panel')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Stopp' }).click();
 	await expect(page.getByTestId('segment-row')).toHaveCount(1);
-	await context.close();
-});
+}
 
 test('long gap: two choices; "Fortführen" keeps the segment, "Neu starten" adds one', async ({ browser }) => {
 	const { page, context } = await start(browser, { viewport: { width: 390, height: 900 } });
