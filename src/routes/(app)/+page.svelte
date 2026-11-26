@@ -13,6 +13,9 @@
 	import ReportsTeaser from '#lib/components/reports/ReportsTeaser.svelte';
 	import SegmentList from '#lib/components/time/SegmentList.svelte';
 	import TimerCard from '#lib/components/time/TimerCard.svelte';
+	import SchoolDayBooking from '#lib/components/time/SchoolDayBooking.svelte';
+	import { isSchoolPlan, planSchoolTimes, timerPreset } from '#lib/time/school.js';
+	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
 	import Unavailable from '#lib/components/time/Unavailable.svelte';
 	import { Alert } from '#lib/components/ui/alert/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -58,6 +61,10 @@
 	const timeZone = $derived(zoneStore.value);
 	const today = $derived(todayLocal(timeZone, new Date(now)));
 	const continuable = $derived(running ? null : continuableSegment(segments));
+	// today planned as school: the timer follows the plan and "Schultag buchen" is offered until school time is booked
+	const preset = $derived(timerPreset(todayPlan, places));
+	const schoolToday = $derived(isSchoolPlan(todayPlan) && !segments.some((s) => s.kind === 'school' && !s.voided));
+	const schoolTimes = $derived(planSchoolTimes(todayPlan));
 
 	/**
 	 * `full` also reloads the slow, non-critical parts (time account, suggestions, places). The 60 s poll only
@@ -172,7 +179,14 @@
 			</p>
 		{/if}
 
-		<TimerCard {running} {places} {now} {timeZone} last={continuable} onchange={onTimerChange} />
+		{#if schoolToday}
+			<div class="flex flex-col gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 sm:flex-row sm:items-center sm:justify-between" data-testid="school-today">
+				<p class="flex items-center gap-2 text-sm"><GraduationCap class="size-4 shrink-0" aria-hidden="true" />{t('school.planned_today', { time: schoolTimes ? `${schoolTimes.start}–${schoolTimes.end}` : '–' })}</p>
+				<SchoolDayBooking date={today} {places} {timeZone} plan={todayPlan} size="sm" onsaved={() => refresh()} />
+			</div>
+		{/if}
+
+		<TimerCard {running} {places} {now} {timeZone} last={continuable} {preset} onchange={onTimerChange} />
 
 		<Card>
 			<CardHeader>

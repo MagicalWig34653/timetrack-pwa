@@ -254,6 +254,10 @@ export function breadcrumbs(pathname: string): Crumb[] {
 		trail.push({ label, href: '/week' }, { label: 'trash.title' });
 		return trail;
 	}
+	if (label && pathname === '/time/school-check') {
+		trail.push({ label, href: '/week' }, { label: 'school.check_title' });
+		return trail;
+	}
 	if (parts[0] === 'groups' && parts.length > 1) {
 		const leaf = parts[1] === 'polls' ? (parts[2] === 'new' ? 'groups.crumb_poll_new' : 'groups.crumb_poll') : parts[1] === 'orders' ? (parts[2] === 'new' ? 'groups.crumb_order_new' : 'groups.crumb_order') : 'groups.crumb_catalogs';
 		return [...trail, { label: 'nav.groups', href: '/groups' }, { label: leaf }];

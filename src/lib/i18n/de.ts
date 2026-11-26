@@ -9,6 +9,7 @@ import { deMail } from './de-mail';
 import { deMcp } from './de-mcp';
 import { deN2 } from './de-n2';
 import { deV6 } from './de-v6';
+import { deSchool } from './de-school';
 import { deModules } from './de-modules';
 import { deOidc } from './de-oidc';
 import { dePlanning } from './de-planning';
@@ -40,6 +41,7 @@ export const de = {
 	...deMcp,
 	...deN2,
 	...deV6,
+	...deSchool,
 	...deModules,
 	...deOidc,
 	...dePlanning,

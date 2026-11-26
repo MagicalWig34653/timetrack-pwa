@@ -10,7 +10,8 @@
 	import { errorMessage, t } from '#lib/i18n/index.js';
 	import { ABSENCE_KINDS, absenceKindLabel, absenceStatusLabel, DOCUMENT_STATUSES, documentStatusLabel } from '#lib/planning/labels.js';
 	import { hasApprovalWorkflow, STATUSES_BY_KIND, statusToSend } from '#lib/planning/absence-status.js';
-	import { isValidDate } from '#lib/time/dates.js';
+	import { addDays, isValidDate } from '#lib/time/dates.js';
+	import { isSchoolPlan } from '#lib/time/school.js';
 	import { moduleStore } from '#lib/modules/store.svelte.js';
 	import AbsenceAttachments from '../transfer/AbsenceAttachments.svelte';
 	import { untrack } from 'svelte';
@@ -54,6 +55,23 @@
 	const withDocuments = $derived(kind === 'sick' || kind === 'other');
 	const vacationStatuses = $derived(STATUSES_BY_KIND.vacation.includes(status) ? STATUSES_BY_KIND.vacation : [...STATUSES_BY_KIND.vacation, status]);
 	const singleDay = $derived(startDate !== '' && startDate === endDate);
+
+	// A Freistellung on a day planned as school is almost always meant as Berufsschule: point to "Schultag buchen".
+	let schoolPlanned = $state(false);
+	let planSeq = 0;
+	$effect(() => {
+		const seq = ++planSeq;
+		const from = startDate;
+		const to = endDate;
+		schoolPlanned = false;
+		if (kind !== 'excused' || !isValidDate(from) || !isValidDate(to) || to < from || to > addDays(from, 31)) return;
+		void api.listPlanDays(from, to).then(
+			(plans) => {
+				if (seq === planSeq) schoolPlanned = plans.some((p) => isSchoolPlan(p));
+			},
+			() => undefined
+		);
+	});
 
 	function validate(): AbsenceInput | null {
 		const next: Record<string, string> = {};
@@ -126,6 +144,7 @@
 				{#each ABSENCE_KINDS as option (option)}<option value={option}>{absenceKindLabel(option)}</option>{/each}
 			</Select>
 			{#if kind === 'excused'}<p class="text-xs text-muted-foreground" data-testid="absence-excused-hint">{t('absence.kind_excused_hint')}</p>{/if}
+			{#if kind === 'excused' && schoolPlanned}<p class="text-xs font-medium text-amber-900 dark:text-amber-200" data-testid="absence-school-hint">{t('school.excused_hint')}</p>{/if}
 		</div>
 		<div class="flex flex-col gap-1.5">
 			{#if hasApprovalWorkflow(kind)}

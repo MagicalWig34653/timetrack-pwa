@@ -20,6 +20,7 @@
 	} from '#lib/time/continue.js';
 	import { newEventId, retryOnNetworkError } from '#lib/time/idempotent.js';
 	import { kindLabel, SEGMENT_KINDS } from '#lib/time/labels.js';
+	import { workAtSchoolPlace } from '#lib/time/school.js';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import SquareIcon from '@lucide/svelte/icons/square';
@@ -31,6 +32,7 @@
 		timeZone,
 		onchange,
 		last = null,
+		preset = null,
 		retryDelayMs = 400
 	}: {
 		running: Segment | null;
@@ -42,6 +44,8 @@
 		onchange: (segment: Segment | null, stopped?: Segment) => void;
 		/** the finished segment that "Fortführen" would reopen (latest of today), if any */
 		last?: Segment | null;
+		/** pre-selection from today's plan (school plan: kind school at the school place) until the user picks something */
+		preset?: { kind: SegmentKind; placeId: string } | null;
 		retryDelayMs?: number;
 	} = $props();
 
@@ -49,6 +53,17 @@
 	let kind = $state<SegmentKind>('work');
 	let pending = $state(false);
 	let error = $state('');
+	/** the user changed place or kind: a later plan load must not overwrite the choice */
+	let touched = false;
+	/** work at a place of kind school waits for a confirmation (docs/ux/schulzeit.md, way D) */
+	let confirmSchool = $state(false);
+
+	$effect(() => {
+		if (preset && !touched && !running) {
+			kind = preset.kind;
+			placeId = preset.placeId;
+		}
+	});
 	let notice = $state('');
 	// One id per click intent: kept across automatic retries so the server can deduplicate.
 	let eventId: string | null = null;
@@ -97,12 +112,21 @@
 
 	function pickPlace(event: Event) {
 		placeId = (event.currentTarget as HTMLSelectElement).value;
+		touched = true;
+		confirmSchool = false;
 		const place = places.find((p) => p.id === placeId);
 		if (place?.defaultSegmentKind) kind = place.defaultSegmentKind;
 	}
 
-	async function toggle() {
+	const selectedPlace = $derived(places.find((p) => p.id === placeId));
+
+	async function toggle(confirmed = false) {
 		if (pending) return;
+		if (!running && !confirmed && workAtSchoolPlace(kind, selectedPlace)) {
+			confirmSchool = true;
+			return;
+		}
+		confirmSchool = false;
 		pending = true;
 		error = '';
 		eventId = newEventId();
@@ -170,17 +194,26 @@
 				</div>
 				<div class="flex flex-col gap-1.5">
 					<Label for="timer-kind">{t('timer.kind')}</Label>
-					<Select id="timer-kind" bind:value={kind} disabled={pending}>
+					<Select id="timer-kind" bind:value={kind} onchange={() => { touched = true; confirmSchool = false; }} disabled={pending}>
 						{#each SEGMENT_KINDS as option (option)}<option value={option}>{kindLabel(option)}</option>{/each}
 					</Select>
 				</div>
 			</div>
 		{/if}
 		<div>
-			<Button size="lg" class="w-full sm:w-auto" variant={running ? 'destructive' : 'default'} onclick={toggle} disabled={pending} aria-busy={pending}>
+			<Button size="lg" class="w-full sm:w-auto" variant={running ? 'destructive' : 'default'} onclick={() => toggle()} disabled={pending} aria-busy={pending}>
 				{#if running}<SquareIcon />{t('timer.stop')}{:else}<PlayIcon />{t('timer.start')}{/if}
 			</Button>
 		</div>
+		{#if confirmSchool && !running}
+			<Alert variant="warning" data-testid="timer-school-confirm">
+				<p>{t('school.timer_confirm', { place: selectedPlace?.name ?? '' })}</p>
+				<div class="mt-2 flex flex-wrap gap-2">
+					<Button size="sm" onclick={() => { kind = 'school'; void toggle(true); }}>{t('school.timer_confirm_school')}</Button>
+					<Button size="sm" variant="outline" onclick={() => toggle(true)}>{t('school.timer_confirm_work')}</Button>
+				</div>
+			</Alert>
+		{/if}
 		{#if !running && last?.endedAt}
 			<div class="flex flex-col gap-2 border-t pt-4" data-testid="continue-panel">
 				{#if longGap}

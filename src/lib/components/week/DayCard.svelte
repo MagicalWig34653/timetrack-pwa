@@ -16,6 +16,8 @@
 	import { BLOCK_KIND_CLASSES, blockKindLabel } from '#lib/planning/labels.js';
 	import { listsBlocks } from '#lib/week/plan-blocks.js';
 	import { offDayBookingHint } from '#lib/time/off-day-booking.js';
+	import { plannedSchoolWithoutBooking } from '#lib/time/school.js';
+	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
 
 	/** One day of the week overview: weekday and date, mark, hours, worked/planned/target bar, balance, first start to last end. */
 	let { day, timeZone, href = `/time/${day.date}`, selected = false, review = false, vacation = null, onselect }: { day: TimeWeekDay; timeZone: string; /** vacation entries of this day from the absence list; null = not loaded (fall back to the week's own absences) */ vacation?: VacationEntry[] | null; href?: string; selected?: boolean; /** has entries that need a check */ review?: boolean; onselect?: () => void } = $props();
@@ -29,6 +31,7 @@
 
 	const hours = $derived(dayHours(day));
 	const offHint = $derived(offDayBookingHint(day));
+	const schoolUnbooked = $derived(plannedSchoolWithoutBooking(day));
 	const bars = $derived(barShares(day));
 	const listed = $derived(vacation !== null);
 	// a named holiday on a holiday-marked day replaces the plain "Feiertag" chip; half company days and free days get the name next to the mark
@@ -126,6 +129,7 @@
 		{#if day.planActualDifferenceSeconds !== null && day.planActualDifferenceSeconds !== undefined}
 			<span title={t('weekview.plan_diff_title')} data-testid="day-plan-diff"><StatusChip tone="neutral" dot={false}>{t('weekview.plan_diff', { delta: day.planActualDifferenceSeconds === 0 ? '±0' : timeDisplay.delta(day.planActualDifferenceSeconds) })}</StatusChip></span>
 		{/if}
+		{#if schoolUnbooked}<span class="inline-flex min-h-5 items-start gap-1 rounded-lg bg-amber-500/15 px-2 py-0.5 text-xs leading-tight font-medium text-amber-900 dark:text-amber-200" data-testid="day-school-unbooked"><GraduationCap class="mt-px size-3 shrink-0" aria-hidden="true" />{t('school.planned_not_booked')}</span>{/if}
 		{#if offHint}<span title={offHint} data-testid="day-off-booking"><StatusChip tone="neutral" dot={false}>{t('weekview.off_booking')}</StatusChip></span>{/if}
 		{#if review}<StatusChip tone="warning" dot={false}>{t('segments.needs_review')}</StatusChip>{/if}
 		{#if showMode && day.planMode}<span class="text-muted-foreground">{planModeLabel(day.planMode)}</span>{/if}

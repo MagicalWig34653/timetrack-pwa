@@ -5,7 +5,10 @@ richtig.“ Nur Analyse und Vorschlag, **noch kein Umbau**. Lino entscheidet per
 
 Arbeitsweise: Heuristische Prüfung nach Nielsen (Sichtbarkeit des Systemzustands, Fehlervermeidung, Konsistenz, Erkennen statt
 Erinnern) plus Durchspielen jedes Wegs im Mock-Build. In dieser Umgebung gibt es keinen eigenen UX-Skill (nur Design- und
-Artefakt-Skills), daher ohne Skill-Unterstützung. Durchspiel-Test: `e2e-mock/ux-school-paths.spec.ts` (Screenshots mit
+Artefakt-Skills), daher ohne Skill-Unterstützung.
+
+**Umgesetzt am 26.11.2026** (Karte 218E0EBC): siehe [handoffs/SCHULZEIT.md](../handoffs/SCHULZEIT.md). Die Tabelle unten
+beschreibt den Stand vor dem Umbau. Durchspiel-Test: `e2e-mock/ux-school-paths.spec.ts` (Screenshots mit
 `SCREENSHOT_DIR=docs/ux/img`). Der Mock rechnet die Schulregel wie das Backend (ADR-0004, ADR-0028).
 
 ## Fachliche Regel (was „richtig“ heißt)
