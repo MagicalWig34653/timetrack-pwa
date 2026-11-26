@@ -1030,6 +1030,20 @@
 	.wg-col[data-off] {
 		background-color: color-mix(in srgb, var(--muted) 55%, transparent);
 	}
+	/* Marked days (vacation, sick, excused, holiday) stay editable (ADR-0035) but must stay visible: a calm tint in the colour
+	   of the header chip, no lock hatching. Without it a marked column looked like an ordinary working day (bug 26.11.2026). */
+	.wg-col[data-blocked='vacation'] {
+		background-color: color-mix(in srgb, #0ea5e9 14%, transparent);
+	}
+	.wg-col[data-blocked='sick'] {
+		background-color: color-mix(in srgb, #f43f5e 11%, transparent);
+	}
+	.wg-col[data-blocked='excused'] {
+		background-color: color-mix(in srgb, #14b8a6 11%, transparent);
+	}
+	.wg-col[data-blocked='holiday'] {
+		background-color: color-mix(in srgb, #f59e0b 14%, transparent);
+	}
 	/* Planned or requested vacation: lighter dashed hatching, still editable */
 	.wg-col[data-vacation] {
 		background-image: repeating-linear-gradient(135deg, color-mix(in srgb, #0ea5e9 14%, transparent) 0 6px, transparent 6px 14px);
