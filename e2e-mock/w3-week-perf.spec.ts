@@ -50,18 +50,31 @@ test('week switch: no blank state, adjacent weeks prefetched, static data not re
 
 test('week switch to an unfetched week keeps the previous week visible and dimmed', async ({ browser }) => {
 	const { page } = await loginAsAdmin(browser, { viewport: { width: 1280, height: 900 } });
+	const weeks: string[] = [];
+	page.on('requestfinished', (r) => { if (r.url().includes('/api/v1/time/weeks/')) weeks.push(r.url()); });
 	await page.goto('/week');
-	await expect(page.getByTestId('week-overview')).toBeVisible();
-	const first = await page.getByTestId('week-overview').getAttribute('data-week');
+	const overview = page.getByTestId('week-overview');
+	await expect(overview).toBeVisible();
+	const first = await overview.getAttribute('data-week');
+	// shown week plus both prefetched neighbours: the first step back is then answered from the cache
+	await expect.poll(() => weeks.length, { timeout: 10_000 }).toBeGreaterThanOrEqual(3);
+	// hold every further week request until released: the week two steps back stays unfetched, however slow the machine is
+	let release!: () => void;
+	const released = new Promise<void>((resolve) => (release = resolve));
 	await page.route('**/api/v1/time/weeks/**', async (route) => {
-		await new Promise((resolve) => setTimeout(resolve, 1500));
+		await released;
 		await route.continue();
 	});
-	await page.getByTestId('week-nav').getByTestId('week-prev').click();
-	await page.getByTestId('week-nav').getByTestId('week-prev').click();
-	await expect(page.getByTestId('week-overview')).toHaveAttribute('aria-busy', 'true');
-	await expect(page.getByTestId('week-overview')).toHaveAttribute('data-week', /^2026-W\d+$/);
+	const prev = page.getByTestId('week-nav').getByTestId('week-prev');
+	await prev.click();
+	// the link's href follows the URL: only click again once the first step is on screen, else both clicks go one week back
+	await expect(overview).not.toHaveAttribute('data-week', first!);
+	const second = await overview.getAttribute('data-week');
+	await prev.click();
+	await expect(overview).toHaveAttribute('aria-busy', 'true');
+	await expect(overview).toHaveAttribute('data-week', second!);
 	await expect(page.getByTestId('week-skeleton')).toHaveCount(0);
-	await expect(page.getByTestId('week-overview')).not.toHaveAttribute('data-week', first!, { timeout: 10_000 });
-	await expect(page.getByTestId('week-overview')).toHaveAttribute('aria-busy', 'false');
+	release();
+	await expect(overview).not.toHaveAttribute('data-week', second!, { timeout: 10_000 });
+	await expect(overview).toHaveAttribute('aria-busy', 'false');
 });

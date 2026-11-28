@@ -6,6 +6,7 @@ describe('navigation helpers', () => {
 		expect(breadcrumbs('/')).toEqual([{ label: 'nav.home' }]);
 		expect(breadcrumbs('/settings/appearance').map((c) => c.label)).toEqual(['nav.home', 'nav.settings', 'nav.appearance']);
 		expect(breadcrumbs('/time/2026-10-15').map((c) => c.label ?? c.text)).toEqual(['nav.home', 'nav.week', '2026-10-15']);
+		expect(breadcrumbs('/time/school-check').map((c) => c.label ?? c.text)).toEqual(['nav.home', 'nav.week', 'school.check_title']);
 	});
 	it('searches settings by title and keyword', () => {
 		const titles = (key: string) => key;

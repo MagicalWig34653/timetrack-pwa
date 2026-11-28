@@ -224,13 +224,11 @@
 		}
 	});
 
-	const ghostClass = (date: string) => {
-		if (!ghost?.dates.has(date)) return '';
-		const severity = ghost.severity.get(date);
-		if (severity === 'block') return 'ring-2 ring-inset ring-destructive bg-destructive/15';
-		if (severity === 'warn') return 'ring-2 ring-inset ring-amber-500 bg-amber-500/15';
-		return 'ring-2 ring-inset ring-primary bg-primary/15';
-	};
+	// Selection and drag preview are unlayered rules (see <style>): they must win over the cell tints (.cell-vac-*, .cell-holiday,
+	// state tints) and the hover tint, otherwise a marked vacation or holiday day looks unmarked (bug 26.11.2026).
+	const ghostClass = (date: string) => (ghost?.dates.has(date) ? 'cell-ghost' : '');
+	const ghostSeverity = (date: string) => (ghost?.dates.has(date) ? (ghost.severity.get(date) ?? 'ok') : undefined);
+	const selectedClass = (date: string) => (selected.has(date) ? 'cell-selected' : '');
 	const base = 'relative flex h-full w-full flex-col gap-1 px-1.5 py-1 text-left shadow-[inset_1px_0_0_var(--grid-line)] transition-colors duration-150 hover:bg-foreground/[0.06] focus-visible:z-10 focus-visible:ring-[3px] focus-visible:ring-ring/60 focus-visible:outline-none focus-visible:ring-inset select-none';
 	/** Calm per-state tints of the cell; the legend keeps the stronger tile colours. */
 	const TINT: Record<DayWorkState, string> = { work: '', free: 'bg-muted/60', vacation_booked: 'bg-sky-500/20', vacation_planned: 'bg-sky-500/12', sick: 'bg-rose-500/10', absence: 'bg-violet-500/10' };
@@ -273,7 +271,8 @@
 					<div role="gridcell" class="min-h-0 min-w-0">
 						<button
 							type="button"
-							class="{base} {TINT[stateOf(info)]} {isOtherMonth(date) ? 'bg-muted/40' : ''} {cellClass(cell)} {selected.has(date) ? 'bg-primary/10 ring-2 ring-primary ring-inset' : ''} {ghostClass(date)}"
+							class="{base} {TINT[stateOf(info)]} {isOtherMonth(date) ? 'bg-muted/40' : ''} {cellClass(cell)} {selectedClass(date)} {ghostClass(date)}"
+							data-ghost={ghostSeverity(date)}
 							aria-label="{visibleText(date, shown.pills, shown.more)}, {describe(info)}"
 							data-work-state={stateOf(info)}
 							aria-pressed={selected.has(date)}
@@ -341,7 +340,8 @@
 					<div role="gridcell" class="p-px">
 						<button
 							type="button"
-							class="relative flex h-16 w-full flex-col items-center gap-1 rounded-lg px-0.5 pt-1.5 select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {state === 'free' ? 'bg-muted/70' : ''} {state === 'sick' ? 'bg-rose-500/10' : ''} {state === 'vacation_booked' ? 'bg-sky-500/20' : ''} {state === 'vacation_planned' ? 'bg-sky-500/12' : ''} {cellClass(pcell)} {isOtherMonth(date) ? 'bg-muted/20' : ''} {selected.has(date) ? 'ring-2 ring-primary ring-inset bg-primary/10' : ''} {ghostClass(date)}"
+							class="relative flex h-16 w-full flex-col items-center gap-1 rounded-lg px-0.5 pt-1.5 select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none {state === 'free' ? 'bg-muted/70' : ''} {state === 'sick' ? 'bg-rose-500/10' : ''} {state === 'vacation_booked' ? 'bg-sky-500/20' : ''} {state === 'vacation_planned' ? 'bg-sky-500/12' : ''} {cellClass(pcell)} {isOtherMonth(date) ? 'bg-muted/20' : ''} {selectedClass(date)} {ghostClass(date)}"
+							data-ghost={ghostSeverity(date)}
 							aria-label={describe(info)}
 							aria-pressed={selected.has(date)}
 							data-date={date}
@@ -430,6 +430,25 @@
 	}
 	:global(.cell-holiday) {
 		background-color: color-mix(in srgb, #f59e0b 9%, transparent);
+	}
+	/* Selected and drag-preview days: one look on every day, above the cell tints and the hover tint (unlayered and later). */
+	:global(.cell-selected),
+	:global(.cell-selected:hover) {
+		background-color: color-mix(in srgb, var(--primary) 16%, transparent);
+		box-shadow: inset 0 0 0 2px var(--primary);
+	}
+	:global(.cell-ghost),
+	:global(.cell-ghost:hover) {
+		background-color: color-mix(in srgb, var(--primary) 20%, transparent);
+		box-shadow: inset 0 0 0 2px var(--primary);
+	}
+	:global(.cell-ghost[data-ghost='warn']) {
+		background-color: color-mix(in srgb, #f59e0b 18%, transparent);
+		box-shadow: inset 0 0 0 2px #f59e0b;
+	}
+	:global(.cell-ghost[data-ghost='block']) {
+		background-color: color-mix(in srgb, var(--destructive) 18%, transparent);
+		box-shadow: inset 0 0 0 2px var(--destructive);
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.pill {

@@ -4,6 +4,7 @@ import { holidayHint } from '#lib/planning/company-days.js';
 import { absenceKindLabel } from '#lib/planning/labels.js';
 import { formatDateLong } from '#lib/time/dates.js';
 import { offDayBookingHint } from '#lib/time/off-day-booking.js';
+import { plannedSchoolWithoutBooking } from '#lib/time/school.js';
 import { absenceWarning, chipAbsences } from './absences.js';
 import { blocksText, listsBlocks } from './plan-blocks.js';
 import { vacationTooltip, type VacationEntry } from './vacation.js';
@@ -71,6 +72,7 @@ export function dayAriaLabel(day: TimeWeekDay, vacation: VacationEntry[] | null 
 	}
 	const offHint = offDayBookingHint(day);
 	if (offHint) parts.push(offHint);
+	if (plannedSchoolWithoutBooking(day)) parts.push(t('school.planned_not_booked'));
 	if (day.provisional && !day.isFuture) parts.push(t('weekview.provisional'));
 	return parts.join(', ');
 }

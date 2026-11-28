@@ -29,6 +29,7 @@
 	import { recalledWeek, rememberWeek } from '#lib/week/last-week.js';
 	import { ABSENCE_CLASSES, absenceKindLabel, absenceStatusLabel } from '#lib/planning/labels.js';
 	import { isEmptyWeek, summarySentence } from '#lib/week/overview.js';
+	import { plannedSchoolWithoutBooking } from '#lib/time/school.js';
 	import Briefcase from '@lucide/svelte/icons/briefcase';
 	import CalendarRange from '@lucide/svelte/icons/calendar-range';
 	import Car from '@lucide/svelte/icons/car';
@@ -159,6 +160,8 @@
 	const planDiff = $derived(workedHours - plannedToDate);
 	const runs = $derived(absenceRuns(allDays));
 	const openAbsence = $derived(hasOpenAbsence(allDays));
+	// past days of this week that "Schultage prüfen" would list (plan without school time, old school credit without times)
+	const schoolChecks = $derived(allDays.filter((d) => d.date < today && (plannedSchoolWithoutBooking(d) || (d.mark === 'school' && d.schoolSeconds === 0))).length);
 </script>
 
 <PageHeader title={t('weekview.title')} description={t('weekview.description')} />
@@ -202,6 +205,13 @@
 			<Alert variant="warning" data-testid="review-banner">
 				{t('segments.review_overview', { count: reviewDates.length })}
 				<button type="button" class="underline" onclick={toggleReview} data-testid="review-toggle">{reviewOnly ? t('segments.show_all') : t('segments.show_review_only')}</button>
+			</Alert>
+		{/if}
+
+		{#if schoolChecks > 0}
+			<Alert variant="warning" data-testid="school-check-banner">
+				<span class="inline-flex flex-wrap items-center gap-2"><GraduationCap class="size-4" aria-hidden="true" />{t('school.check_week_hint')}
+					<a class="underline" href="/time/school-check" data-testid="school-check-link">{t('school.check_link', { count: schoolChecks })}</a></span>
 			</Alert>
 		{/if}
 

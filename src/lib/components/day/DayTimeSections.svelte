@@ -5,6 +5,7 @@
 	import Field from '#lib/components/app/Field.svelte';
 	import DaySummary from '#lib/components/time/DaySummary.svelte';
 	import DayTimeline from '#lib/components/time/DayTimeline.svelte';
+	import SchoolDayBooking from '#lib/components/time/SchoolDayBooking.svelte';
 	import SegmentForm from '#lib/components/time/SegmentForm.svelte';
 	import SegmentList from '#lib/components/time/SegmentList.svelte';
 	import Unavailable from '#lib/components/time/Unavailable.svelte';
@@ -19,7 +20,8 @@
 	import { continuableSegment, continueErrorMessage, continueSegment, gapSeconds } from '#lib/time/continue.js';
 	import { dayBounds, todayLocal } from '#lib/time/dates.js';
 	import { formatDuration, parseDuration } from '#lib/time/format.js';
-	import { DAY_MARKS, markLabel } from '#lib/time/labels.js';
+	import { markLabel } from '#lib/time/labels.js';
+	import { dayMarkOptions, needsSchoolTimes, schoolEvaluationText, schoolPlace } from '#lib/time/school.js';
 	import { toLoadState, type LoadState } from '#lib/time/load.js';
 	import { zoneStore } from '#lib/time/zone.svelte.js';
 	import Pencil from '@lucide/svelte/icons/pencil';
@@ -61,6 +63,11 @@
 
 	const revisionCount = $derived(segments.reduce((sum, s) => sum + (s.revisions ?? 0), 0));
 	const activeSegments = $derived(segments.filter((s) => !s.voided));
+	// "Schultag buchen" is the one way to record school (docs/ux/schulzeit.md); the old mark stays only where it is stored
+	const markOptions = $derived(dayMarkOptions(day?.mark ?? 'none'));
+	const schoolText = $derived(day ? schoolEvaluationText(day, segments) : null);
+	const creditWithoutTimes = $derived(needsSchoolTimes(day?.mark, segments));
+	const offerSchool = $derived(!creditWithoutTimes && !activeSegments.some((s) => s.kind === 'school') && schoolPlace(places) !== null);
 
 	/** Only the latest load may take over the state: a late answer for a previous date must not land under the new one. */
 	let loadSeq = 0;
@@ -252,6 +259,12 @@
 		{#if notice}<Alert variant="success">{notice}</Alert>{/if}
 		{#if continueError}<Alert variant="destructive">{continueError}</Alert>{/if}
 		{#if reviewError}<Alert variant="destructive">{reviewError}</Alert>{/if}
+		{#if creditWithoutTimes}
+			<Alert variant="warning" data-testid="school-credit-hint">
+				<p>{t('school.credit_without_times')}</p>
+				<div class="mt-2"><SchoolDayBooking {date} {places} {timeZone} label={t('school.book_times')} size="sm" onsaved={saved} /></div>
+			</Alert>
+		{/if}
 
 		<Card>
 			<CardHeader>
@@ -259,6 +272,7 @@
 				<CardDescription>{t('day_detail.evaluation_hint')}</CardDescription>
 			</CardHeader>
 			<CardContent class="flex flex-col gap-5">
+				{#if schoolText}<p class="text-sm font-medium" data-testid="school-evaluation">{schoolText}</p>{/if}
 				{#if day}<DaySummary evaluation={day} />{/if}
 				<DayTimeline {date} {timeZone} {segments} evaluation={day} {now} />
 			</CardContent>
@@ -299,7 +313,10 @@
 				{#if adding}
 					<SegmentForm {date} {places} {timeZone} onsaved={() => saved(t('day_detail.created'))} oncancel={cancelForm} />
 				{:else}
-					<div><Button variant="outline" onclick={() => { adding = true; editingId = null; voidingId = null; }}>{t('day_detail.add')}</Button></div>
+					<div class="flex flex-wrap items-start gap-2">
+						{#if offerSchool}<SchoolDayBooking {date} {places} {timeZone} onsaved={saved} />{/if}
+						<Button variant="outline" onclick={() => { adding = true; editingId = null; voidingId = null; }}>{t('day_detail.add')}</Button>
+					</div>
 				{/if}
 				{#if activeSegments.length === 0 && !adding}
 					<p class="text-xs text-muted-foreground">{t('day_detail.no_invention')}</p>
@@ -319,7 +336,7 @@
 						<div class="flex flex-col gap-1.5">
 							<Label for="day-mark">{t('day_prefs.mark')}</Label>
 							<Select id="day-mark" bind:value={mark} disabled={prefsPending}>
-								{#each DAY_MARKS as option (option)}<option value={option}>{markLabel(option)}</option>{/each}
+								{#each markOptions as option (option)}<option value={option}>{markLabel(option)}</option>{/each}
 							</Select>
 						</div>
 						{#if mark !== 'none'}

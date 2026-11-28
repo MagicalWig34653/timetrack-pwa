@@ -346,3 +346,31 @@ describe('mock absence status per kind (contract 0.36.0)', () => {
 		expect(await code(api.createAbsence({ ...input('sick', 'bogus'), startDate: '2026-11-09', endDate: '2026-11-09' }))).toBe('400:bad_request');
 	});
 });
+
+describe('mock demo seed near the turn of the year', () => {
+	// The /absences list shows one year. The seeded absences span about eleven weeks around today, so near New Year one
+	// of them used to fall into the neighbour year and the list showed 3 instead of 4 rows (mock E2E red from late November).
+	for (const now of ['2026-11-26T09:00:00Z', '2026-12-30T09:00:00Z', '2027-01-04T09:00:00Z', '2027-02-01T09:00:00Z']) {
+		it(`keeps all four seeded absences in the current year (${now.slice(0, 10)})`, async () => {
+			await login({ now: () => Date.parse(now) });
+			const year = now.slice(0, 4);
+			const list = await api.listAbsences(`${year}-01-01`, `${year}-12-31`);
+			expect(list).toHaveLength(4);
+			expect(list.every((a) => a.startDate.startsWith(year) && a.endDate.startsWith(year))).toBe(true);
+			expect(list.filter((a) => a.kind === 'vacation' && a.status === 'planned')).toHaveLength(1);
+		});
+	}
+
+	it('leaves the seed unchanged in the middle of the year', async () => {
+		const list = await api.listAbsences('2026-01-01', '2026-12-31');
+		expect(list.map((a) => `${a.kind}:${a.startDate}`).sort()).toEqual(['sick:2026-09-28', 'vacation:2026-09-07', 'vacation:2026-10-26', 'vacation:2026-11-23'].sort());
+	});
+});
+
+it('moves only the absence that would leave the year (26.11.2026: planned vacation, the rest keeps its date)', async () => {
+	await login({ now: () => Date.parse('2026-11-26T09:00:00Z') });
+	const list = await api.listAbsences('2026-01-01', '2026-12-31');
+	expect(list.map((a) => `${a.kind}:${a.status}:${a.startDate}`).sort()).toEqual(
+		['vacation:taken:2026-10-19', 'sick:recorded:2026-11-09', 'vacation:approved:2026-12-07', 'vacation:planned:2026-12-28'].sort()
+	);
+});

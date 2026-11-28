@@ -443,10 +443,25 @@ export function createPlanningMock(deps: PlanningDeps) {
 		const add = (input: Partial<AbsenceInput> & Pick<AbsenceInput, 'kind' | 'startDate' | 'endDate' | 'status'>) => {
 			state.absences.push(withCount(accountId, { id: uuid(), version: 1, ...(normalize(input) as { input: AbsenceInput & { status: string } }).input }));
 		};
-		add({ kind: 'vacation', startDate: addDays(monday, -35), endDate: addDays(monday, -33), status: 'taken' });
-		add({ kind: 'sick', startDate: addDays(monday, -14), endDate: addDays(monday, -13), status: 'recorded', documentStatus: 'pending', documentReferenceStart: addDays(monday, -14), documentReferenceEnd: addDays(monday, -13), note: 'Erkältung' });
-		add({ kind: 'vacation', startDate: addDays(monday, 14), endDate: addDays(monday, 18), status: 'approved' });
-		add({ kind: 'vacation', startDate: addDays(monday, 42), endDate: addDays(monday, 44), halfDayEnd: true, status: 'planned' });
+		// The absences lie between monday-35 and monday+44. The /absences list shows one year, so near New Year an absence
+		// that would fall into the neighbour year moves by whole weeks into the current year (past the others); the rest stays.
+		const year = today.slice(0, 4);
+		const fit = (from: number, to: number): [string, string] => {
+			let shift = 0;
+			const span = () => [addDays(monday, from + shift), addDays(monday, to + shift)] as const;
+			const step = addDays(monday, to).slice(0, 4) > year ? -7 : 7;
+			const clashes = () => state.absences.some((a) => a.startDate <= span()[1] && span()[0] <= a.endDate);
+			while (span()[0].slice(0, 4) !== year || span()[1].slice(0, 4) !== year || (shift !== 0 && clashes())) shift += step;
+			return [...span()];
+		};
+		const [takenFrom, takenTo] = fit(-35, -33);
+		add({ kind: 'vacation', startDate: takenFrom, endDate: takenTo, status: 'taken' });
+		const [sickFrom, sickTo] = fit(-14, -13);
+		add({ kind: 'sick', startDate: sickFrom, endDate: sickTo, status: 'recorded', documentStatus: 'pending', documentReferenceStart: sickFrom, documentReferenceEnd: sickTo, note: 'Erkältung' });
+		const [approvedFrom, approvedTo] = fit(14, 18);
+		add({ kind: 'vacation', startDate: approvedFrom, endDate: approvedTo, status: 'approved' });
+		const [plannedFrom, plannedTo] = fit(42, 44);
+		add({ kind: 'vacation', startDate: plannedFrom, endDate: plannedTo, halfDayEnd: true, status: 'planned' });
 		state.customDays.push({ id: uuid(), kind: 'school_holiday', startDate: addDays(monday, 21), endDate: addDays(monday, 25), name: 'Berufsschulferien', source: 'custom' });
 		const put = (date: string, mode: PlanMode, start: string | null, end: string | null, breakMinutes: number | null, note: string | null = null) => {
 			const normalized = normalizePlanBody({ mode, note, plannedStart: start, plannedEnd: end, plannedBreakMinutes: breakMinutes });
