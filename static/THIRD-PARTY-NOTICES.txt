@@ -104,7 +104,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 
 ========================================================================
 Package: @lucide/svelte
-Version: 1.68.0
+Version: 1.75.0
 SPDX: ISC
 License file: LICENSE
 
@@ -210,7 +210,7 @@ SOFTWARE.
 
 ========================================================================
 Package: @sveltejs/kit
-Version: 3.1.1
+Version: 3.3.1
 SPDX: MIT
 License file: LICENSE
 
@@ -557,7 +557,7 @@ NOTICE (build/pdf.mjs header; no separate NOTICE file in npm package):
 
 ========================================================================
 Package: shadcn-svelte
-Version: 1.8.0
+Version: 1.8.1
 SPDX: MIT
 License file: LICENSE.md
 
@@ -587,7 +587,7 @@ SOFTWARE.
 
 ========================================================================
 Package: svelte
-Version: 5.57.3
+Version: 5.58.0
 SPDX: MIT
 License file: LICENSE.md
 
@@ -601,7 +601,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ========================================================================
 Package: tailwind-variants
-Version: 4.0.1
+Version: 4.0.2
 SPDX: MIT
 License file: LICENSE
 
@@ -629,7 +629,7 @@ SOFTWARE.
 
 ========================================================================
 Package: tailwindcss
-Version: 4.3.4
+Version: 4.3.5
 SPDX: MIT
 License file: LICENSE
 

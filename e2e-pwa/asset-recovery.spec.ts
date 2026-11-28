@@ -10,11 +10,22 @@ test('recovers once from an HTML answer for the entry script (stale document, ot
 	const context = await browser.newContext();
 	const page = await context.newPage();
 	let served = 0;
-	await page.route(entryScript, (route) => (served++ === 0 ? route.fulfill(htmlAnswer) : route.continue()));
+	// Every direct request of the page gets HTML, not only the first: the entry script is preloaded and then imported, and a
+	// one-time HTML answer let the import fetch it again and start the app without any recovery (flaky "controller" check).
+	await page.route(entryScript, (route) => {
+		served++;
+		return route.fulfill(htmlAnswer);
+	});
+	// start.js arrives after the preload of the entry script has already failed: Chromium then fetches the entry script again
+	await page.route('**/_app/immutable/entry/start.*.js', async (route) => {
+		await new Promise((resolve) => setTimeout(resolve, 750));
+		await route.continue();
+	});
 	await page.goto('/login');
 	await expect(page.getByRole('button', { name: 'Mit Passkey anmelden' })).toBeVisible({ timeout: 15_000 });
 	// the recovery registers a fresh service worker; the reload is served through it (page.route no longer sees it)
 	expect(served).toBeGreaterThanOrEqual(1);
+	expect(await page.evaluate(() => localStorage.getItem('tt.recovery'))).not.toBeNull();
 	expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
 	expect(await page.locator('#tt-recovery-fallback').count()).toBe(0);
 	await context.close();
